@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { EventEmitter } = require('events');
 const { getPool } = require('../db/pool');
-const { createMessage, isEnabled, buildSystemPrompt, getCreateParams } = require('../services/llm');
+const { createMessage, isEnabled, buildSystemPrompt, getCreateParams, isValidModel } = require('../services/llm');
 const { validate, getSchemaReminder } = require('../services/recipe-validator');
 const { fetchWebpage } = require('../services/web');
 const { webSearch, init: initSearch } = require('../services/search');
@@ -120,8 +120,22 @@ function chatRoutes(config) {
         send('rate_limit', { used: limit - remaining, limit });
       }
 
+      // Per-user model choice (saved via the settings modal); falls back to
+      // the server default for missing rows or stale/unknown saved ids.
+      let userModel = config.anthropicModel;
+      try {
+        const { rows: settingsRows } = await pool.query(
+          'SELECT preferences FROM user_settings WHERE user_id = $1',
+          [req.user.id]
+        );
+        const savedModel = settingsRows.length ? (settingsRows[0].preferences || {}).model : null;
+        if (isValidModel(savedModel)) userModel = savedModel;
+      } catch (err) {
+        log.warn('chat', 'Failed to load user model preference', { message: err.message });
+      }
+
       runBackgroundStream(
-        userToken, config, pool, convId, replyId, req.user.id, config.anthropicModel,
+        userToken, config, pool, convId, replyId, req.user.id, userModel,
         preferences, send, userMsgId
       );
 

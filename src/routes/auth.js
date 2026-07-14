@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const { getPool } = require('../db/pool');
-const { isEnabled, llmMode } = require('../services/llm');
+const { isEnabled, llmMode, MODELS, DEFAULT_MODEL, isValidModel } = require('../services/llm');
 const log = require('../services/logger');
 
 // Identity comes from the platform JWT (see src/middleware/auth.js).
@@ -15,13 +15,22 @@ function authRoutes(config) {
         'SELECT preferences FROM user_settings WHERE user_id = $1',
         [req.user.id]
       );
+      const prefs = rows.length ? rows[0].preferences || {} : {};
+      const defaultModel = isValidModel(config.anthropicModel) ? config.anthropicModel : DEFAULT_MODEL;
+      const effectiveModel = isValidModel(prefs.model) ? prefs.model : defaultModel;
       res.json({
         user: {
           id: req.user.id,
           username: req.user.username,
-          preferences: rows.length ? rows[0].preferences || {} : {},
+          preferences: prefs,
         },
-        llm: { enabled: isEnabled(config), mode: llmMode(config) },
+        llm: {
+          enabled: isEnabled(config),
+          mode: llmMode(config),
+          models: MODELS,
+          model: effectiveModel,
+          defaultModel,
+        },
         staging: config.isStaging,
       });
     } catch (err) {
@@ -31,13 +40,19 @@ function authRoutes(config) {
   });
 
   router.patch('/api/auth/preferences', async (req, res) => {
-    const { diet, complexity, serving, tempUnit } = req.body;
+    const { diet, complexity, serving, tempUnit, model } = req.body;
+
+    if (model != null && !isValidModel(model)) {
+      return res.status(400).json({ error: 'Unknown model' });
+    }
+
     const prefs = {
       diet: diet || null,
       complexity: complexity || 'normal',
       serving: serving || 'normal',
       tempUnit: tempUnit === 'F' ? 'F' : 'C',
     };
+    if (isValidModel(model)) prefs.model = model;
 
     try {
       await pool.query(

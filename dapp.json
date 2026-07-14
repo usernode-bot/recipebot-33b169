@@ -20,9 +20,9 @@
     },
     {
       "key": "ANTHROPIC_MODEL",
-      "description": "Claude model id used for recipe chat",
+      "description": "Default Claude model id for recipe chat (users can pick their own in App settings)",
       "required": false,
-      "default": "claude-haiku-4-5-20251001"
+      "default": "claude-sonnet-5"
     },
     {
       "key": "THINKING_ENABLED",
@@ -59,6 +59,16 @@
       "name": "Sidebar shows staging demo conversation",
       "path": "/",
       "expectText": "Staging demo"
+    },
+    {
+      "name": "User menu button renders",
+      "path": "/",
+      "expectSelector": "#user-menu-btn"
+    },
+    {
+      "name": "Settings modal exists",
+      "path": "/",
+      "expectSelector": "#settings-modal"
     }
   ]
 }

@@ -169,7 +169,20 @@
       </button>
       <button id="shortcuts-help-btn" class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-sm font-mono font-bold" title="Keyboard shortcuts">?</button>
       <span id="rate-limit-display" class="text-xs text-zinc-500 hidden sm:inline"></span>
-      <span id="username-display" class="text-xs text-zinc-400 dark:text-zinc-500 hidden sm:inline"></span>
+      <div class="relative">
+        <button id="user-menu-btn" class="hidden items-center gap-1.5 p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" title="Account menu" aria-haspopup="true" aria-expanded="false">
+          <svg class="w-5 h-5 sm:hidden text-zinc-400 dark:text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A10.97 10.97 0 0112 15c2.5 0 4.847.826 6.879 2.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <span id="username-display" class="text-xs text-zinc-400 dark:text-zinc-500 hidden sm:inline"></span>
+          <svg class="w-3 h-3 hidden sm:block text-zinc-400 dark:text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+        <div id="user-menu" class="hidden absolute right-0 top-full mt-1 z-40 w-44 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg py-1">
+          <button id="open-settings" class="w-full text-left px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">App settings</button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -351,7 +364,24 @@
   </div>
   <script src="/js/feedback.js"></script>
 
+  <!-- App settings modal (opened from the user menu) -->
+  <div id="settings-modal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div class="absolute inset-0 bg-black/50" id="settings-backdrop"></div>
+    <div class="relative bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-semibold">App Settings</h3>
+        <button id="settings-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>
+      </div>
+      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-2">AI model</p>
+      <div id="model-options" class="space-y-2">
+        <!-- Populated by settings.js from /api/auth/me -->
+      </div>
+      <div id="settings-status" class="text-sm mt-3 hidden"></div>
+    </div>
+  </div>
+
   <script src="/js/app.js"></script>
+  <script src="/js/settings.js"></script>
   <script src="/js/sidebar.js"></script>
   <script src="/js/chat.js"></script>
   <script src="/js/recipe.js"></script>
