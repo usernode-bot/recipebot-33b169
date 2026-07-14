@@ -8,6 +8,7 @@ window.App = {
     diet: null,
     complexity: 'normal',
     serving: 'normal',
+    model: null,
   },
 };
 
@@ -52,6 +53,11 @@ window.HashParams = {
       const usernameEl = document.getElementById('username-display');
       if (usernameEl && data.user.username) {
         usernameEl.textContent = data.user.username;
+        const menuBtn = document.getElementById('user-menu-btn');
+        if (menuBtn) {
+          menuBtn.classList.remove('hidden');
+          menuBtn.classList.add('inline-flex');
+        }
       }
 
       if (data.user.preferences) {
@@ -61,6 +67,8 @@ window.HashParams = {
           complexity: data.user.preferences.complexity || 'normal',
           serving: data.user.preferences.serving || 'normal',
           tempUnit,
+          // Effective model (saved choice validated server-side, else default)
+          model: (data.llm && data.llm.model) || null,
         };
         if (typeof Recipe !== 'undefined') {
           Recipe.useCelsius = tempUnit !== 'F';

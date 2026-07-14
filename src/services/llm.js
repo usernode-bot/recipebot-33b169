@@ -1,5 +1,40 @@
 const log = require('./logger');
 
+// User-selectable chat models. Alias IDs only (no date suffixes) — this list
+// is the single source of truth for the settings picker, the preferences
+// PATCH validator, and the per-message model resolution in the chat route.
+const MODELS = [
+  {
+    id: 'claude-sonnet-5',
+    label: 'Claude Sonnet 5',
+    description: 'Best all-around quality. Recommended.',
+    default: true,
+  },
+  {
+    id: 'claude-haiku-4-5',
+    label: 'Claude Haiku 4.5',
+    description: 'Fastest and cheapest — good for simple recipes.',
+  },
+  {
+    id: 'claude-opus-4-8',
+    label: 'Claude Opus 4.8',
+    description: 'Most capable, slower and uses more of your daily AI budget.',
+  },
+];
+
+const DEFAULT_MODEL = MODELS.find((m) => m.default).id;
+
+function isValidModel(id) {
+  return typeof id === 'string' && MODELS.some((m) => m.id === id);
+}
+
+// Haiku 4.5 (and older dated snapshots) still take the pre-4.6 thinking shape
+// `{type: 'enabled', budget_tokens}`. Sonnet 5 / Opus 4.8 reject budget_tokens
+// and non-default sampling params with a 400 — they use adaptive thinking.
+function usesLegacyThinking(model) {
+  return /haiku|-4-5-|sonnet-4-5|opus-4-5/.test(model);
+}
+
 // LLM access resolution order:
 //   1. Platform LLM proxy (production; billed to the user's AI budget)
 //   2. Direct Anthropic API via optional ANTHROPIC_API_KEY secret
@@ -247,8 +282,9 @@ function buildMessages(history) {
 }
 
 function getCreateParams(config, messages, systemPrompt, { model } = {}) {
+  const resolvedModel = model || config.anthropicModel;
   const params = {
-    model: model || config.anthropicModel,
+    model: resolvedModel,
     max_tokens: 8192,
     system: systemPrompt,
     tools: TOOLS,
@@ -256,11 +292,15 @@ function getCreateParams(config, messages, systemPrompt, { model } = {}) {
   };
 
   if (config.thinkingEnabled) {
-    params.thinking = {
-      type: 'enabled',
-      budget_tokens: config.thinkingBudget,
-    };
-    params.temperature = 1;
+    if (usesLegacyThinking(resolvedModel)) {
+      params.thinking = {
+        type: 'enabled',
+        budget_tokens: config.thinkingBudget,
+      };
+      params.temperature = 1;
+    } else {
+      params.thinking = { type: 'adaptive' };
+    }
   }
 
   return params;
@@ -271,6 +311,9 @@ module.exports = {
   llmMode,
   createMessage,
   TOOLS,
+  MODELS,
+  DEFAULT_MODEL,
+  isValidModel,
   buildSystemPrompt,
   buildMessages,
   getCreateParams,
