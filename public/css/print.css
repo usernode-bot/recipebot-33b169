@@ -1,0 +1,77 @@
+@media print {
+  header,
+  #sidebar,
+  #sidebar-overlay,
+  #chat-panel,
+  #mobile-tabs,
+  #save-recipe-btn,
+  .servings-btn,
+  button {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+  }
+
+  #recipe-panel {
+    border: none !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  #recipe-content {
+    padding: 0 !important;
+  }
+
+  #recipe-display {
+    display: block !important;
+  }
+
+  #recipe-empty {
+    display: none !important;
+  }
+
+  details {
+    display: block !important;
+  }
+
+  details[open] summary {
+    display: none;
+  }
+
+  details summary {
+    display: none;
+  }
+
+  details > div {
+    display: block !important;
+  }
+
+  .diff-removed,
+  .diff-added {
+    background: none !important;
+  }
+
+  .diff-removed {
+    color: #999 !important;
+    text-decoration: line-through;
+  }
+
+  .diff-added {
+    color: black !important;
+    font-weight: bold;
+  }
+
+  a {
+    color: black !important;
+    text-decoration: none !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
