@@ -45,18 +45,13 @@ CREATE TABLE IF NOT EXISTS user_settings (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS feedback (
-  id          SERIAL PRIMARY KEY,
-  user_id     INTEGER NOT NULL,
-  username    VARCHAR(255),
-  description TEXT NOT NULL,
-  created_at  TIMESTAMPTZ DEFAULT NOW()
-);
+-- The in-app feedback widget was removed (platform-level feedback covers
+-- it now); drop its table, which nothing else used.
+DROP TABLE IF EXISTS feedback;
 
--- Owner-only content: 1:1 chats with the bot, diet preferences, free-text
--- feedback. Copied schema-only into staging; seeded there by migrate.js.
+-- Owner-only content: 1:1 chats with the bot, diet preferences.
+-- Copied schema-only into staging; seeded there by migrate.js.
 COMMENT ON TABLE conversations   IS 'staging:private';
 COMMENT ON TABLE messages        IS 'staging:private';
 COMMENT ON TABLE pending_replies IS 'staging:private';
 COMMENT ON TABLE user_settings   IS 'staging:private';
-COMMENT ON TABLE feedback        IS 'staging:private';

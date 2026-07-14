@@ -59,7 +59,7 @@ Key architecture notes:
 ## App-specific conventions
 
 - **Private tables** (`staging:private`): `conversations`, `messages`,
-  `pending_replies`, `user_settings`, `feedback` — all owner-only
+  `pending_replies`, `user_settings` — all owner-only
   content. Staging is seeded by `src/db/migrate.js` with a demo
   conversation under sentinel `user_id = 0`; in staging, list/read
   endpoints also include that user's rows.
