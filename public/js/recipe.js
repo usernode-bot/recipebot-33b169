@@ -51,10 +51,22 @@ const Recipe = {
 
     const scaleLabel = ss === 1.0 ? '1×' : `${ss}×`;
 
+    // Byline while viewing someone's shared recipe read-only (no owned
+    // conversation yet — sending a chat message auto-forks it).
+    let bylineHtml = '';
+    if (App.viewingShared && !App.currentConversationId) {
+      const vs = App.viewingShared;
+      const ratingBit = vs.rating_count
+        ? ` · ★ ${Number(vs.avg_rating).toFixed(1)} (${vs.rating_count})`
+        : '';
+      bylineHtml = `<p class="text-sm text-zinc-400 dark:text-zinc-500 mt-1">by ${this.escapeHtml(vs.is_mine ? 'you' : vs.username)}${ratingBit}</p>`;
+    }
+
     display.innerHTML = `
       <div class="space-y-5">
         <div>
           <h2 class="text-2xl font-bold tracking-tight">${this.escapeHtml(recipe.title)}</h2>
+          ${bylineHtml}
           ${recipe.description ? `<p class="text-zinc-500 dark:text-zinc-400 text-sm mt-1.5 leading-relaxed">${this.renderInline(recipe.description)}</p>` : ''}
         </div>
 
@@ -97,6 +109,7 @@ const Recipe = {
 
         <div class="flex flex-wrap gap-2 pt-1">
           <button id="cook-btn" class="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors">🍳 Cook Mode</button>
+          ${this.renderShareControls()}
           <div class="relative">
             <button id="export-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">Export ▾</button>
             <div id="export-menu" class="hidden absolute top-full mt-1 left-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg overflow-hidden z-10 min-w-[160px]">
@@ -205,7 +218,46 @@ const Recipe = {
     }).catch(() => {});
   },
 
+  // Share / Update / Unshare controls for the recipe of an owned
+  // conversation (shared state comes from the sidebar's conversation list).
+  renderShareControls() {
+    if (!App.currentConversationId) return '';
+    const conv = (typeof Sidebar !== 'undefined')
+      ? Sidebar.conversations.find((c) => c.id === App.currentConversationId)
+      : null;
+    if (conv?.is_shared) {
+      return `
+        <button id="share-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">Update shared copy</button>
+        <button id="unshare-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 transition-colors">Unshare</button>`;
+    }
+    return `<button id="share-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">Share</button>`;
+  },
+
   bindActions(recipe, display) {
+    display.querySelector('#share-btn')?.addEventListener('click', async () => {
+      const btn = display.querySelector('#share-btn');
+      try {
+        const res = await fetch('/api/recipes/share', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversationId: App.currentConversationId }),
+        });
+        if (!res.ok) throw new Error('share failed');
+        if (btn) btn.textContent = 'Shared!';
+        if (typeof Sidebar !== 'undefined') await Sidebar.refresh();
+        setTimeout(() => this.display(App.currentRecipe), 800);
+      } catch {
+        if (btn) btn.textContent = 'Share failed';
+      }
+    });
+
+    display.querySelector('#unshare-btn')?.addEventListener('click', async () => {
+      if (!confirm('Unshare this recipe? Its ratings and favorites from other users will be removed.')) return;
+      await fetch(`/api/recipes/share/${App.currentConversationId}`, { method: 'DELETE' }).catch(() => {});
+      if (typeof Sidebar !== 'undefined') await Sidebar.refresh();
+      this.display(App.currentRecipe);
+    });
+
     display.querySelectorAll('.servings-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const delta = parseInt(btn.dataset.delta);

@@ -160,6 +160,30 @@ async function seedStagingDemo(pool) {
     );
     log.info('db', 'Seeded staging demo conversation');
   }
+
+  // Social features: seed the community feed with two shared recipes from
+  // two distinct fake creators, plus ratings so aggregates visibly render.
+  // Fixed high IDs + ON CONFLICT keep this idempotent across reboots.
+  await pool.query(
+    `INSERT INTO shared_recipes (id, user_id, username, conversation_id, recipe_data)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (id) DO NOTHING`,
+    [900001, DEMO_USER_ID, 'staging-demo-user', DEMO_CONV_ID, JSON.stringify(DEMO_RECIPE)]
+  );
+  await pool.query(
+    `INSERT INTO shared_recipes (id, user_id, username, conversation_id, recipe_data)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (id) DO NOTHING`,
+    [900002, 900002, 'staging-demo-chef', 900002, JSON.stringify(DEMO_RECIPE_2)]
+  );
+  await pool.query(
+    `INSERT INTO recipe_ratings (shared_recipe_id, user_id, rating) VALUES
+       (900001, 900101, 5),
+       (900001, 900102, 4),
+       (900002, 900103, 3)
+     ON CONFLICT (shared_recipe_id, user_id) DO NOTHING`
+  );
+  log.info('db', 'Seeded staging shared recipes and ratings');
 }
 
 module.exports = { migrate, DEMO_USER_ID };

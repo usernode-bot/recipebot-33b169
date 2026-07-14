@@ -45,6 +45,47 @@ CREATE TABLE IF NOT EXISTS user_settings (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Social features: published recipe snapshots, ratings, favorites.
+-- All three are PUBLIC tables (shared content, visible across users).
+-- conversation_id columns are bare integers on purpose: conversations is
+-- staging:private and public tables must not FK into private tables.
+CREATE TABLE IF NOT EXISTS shared_recipes (
+  id              SERIAL PRIMARY KEY,
+  user_id         INTEGER NOT NULL,
+  username        VARCHAR(255) NOT NULL,
+  conversation_id INTEGER NOT NULL,
+  recipe_data     JSONB NOT NULL,
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS shared_recipes_owner_conv
+  ON shared_recipes (user_id, conversation_id);
+
+CREATE TABLE IF NOT EXISTS recipe_ratings (
+  shared_recipe_id INTEGER NOT NULL REFERENCES shared_recipes(id) ON DELETE CASCADE,
+  user_id          INTEGER NOT NULL,
+  rating           INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (shared_recipe_id, user_id)
+);
+
+-- Dual-target favorites: others' shared recipes (shared_recipe_id) or
+-- your own conversations (conversation_id) — exactly one is set.
+CREATE TABLE IF NOT EXISTS recipe_favorites (
+  id               SERIAL PRIMARY KEY,
+  user_id          INTEGER NOT NULL,
+  shared_recipe_id INTEGER REFERENCES shared_recipes(id) ON DELETE CASCADE,
+  conversation_id  INTEGER,
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  CHECK ((shared_recipe_id IS NULL) <> (conversation_id IS NULL))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS recipe_favorites_shared
+  ON recipe_favorites (user_id, shared_recipe_id) WHERE shared_recipe_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS recipe_favorites_conv
+  ON recipe_favorites (user_id, conversation_id) WHERE conversation_id IS NOT NULL;
+
 -- The in-app feedback widget was removed (platform-level feedback covers
 -- it now); drop its table, which nothing else used.
 DROP TABLE IF EXISTS feedback;
