@@ -7,7 +7,6 @@ const { authRoutes } = require('./src/routes/auth');
 const { conversationRoutes } = require('./src/routes/conversations');
 const { recipeRoutes } = require('./src/routes/recipes');
 const { chatRoutes } = require('./src/routes/chat');
-const { feedbackRoutes } = require('./src/routes/feedback');
 const log = require('./src/services/logger');
 
 const config = loadConfig();
@@ -26,7 +25,6 @@ app.use(authRoutes(config));
 app.use(conversationRoutes(config));
 app.use(recipeRoutes(config));
 app.use(chatRoutes(config));
-app.use(feedbackRoutes(config));
 
 app.use(express.static(path.join(__dirname, 'public')));
 

@@ -1,5 +1,7 @@
 const Sidebar = {
   recipes: {},
+  conversations: [],
+  searchQuery: '',
 
   async refresh() {
     try {
@@ -15,6 +17,7 @@ const Sidebar = {
         if (r.conversation_id) this.recipes[r.conversation_id] = r.data;
       }
 
+      this.conversations = conversations;
       this.render(conversations);
     } catch { /* retry on next refresh */ }
   },
@@ -23,7 +26,23 @@ const Sidebar = {
     const list = document.getElementById('conversation-list');
     list.innerHTML = '';
 
-    for (const conv of conversations) {
+    const q = this.searchQuery.trim().toLowerCase();
+    const visible = q
+      ? conversations.filter((conv) => {
+          const name = this.recipes[conv.id]?.title || conv.title || 'New conversation';
+          return name.toLowerCase().includes(q);
+        })
+      : conversations;
+
+    if (q && visible.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'px-2 py-3 text-sm text-zinc-500';
+      empty.textContent = 'No recipes match your search';
+      list.appendChild(empty);
+      return;
+    }
+
+    for (const conv of visible) {
       const recipe = this.recipes[conv.id];
       const el = document.createElement('div');
       el.className = 'conversation-item flex items-center gap-1 group';
@@ -124,5 +143,10 @@ const Sidebar = {
     document.getElementById('chat-input')?.focus();
   },
 };
+
+document.getElementById('sidebar-search')?.addEventListener('input', (e) => {
+  Sidebar.searchQuery = e.target.value;
+  Sidebar.render(Sidebar.conversations);
+});
 
 Sidebar.refresh();

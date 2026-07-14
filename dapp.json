@@ -69,6 +69,11 @@
       "name": "Settings modal exists",
       "path": "/",
       "expectSelector": "#settings-modal"
+    },
+    {
+      "name": "Sidebar recipe search renders",
+      "path": "/",
+      "expectSelector": "#sidebar-search"
     }
   ]
 }
