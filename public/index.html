@@ -146,6 +146,11 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
         </svg>
       </button>
+      <button id="home-btn" class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" title="Home">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4a1 1 0 001-1v-5h2v5a1 1 0 001 1h4a1 1 0 001-1V10"/>
+        </svg>
+      </button>
       <h1 class="text-lg font-semibold">Recipe Bot</h1>
     </div>
     <div class="flex items-center gap-2">
@@ -233,6 +238,40 @@
 
     <!-- Sidebar overlay for mobile -->
     <div id="sidebar-overlay" class="hidden fixed inset-0 bg-black/50 z-20 lg:hidden"></div>
+
+    <!-- Homepage (default first screen; toggled with the chat layout by app.js) -->
+    <div id="homepage" class="flex-1 min-w-0 overflow-y-auto" style="display:none">
+      <div class="max-w-5xl mx-auto p-4 sm:p-6 space-y-8">
+        <section id="home-favorites" class="hidden">
+          <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
+            <svg class="w-4 h-4 text-pink-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
+            Your favorites
+          </h2>
+          <div id="home-favorites-list" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
+        </section>
+        <section id="home-mine" class="hidden">
+          <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
+            <span class="text-orange-400">🍳</span>
+            Your recipes
+          </h2>
+          <div id="home-mine-list" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
+        </section>
+        <section id="home-community" class="hidden">
+          <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
+            <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6-4a3 3 0 11-3-3m-9 3a3 3 0 10-3-3"/></svg>
+            Community recipes
+          </h2>
+          <div id="home-community-list" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
+        </section>
+        <div id="home-empty" class="hidden text-center text-zinc-500 py-16">
+          <svg class="w-12 h-12 mx-auto mb-3 text-zinc-300 dark:text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/>
+          </svg>
+          <p class="text-lg mb-1">No recipes yet</p>
+          <p class="text-sm text-zinc-400 dark:text-zinc-600">Start a conversation to create a recipe, then share it to the community feed.</p>
+        </div>
+      </div>
+    </div>
 
     <!-- Recipe Panel -->
     <div id="recipe-panel" class="flex-1 min-w-0 flex flex-col border-r border-zinc-200 dark:border-zinc-800 overflow-hidden">
@@ -366,6 +405,7 @@
   <script src="/js/sidebar.js"></script>
   <script src="/js/chat.js"></script>
   <script src="/js/recipe.js"></script>
+  <script src="/js/home.js"></script>
   <script src="/js/cooking-mode.js"></script>
   <script src="/js/shortcuts.js"></script>
 </body>

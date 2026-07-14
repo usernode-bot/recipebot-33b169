@@ -14,12 +14,56 @@ function conversationRoutes(config) {
   router.get('/api/conversations', async (req, res) => {
     try {
       const { rows } = await pool.query(
-        `SELECT id, title, created_at FROM conversations WHERE ${ownerClause('user_id')} ORDER BY created_at DESC`,
+        `SELECT c.id, c.title, c.created_at,
+           EXISTS (SELECT 1 FROM recipe_favorites f
+                   WHERE f.conversation_id = c.id AND f.user_id = $1) AS is_favorited,
+           EXISTS (SELECT 1 FROM shared_recipes s
+                   WHERE s.conversation_id = c.id) AS is_shared
+         FROM conversations c
+         WHERE ${ownerClause('c.user_id')} ORDER BY c.created_at DESC`,
         [req.user.id]
       );
       res.json(rows);
     } catch (err) {
       log.error('conversations', 'List failed', { message: err.message });
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Favorite / unfavorite one of your own conversations (its recipe).
+  router.put('/api/conversations/:id/favorite', async (req, res) => {
+    try {
+      const convId = parseInt(req.params.id);
+      const { rows: conv } = await pool.query(
+        `SELECT id FROM conversations WHERE id = $2 AND ${ownerClause('user_id')}`,
+        [req.user.id, convId]
+      );
+      if (!conv.length) return res.status(404).json({ error: 'Conversation not found' });
+
+      await pool.query(
+        `INSERT INTO recipe_favorites (user_id, conversation_id)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id, conversation_id) WHERE conversation_id IS NOT NULL
+         DO NOTHING`,
+        [req.user.id, convId]
+      );
+      res.json({ ok: true });
+    } catch (err) {
+      log.error('conversations', 'Favorite failed', { message: err.message });
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  router.delete('/api/conversations/:id/favorite', async (req, res) => {
+    try {
+      const convId = parseInt(req.params.id);
+      await pool.query(
+        'DELETE FROM recipe_favorites WHERE user_id = $1 AND conversation_id = $2',
+        [req.user.id, convId]
+      );
+      res.json({ ok: true });
+    } catch (err) {
+      log.error('conversations', 'Unfavorite failed', { message: err.message });
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -97,6 +141,17 @@ function conversationRoutes(config) {
       const convId = parseInt(req.params.id);
       await pool.query(
         'DELETE FROM conversations WHERE id = $1 AND user_id = $2',
+        [convId, req.user.id]
+      );
+      // No FK exists across the private/public boundary — clean up the
+      // published snapshot (cascades its ratings/favorites) and any
+      // own-conversation favorite explicitly.
+      await pool.query(
+        'DELETE FROM shared_recipes WHERE conversation_id = $1 AND user_id = $2',
+        [convId, req.user.id]
+      );
+      await pool.query(
+        'DELETE FROM recipe_favorites WHERE conversation_id = $1 AND user_id = $2',
         [convId, req.user.id]
       );
       log.info('conversations', 'Deleted', { id: convId });

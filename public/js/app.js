@@ -3,6 +3,10 @@ window.App = {
   currentConversationId: null,
   currentRecipe: null,
   pendingRecipe: null,
+  // Set while viewing a shared recipe read-only ({ username, avg_rating,
+  // rating_count }); chatting from that state auto-forks the recipe.
+  viewingShared: null,
+  currentView: 'chat',
 
   preferences: {
     diet: null,
@@ -10,6 +14,26 @@ window.App = {
     serving: 'normal',
     model: null,
   },
+};
+
+// Toggle between the homepage feed and the chat + recipe layout.
+App.showView = function (view) {
+  App.currentView = view;
+  const isHome = view === 'home';
+  const homepage = document.getElementById('homepage');
+  const recipePanel = document.getElementById('recipe-panel');
+  const chatPanel = document.getElementById('chat-panel');
+  const divider = document.getElementById('panel-divider');
+  const tabs = document.getElementById('mobile-tabs');
+  if (homepage) homepage.style.display = isHome ? 'block' : 'none';
+  if (recipePanel) recipePanel.style.display = isHome ? 'none' : '';
+  if (chatPanel) chatPanel.style.display = isHome ? 'none' : '';
+  if (divider) {
+    divider.style.display =
+      isHome || (chatPanel && chatPanel.classList.contains('chat-closed')) ? 'none' : '';
+  }
+  if (tabs) tabs.style.display = isHome ? 'none' : '';
+  if (isHome && typeof Home !== 'undefined') Home.refresh();
 };
 
 window.HashParams = {
@@ -98,6 +122,7 @@ window.HashParams = {
   if (prefEl) prefEl.classList.remove('hidden');
   setupDarkMode();
   setupNewConversation();
+  setupHomeButton();
   setupTextareaResize();
   setupPanelResize();
   setupChatToggle();
@@ -105,8 +130,17 @@ window.HashParams = {
   const hp = HashParams.get();
   if (hp.c && typeof Sidebar !== 'undefined') {
     Sidebar.selectConversation(parseInt(hp.c), { restore: true });
+  } else {
+    App.showView('home');
   }
 })();
+
+function setupHomeButton() {
+  document.getElementById('home-btn')?.addEventListener('click', () => {
+    HashParams.set('c', null);
+    App.showView('home');
+  });
+}
 
 function setupSidebar() {
   const sidebar = document.getElementById('sidebar');
@@ -237,6 +271,8 @@ function setupNewConversation() {
     App.currentConversationId = null;
     App.currentRecipe = null;
     App.pendingRecipe = null;
+    App.viewingShared = null;
+    App.showView('chat');
     HashParams.clear();
     if (typeof Chat !== 'undefined') Chat.clear();
     document.getElementById('recipe-display')?.classList.add('hidden');

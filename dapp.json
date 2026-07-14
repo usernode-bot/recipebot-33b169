@@ -74,6 +74,26 @@
       "name": "Sidebar recipe search renders",
       "path": "/",
       "expectSelector": "#sidebar-search"
+    },
+    {
+      "name": "Homepage renders",
+      "path": "/",
+      "expectSelector": "#homepage"
+    },
+    {
+      "name": "Homepage shows seeded shared recipe",
+      "path": "/",
+      "expectText": "Staging Demo Chicken Stir Fry"
+    },
+    {
+      "name": "Homepage shows creator username",
+      "path": "/",
+      "expectText": "staging-demo-chef"
+    },
+    {
+      "name": "Homepage shows Your recipes section",
+      "path": "/",
+      "expectText": "Your recipes"
     }
   ]
 }
