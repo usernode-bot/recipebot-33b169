@@ -1,3 +1,64 @@
 {
-  "secrets": []
+  "name": "RecipeBot",
+  "icon": { "emoji": "🍳" },
+  "llm": {
+    "purpose": "Generates and refines cooking recipes in chat",
+    "suggested_daily_cap_cents": 300
+  },
+  "secrets": [
+    {
+      "key": "BRAVE_SEARCH_API_KEY",
+      "description": "Brave Search API key (api.search.brave.com) for the assistant's web_search tool. Optional — falls back to DuckDuckGo scraping when unset.",
+      "required": false,
+      "private": true
+    },
+    {
+      "key": "ANTHROPIC_API_KEY",
+      "description": "Optional direct Anthropic API key, used only when the platform LLM proxy is unavailable (staging/standalone). Leave unset to rely on the platform proxy.",
+      "required": false,
+      "private": true
+    },
+    {
+      "key": "ANTHROPIC_MODEL",
+      "description": "Claude model id used for recipe chat",
+      "required": false,
+      "default": "claude-haiku-4-5-20251001"
+    },
+    {
+      "key": "THINKING_ENABLED",
+      "description": "Enable extended thinking for recipe generation (true/false)",
+      "required": false,
+      "default": "true"
+    },
+    {
+      "key": "THINKING_BUDGET",
+      "description": "Max extended-thinking tokens per response",
+      "required": false,
+      "default": "4096"
+    },
+    {
+      "key": "DEFAULT_DAILY_MSG_LIMIT",
+      "description": "Daily chat message limit per user",
+      "required": false,
+      "default": "50"
+    },
+    {
+      "key": "LOG_LEVEL",
+      "description": "Server log level (DEBUG, INFO, WARN, ERROR)",
+      "required": false,
+      "default": "INFO"
+    }
+  ],
+  "tests": [
+    {
+      "name": "App shell renders",
+      "path": "/",
+      "expectSelector": "#chat-panel"
+    },
+    {
+      "name": "Sidebar shows staging demo conversation",
+      "path": "/",
+      "expectText": "Staging demo"
+    }
+  ]
 }

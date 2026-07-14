@@ -1,0 +1,509 @@
+/* Hide sidebar on mobile before JS runs */
+@media (max-width: 1023px) {
+  #sidebar:not(.sidebar-ready) {
+    transform: translateX(-100%);
+    width: 0;
+    border: none;
+    overflow: hidden;
+    transition: none;
+  }
+}
+
+/* Sidebar states */
+.sidebar-open {
+  transform: translateX(0);
+  width: 16rem; /* w-64 */
+  min-width: 16rem;
+}
+
+.sidebar-closed {
+  transform: translateX(-100%);
+  width: 0;
+  min-width: 0;
+  border: none;
+  overflow: hidden;
+}
+
+@media (min-width: 1024px) {
+  .sidebar-closed {
+    transform: translateX(0);
+  }
+}
+
+/* Chat panel states */
+@media (min-width: 1024px) {
+  #chat-panel.chat-open {
+    width: 420px;
+  }
+  #chat-panel.chat-closed {
+    width: 0;
+    min-width: 0;
+    overflow: hidden;
+    border: none;
+  }
+  #chat-panel.chat-ready {
+    transition: width 200ms;
+  }
+}
+
+@media (min-width: 1280px) {
+  #chat-panel.chat-open {
+    width: 480px;
+  }
+}
+
+/* Panel resize divider */
+#panel-divider:active {
+  width: 6px;
+}
+
+/* Mobile panel visibility */
+@media (max-width: 1023px) {
+  #recipe-panel.panel-hidden,
+  #chat-panel.panel-hidden {
+    display: none;
+  }
+}
+
+/* Auto-resize textarea */
+#chat-input {
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+/* Preference button states — !important needed to override Tailwind utilities */
+.pref-btn.active {
+  border-color: #00c8ff !important;
+  background: rgba(0, 200, 255, 0.1) !important;
+  color: #00c8ff !important;
+}
+
+/* Conversation list items */
+.conversation-item {
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-item:hover {
+  background: #eeeef6;
+}
+
+:is(.dark .conversation-item:hover) {
+  background: #24244a;
+}
+
+.conversation-item.active {
+  background: #eeeef6;
+  color: #1a1a2e;
+}
+
+:is(.dark .conversation-item.active) {
+  background: #24244a;
+  color: #e4e4f0;
+}
+
+/* Chat message styles */
+.msg-user {
+  background: #dde8fb;
+  color: #1a1a2e;
+  border-radius: 1rem 1rem 0.25rem 1rem;
+  max-width: 85%;
+  margin-left: auto;
+}
+
+:is(.dark .msg-user) {
+  background: rgba(0, 200, 255, 0.12);
+  color: #e4e4f0;
+  border: 1px solid rgba(0, 200, 255, 0.2);
+}
+
+.msg-assistant {
+  background: #eeeef6;
+  color: #1a1a2e;
+  border-radius: 1rem 1rem 1rem 0.25rem;
+  max-width: 85%;
+}
+
+:is(.dark .msg-assistant) {
+  background: #1a1a30;
+  color: #e4e4f0;
+  border: 1px solid #2e2e50;
+}
+
+
+.status-toggle {
+  cursor: pointer;
+  user-select: none;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+
+.status-toggle:hover {
+  color: #6e6e8a;
+}
+
+:is(.dark .status-toggle:hover) {
+  color: #9898b0;
+}
+
+.status-detail {
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  color: #6e6e8a;
+  background: #f6f6fb;
+  border: 1px solid #d4d4e4;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.25rem;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+:is(.dark .status-detail) {
+  color: #9898b0;
+  background: #12122a;
+  border-color: #2e2e50;
+}
+
+.status-link {
+  color: #5b8dd9;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+
+.status-link:hover {
+  color: #3b6dbf;
+}
+
+:is(.dark .status-link) {
+  color: #6ea8ff;
+}
+
+:is(.dark .status-link:hover) {
+  color: #90c0ff;
+}
+
+/* Thinking / loading indicator */
+.thinking-indicator {
+  color: rgb(161, 161, 170);
+  font-size: 0.875rem;
+}
+
+.thinking-indicator .dots {
+  display: inline-block;
+  animation: dotPulse 1.4s infinite;
+}
+
+@keyframes dotPulse {
+  0%, 20% { opacity: 0.2; }
+  50% { opacity: 1; }
+  80%, 100% { opacity: 0.2; }
+}
+
+/* Streaming spinner — three bouncing dots */
+.streaming-spinner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.5rem 0.25rem;
+}
+
+.streaming-spinner .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #a1a1aa;
+  animation: dotBounce 1.2s ease-in-out infinite;
+}
+
+.streaming-spinner .dot:nth-child(2) { animation-delay: 0.15s; }
+.streaming-spinner .dot:nth-child(3) { animation-delay: 0.3s; }
+
+:is(.dark .streaming-spinner .dot) {
+  background: #71717a;
+}
+
+@keyframes dotBounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40% { transform: translateY(-6px); opacity: 1; }
+}
+
+.status-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #8b8ba0;
+  line-height: 1.5;
+}
+
+.status-line .status-icon {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  color: #a1a1aa;
+}
+
+.status-line .status-icon.spinning {
+  animation: spin 1s linear infinite;
+}
+
+:is(.dark .status-line) {
+  color: #71718a;
+}
+
+:is(.dark .status-line .status-icon) {
+  color: #71717a;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Send button streaming state */
+#send-btn.btn-streaming {
+  background: #a1a1aa;
+  cursor: not-allowed;
+}
+
+#send-btn.btn-streaming:hover {
+  background: #a1a1aa;
+}
+
+:is(.dark #send-btn.btn-streaming) {
+  background: #52525b;
+}
+
+:is(.dark #send-btn.btn-streaming:hover) {
+  background: #52525b;
+}
+
+#send-btn .send-spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+/* Step highlight on click */
+.step-card {
+  transition: background-color 0.15s, border-color 0.15s;
+  border: 1px solid transparent;
+}
+
+.step-card.step-active {
+  background: #dcfce9 !important;
+  border-color: #86efac;
+}
+
+:is(.dark .step-card.step-active) {
+  background: rgba(16, 185, 129, 0.13) !important;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+/* Macro pills */
+.macro-pill {
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 9999px;
+}
+
+/* Ingredient grid — name + amount aligned in two columns, compact */
+.ing-grid {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: start;
+  column-gap: 1.25rem;
+  row-gap: 0.25rem;
+  align-items: baseline;
+}
+
+/* Ingredient summary grid — aligns all amounts across all steps */
+.summary-grid {
+  display: grid;
+  grid-template-columns: auto auto auto auto auto auto auto auto;
+  justify-content: start;
+  column-gap: 1.25rem;
+  row-gap: 0;
+  align-items: center;
+}
+
+.ing-macro {
+  visibility: hidden;
+  margin-left: -0.75rem;
+}
+
+.ing-macro:first-of-type {
+  margin-left: 0.5rem;
+}
+
+.summary-grid.show-macros .ing-macro {
+  visibility: visible;
+}
+
+.macros-toggle-row {
+  grid-column: 4 / -1;
+  padding-bottom: 0.25rem;
+}
+
+.ing-actions {
+  column-gap: 0;
+  margin-left: -0.5rem;
+}
+
+.summary-grid-header {
+  grid-column: 1 / -1;
+  padding-top: 0.75rem;
+  padding-bottom: 0.25rem;
+}
+
+.summary-grid-row {
+  display: contents;
+}
+
+/* Checked state for summary grid rows */
+.summary-grid-row:has(.ingredient-check:checked) .ing-name {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+.summary-grid-row:has(.ingredient-check:checked) .ing-amt,
+.summary-grid-row:has(.ingredient-check:checked) .ing-macro {
+  opacity: 0.5;
+}
+
+/* Ingredient checkboxes */
+.ingredient-check {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #9898b0;
+  border-radius: 0.25rem;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.ingredient-check:checked {
+  background: #0090cc;
+  border-color: #0090cc;
+}
+
+.ingredient-check:checked::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0px;
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+:is(.dark .ingredient-check) {
+  border-color: #484870;
+  background: #1a1a30;
+}
+
+:is(.dark .ingredient-check:checked) {
+  background: #00c8ff;
+  border-color: #00c8ff;
+}
+
+.ingredient-check:focus-visible {
+  outline: 2px solid #00c8ff;
+  outline-offset: 2px;
+}
+
+.ingredient-label:has(.ingredient-check:checked) .ing-name {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+.ingredient-label:has(.ingredient-check:checked) .ing-amt,
+.ingredient-label:has(.ingredient-check:checked) .ing-vol {
+  opacity: 0.5;
+}
+
+/* Recipe diff styles */
+.diff-removed {
+  text-decoration: line-through;
+  color: #d42050;
+  background: rgba(212, 32, 80, 0.08);
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+:is(.dark .diff-removed) {
+  color: #ff3366;
+  background: rgba(255, 51, 102, 0.1);
+}
+
+.diff-added {
+  color: #00a060;
+  background: rgba(0, 160, 96, 0.08);
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+:is(.dark .diff-added) {
+  color: #00e088;
+  background: rgba(0, 224, 136, 0.1);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #b0b0c8;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9898b0;
+}
+
+:is(.dark) ::-webkit-scrollbar-thumb {
+  background: #2e2e50;
+}
+
+:is(.dark) ::-webkit-scrollbar-thumb:hover {
+  background: #484870;
+}
+
+/* Subtle background glow */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse at 25% 50%, rgba(0, 200, 255, 0.03) 0%, transparent 60%),
+    radial-gradient(ellipse at 75% 20%, rgba(124, 92, 255, 0.02) 0%, transparent 60%);
+}
+
+:is(.dark) body::before {
+  background:
+    radial-gradient(ellipse at 25% 50%, rgba(0, 200, 255, 0.04) 0%, transparent 60%),
+    radial-gradient(ellipse at 75% 20%, rgba(124, 92, 255, 0.025) 0%, transparent 60%);
+}

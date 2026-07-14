@@ -1,69 +1,32 @@
 const express = require('express');
 const path = require('path');
-const { Pool } = require('pg');
-const jwt = require('jsonwebtoken');
+const { load: loadConfig } = require('./src/config');
+const { migrate } = require('./src/db/migrate');
+const { authMiddleware } = require('./src/middleware/auth');
+const { authRoutes } = require('./src/routes/auth');
+const { conversationRoutes } = require('./src/routes/conversations');
+const { recipeRoutes } = require('./src/routes/recipes');
+const { chatRoutes } = require('./src/routes/chat');
+const { feedbackRoutes } = require('./src/routes/feedback');
+const log = require('./src/services/logger');
+
+const config = loadConfig();
+log.setLevel(config.logLevel);
 
 const app = express();
-const port = process.env.PORT || 3000;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const JWT_SECRET = process.env.JWT_SECRET;
-
-// Paths that stay open without authentication. Add a path here (and add it
-// with `app.get`/`app.post` below) if you deliberately want it public.
-// Everything else requires a valid platform-issued JWT.
-const PUBLIC_API_PATHS = new Set(['/health']);
 
 app.use(express.json());
 
-// Verify platform-issued JWT if one was passed, then enforce auth on
-// anything not explicitly marked public. The iframe adds `?token=…`
-// on load; the frontend script forwards the token via `x-usernode-token`
-// on subsequent fetches.
-app.use((req, res, next) => {
-  const token = req.query.token || req.headers['x-usernode-token'];
-  if (token && JWT_SECRET) {
-    try { req.user = jwt.verify(token, JWT_SECRET); } catch {}
-  }
-
-  // Static assets (CSS/JS/images) are always served; the API and the HTML
-  // shell are gated so direct hits to the staging/prod subdomain don't
-  // leak app data to the public internet.
-  if (req.method !== 'GET' || req.path.startsWith('/api/')) {
-    if (PUBLIC_API_PATHS.has(req.path)) return next();
-    if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
-  }
-  next();
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok' });
 });
 
-app.get('/health', (_req, res) => res.json({ status: 'ok' }));
-
-// Button press
-app.post('/api/press', async (req, res) => {
-  try {
-    await pool.query(`
-      INSERT INTO presses (user_id, username) VALUES ($1, $2)
-    `, [req.user.id, req.user.username]);
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Leaderboard
-app.get('/api/leaderboard', async (_req, res) => {
-  try {
-    const { rows } = await pool.query(`
-      SELECT username, COUNT(*) as presses
-      FROM presses
-      GROUP BY username
-      ORDER BY presses DESC
-      LIMIT 50
-    `);
-    res.json({ leaderboard: rows });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+app.use(authMiddleware(config));
+app.use(authRoutes(config));
+app.use(conversationRoutes(config));
+app.use(recipeRoutes(config));
+app.use(chatRoutes(config));
+app.use(feedbackRoutes(config));
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -71,10 +34,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 // visits (share links pasted into a browser — Sec-Fetch-Dest: document)
 // are sent to the platform's chromeless view of this app, where the shell
 // embeds it with a real token so the link just works. Every other
-// tokenless case (iframe loads with an expired token, old browsers
-// without Sec-Fetch-*) gets the "open in Usernode" landing page instead
-// of a redirect, so the platform shell is never loaded INSIDE its own
-// app iframe and stray visits still don't reveal the app.
+// tokenless case gets the "open in Usernode" landing page instead of a
+// redirect, so the platform shell is never loaded INSIDE its own app
+// iframe and stray visits still don't reveal the app.
 app.get('*', (req, res) => {
   if (!req.user) {
     if (req.get('sec-fetch-dest') === 'document') {
@@ -89,19 +51,22 @@ app.get('*', (req, res) => {
   </div>
 </body>`);
   }
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  if (req.accepts('html')) {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  } else {
+    res.status(404).json({ error: 'Not found' });
+  }
 });
 
 async function start() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS presses (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL,
-      username VARCHAR(255) NOT NULL,
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `);
-  app.listen(port, () => console.log(`Listening on :${port}`));
+  await migrate(config);
+
+  app.listen(config.port, () => {
+    log.info('server', `Listening on :${config.port}`);
+  });
 }
 
-start().catch(err => { console.error(err); process.exit(1); });
+start().catch((err) => {
+  log.error('server', 'Failed to start', { message: err.message });
+  process.exit(1);
+});
