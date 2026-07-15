@@ -141,9 +141,10 @@
   <!-- Header -->
   <header class="flex items-center justify-between px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
     <div class="flex items-center gap-3">
-      <button id="home-btn" class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" title="Home">
+      <!-- Back to the homepage recipe list; hidden on the homepage itself (see App.showView) -->
+      <button id="home-btn" class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" title="Back to recipes" aria-label="Back to recipes" style="display:none">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4a1 1 0 001-1v-5h2v5a1 1 0 001 1h4a1 1 0 001-1V10"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
         </svg>
       </button>
       <h1 class="text-lg font-semibold">Recipe Bot</h1>

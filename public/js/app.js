@@ -25,7 +25,9 @@ App.showView = function (view) {
   const chatPanel = document.getElementById('chat-panel');
   const divider = document.getElementById('panel-divider');
   const tabs = document.getElementById('mobile-tabs');
+  const backBtn = document.getElementById('home-btn');
   if (homepage) homepage.style.display = isHome ? 'block' : 'none';
+  if (backBtn) backBtn.style.display = isHome ? 'none' : '';
   if (recipePanel) recipePanel.style.display = isHome ? 'none' : '';
   if (chatPanel) chatPanel.style.display = isHome ? 'none' : '';
   if (divider) {
