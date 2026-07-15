@@ -219,11 +219,11 @@ const Recipe = {
   },
 
   // Share / Update / Unshare controls for the recipe of an owned
-  // conversation (shared state comes from the sidebar's conversation list).
+  // conversation (shared state comes from the store's conversation list).
   renderShareControls() {
     if (!App.currentConversationId) return '';
-    const conv = (typeof Sidebar !== 'undefined')
-      ? Sidebar.conversations.find((c) => c.id === App.currentConversationId)
+    const conv = (typeof Store !== 'undefined')
+      ? Store.conversations.find((c) => c.id === App.currentConversationId)
       : null;
     if (conv?.is_shared) {
       return `
@@ -244,7 +244,7 @@ const Recipe = {
         });
         if (!res.ok) throw new Error('share failed');
         if (btn) btn.textContent = 'Shared!';
-        if (typeof Sidebar !== 'undefined') await Sidebar.refresh();
+        if (typeof Store !== 'undefined') await Store.refresh();
         setTimeout(() => this.display(App.currentRecipe), 800);
       } catch {
         if (btn) btn.textContent = 'Share failed';
@@ -254,7 +254,7 @@ const Recipe = {
     display.querySelector('#unshare-btn')?.addEventListener('click', async () => {
       if (!confirm('Unshare this recipe? Its ratings and favorites from other users will be removed.')) return;
       await fetch(`/api/recipes/share/${App.currentConversationId}`, { method: 'DELETE' }).catch(() => {});
-      if (typeof Sidebar !== 'undefined') await Sidebar.refresh();
+      if (typeof Store !== 'undefined') await Store.refresh();
       this.display(App.currentRecipe);
     });
 
@@ -471,7 +471,7 @@ const Recipe = {
       if (!this.currentServings) this.currentServings = newRecipe.default_servings;
       this.display(newRecipe);
       this.saveUIStateToServer();
-      Sidebar.refresh();
+      Store.refresh();
       if (App.pendingReplyId) {
         Chat._acknowledgeReply(App.pendingReplyId);
         App.pendingReplyId = null;

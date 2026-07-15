@@ -56,11 +56,6 @@
       "expectSelector": "#chat-panel"
     },
     {
-      "name": "Sidebar shows staging demo conversation",
-      "path": "/",
-      "expectText": "Staging demo"
-    },
-    {
       "name": "User menu button renders",
       "path": "/",
       "expectSelector": "#user-menu-btn"
@@ -71,9 +66,14 @@
       "expectSelector": "#settings-modal"
     },
     {
-      "name": "Sidebar recipe search renders",
+      "name": "Homepage recipe search renders",
       "path": "/",
-      "expectSelector": "#sidebar-search"
+      "expectSelector": "#home-search"
+    },
+    {
+      "name": "Homepage new recipe button renders",
+      "path": "/",
+      "expectSelector": "#new-conversation-btn"
     },
     {
       "name": "Homepage renders",

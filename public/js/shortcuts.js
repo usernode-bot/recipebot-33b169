@@ -52,21 +52,12 @@ document.addEventListener('keydown', (e) => {
     document.getElementById('new-conversation-btn')?.click();
   }
 
-  if (mod && e.key === 'b') {
-    e.preventDefault();
-    document.getElementById('sidebar-toggle')?.click();
-  }
-
   if (mod && e.key === 'p') {
     e.preventDefault();
     window.print();
   }
 
   if (e.key === 'Escape') {
-    const sidebar = document.getElementById('sidebar');
-    if (sidebar?.classList.contains('sidebar-open') && window.innerWidth < 1024) {
-      document.getElementById('sidebar-toggle')?.click();
-    }
     if (typeof CookingMode !== 'undefined' && CookingMode.active) {
       CookingMode.exit();
     }

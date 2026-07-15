@@ -115,7 +115,6 @@ window.HashParams = {
     console.warn('[app] Failed to load user', e);
   }
 
-  setupSidebar();
   setupMobileTabs();
   setupPreferences();
   const prefEl = document.getElementById('preferences');
@@ -128,8 +127,8 @@ window.HashParams = {
   setupChatToggle();
 
   const hp = HashParams.get();
-  if (hp.c && typeof Sidebar !== 'undefined') {
-    Sidebar.selectConversation(parseInt(hp.c), { restore: true });
+  if (hp.c && typeof Store !== 'undefined') {
+    Store.selectConversation(parseInt(hp.c), { restore: true });
   } else {
     App.showView('home');
   }
@@ -140,45 +139,6 @@ function setupHomeButton() {
     HashParams.set('c', null);
     App.showView('home');
   });
-}
-
-function setupSidebar() {
-  const sidebar = document.getElementById('sidebar');
-  const toggle = document.getElementById('sidebar-toggle');
-  const overlay = document.getElementById('sidebar-overlay');
-
-  function closeSidebar(updateHash) {
-    sidebar.classList.remove('sidebar-open');
-    sidebar.classList.add('sidebar-closed');
-    overlay.classList.add('hidden');
-    if (updateHash !== false) HashParams.set('sb', '0');
-  }
-
-  function openSidebar(updateHash) {
-    sidebar.classList.remove('sidebar-closed');
-    sidebar.classList.add('sidebar-open');
-    if (window.innerWidth < 1024) {
-      overlay.classList.remove('hidden');
-    }
-    if (updateHash !== false) HashParams.set('sb', null);
-  }
-
-  toggle.addEventListener('click', () => {
-    if (sidebar.classList.contains('sidebar-open')) {
-      closeSidebar();
-    } else {
-      openSidebar();
-    }
-  });
-
-  overlay.addEventListener('click', closeSidebar);
-
-  if (!sidebar.classList.contains('sidebar-open') && !sidebar.classList.contains('sidebar-closed')) {
-    const hp = HashParams.get();
-    if (window.innerWidth < 1024 || hp.sb === '0') {
-      closeSidebar(false);
-    }
-  }
 }
 
 function setupMobileTabs() {
@@ -277,7 +237,6 @@ function setupNewConversation() {
     if (typeof Chat !== 'undefined') Chat.clear();
     document.getElementById('recipe-display')?.classList.add('hidden');
     document.getElementById('recipe-empty')?.classList.remove('hidden');
-    document.querySelectorAll('.conversation-item').forEach((el) => el.classList.remove('active'));
     document.getElementById('chat-input')?.focus();
   });
 }

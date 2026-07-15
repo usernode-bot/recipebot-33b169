@@ -141,11 +141,6 @@
   <!-- Header -->
   <header class="flex items-center justify-between px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
     <div class="flex items-center gap-3">
-      <button id="sidebar-toggle" class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" title="Toggle sidebar (Ctrl+B)">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-        </svg>
-      </button>
       <button id="home-btn" class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" title="Home">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4a1 1 0 001-1v-5h2v5a1 1 0 001 1h4a1 1 0 001-1V10"/>
@@ -201,7 +196,6 @@
       <div class="space-y-2 text-sm">
         <div class="flex justify-between"><span class="text-zinc-500 dark:text-zinc-400">Send message</span><kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-mono">Ctrl+Enter</kbd></div>
         <div class="flex justify-between"><span class="text-zinc-500 dark:text-zinc-400">New conversation</span><kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-mono">Ctrl+N</kbd></div>
-        <div class="flex justify-between"><span class="text-zinc-500 dark:text-zinc-400">Toggle sidebar</span><kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-mono">Ctrl+B</kbd></div>
         <div class="flex justify-between"><span class="text-zinc-500 dark:text-zinc-400">Print recipe</span><kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-mono">Ctrl+P</kbd></div>
         <div class="flex justify-between"><span class="text-zinc-500 dark:text-zinc-400">Close / exit</span><kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-mono">Escape</kbd></div>
         <div class="flex justify-between"><span class="text-zinc-500 dark:text-zinc-400">This help</span><kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-mono">?</kbd></div>
@@ -220,28 +214,17 @@
   <!-- Main layout -->
   <div class="flex flex-1 overflow-hidden">
 
-    <!-- Sidebar -->
-    <aside id="sidebar" class="sidebar-open shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex flex-col overflow-hidden transition-all duration-200 lg:relative absolute inset-y-0 left-0 z-30">
-      <div class="p-3 border-b border-zinc-200 dark:border-zinc-800 space-y-2">
-        <button id="new-conversation-btn" class="w-full rounded-lg bg-blue-600 hover:bg-blue-500 px-3 py-2 text-sm font-medium text-white transition-colors">
-          + New conversation
-        </button>
-        <input id="sidebar-search" type="search" placeholder="Search recipes..." autocomplete="off"
-          class="w-full rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-      </div>
-      <div class="flex-1 overflow-y-auto p-2 space-y-1">
-        <div id="conversation-list" class="space-y-1">
-          <!-- Populated by sidebar.js -->
-        </div>
-      </div>
-    </aside>
-
-    <!-- Sidebar overlay for mobile -->
-    <div id="sidebar-overlay" class="hidden fixed inset-0 bg-black/50 z-20 lg:hidden"></div>
-
     <!-- Homepage (default first screen; toggled with the chat layout by app.js) -->
     <div id="homepage" class="flex-1 min-w-0 overflow-y-auto" style="display:none">
       <div class="max-w-5xl mx-auto p-4 sm:p-6 space-y-8">
+        <!-- Toolbar: recipe search + new recipe (moved here from the old sidebar) -->
+        <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <input id="home-search" type="search" placeholder="Search recipes..." autocomplete="off"
+            class="flex-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <button id="new-conversation-btn" class="shrink-0 rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-sm font-medium text-white transition-colors">
+            + New recipe
+          </button>
+        </div>
         <section id="home-favorites" class="hidden">
           <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
             <svg class="w-4 h-4 text-pink-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
@@ -256,6 +239,13 @@
           </h2>
           <div id="home-mine-list" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
         </section>
+        <section id="home-convs" class="hidden">
+          <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
+            <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+            Your conversations
+          </h2>
+          <div id="home-convs-list" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
+        </section>
         <section id="home-community" class="hidden">
           <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
             <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6-4a3 3 0 11-3-3m-9 3a3 3 0 10-3-3"/></svg>
@@ -269,6 +259,9 @@
           </svg>
           <p class="text-lg mb-1">No recipes yet</p>
           <p class="text-sm text-zinc-400 dark:text-zinc-600">Start a conversation to create a recipe, then share it to the community feed.</p>
+        </div>
+        <div id="home-no-match" class="hidden text-center text-zinc-500 py-16">
+          <p class="text-sm">No recipes match your search</p>
         </div>
       </div>
     </div>
@@ -356,11 +349,6 @@
   <script>
     (function() {
       var p = window.__initHash || {};
-      var sb = document.getElementById('sidebar');
-      if (p.sb === '0' || window.innerWidth < 1024) {
-        sb.classList.remove('sidebar-open');
-        sb.classList.add('sidebar-closed');
-      }
       var ch = document.getElementById('chat-panel');
       var dv = document.getElementById('panel-divider');
       if (p.ch === '0') {
@@ -371,13 +359,10 @@
         var savedW = localStorage.getItem('chatPanelWidth');
         if (savedW && window.innerWidth >= 1024) ch.style.width = savedW + 'px';
       }
-      sb.style.transition = 'none';
       ch.style.transition = 'none';
       requestAnimationFrame(function() {
         requestAnimationFrame(function() {
-          sb.style.transition = '';
           ch.style.transition = '';
-          sb.classList.add('sidebar-ready');
           ch.classList.add('chat-ready');
         });
       });
@@ -402,7 +387,7 @@
 
   <script src="/js/app.js"></script>
   <script src="/js/settings.js"></script>
-  <script src="/js/sidebar.js"></script>
+  <script src="/js/store.js"></script>
   <script src="/js/chat.js"></script>
   <script src="/js/recipe.js"></script>
   <script src="/js/home.js"></script>
