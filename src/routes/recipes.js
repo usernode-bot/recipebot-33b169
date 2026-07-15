@@ -83,21 +83,6 @@ function recipeRoutes(config) {
     }
   });
 
-  // Unshare (ratings/favorites cascade via FK).
-  router.delete('/api/recipes/share/:conversationId', async (req, res) => {
-    const convId = parseInt(req.params.conversationId);
-    try {
-      await pool.query(
-        `DELETE FROM shared_recipes WHERE conversation_id = $2 AND ${ownerClause('user_id')}`,
-        [req.user.id, convId]
-      );
-      res.json({ ok: true });
-    } catch (err) {
-      log.error('recipes', 'Unshare failed', { message: err.message });
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
   // Community feed: every shared recipe, newest first.
   router.get('/api/shared-recipes', async (req, res) => {
     try {

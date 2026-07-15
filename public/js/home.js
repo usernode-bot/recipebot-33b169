@@ -171,15 +171,14 @@ const Home = {
     forkBtn.addEventListener('click', () => {
       if (typeof Store !== 'undefined') Store.forkRecipe(recipe);
     });
-    const shareBtn = this._actionBtn(r.is_shared ? 'Unshare' : 'Share');
-    shareBtn.title = r.is_shared
-      ? 'Unshare recipe'
-      : 'Share recipe to the community feed';
-    shareBtn.addEventListener('click', () =>
-      this.toggleShare(r.conversation_id, r.is_shared));
     actions.appendChild(openBtn);
     actions.appendChild(forkBtn);
-    actions.appendChild(shareBtn);
+    if (!r.is_shared) {
+      const shareBtn = this._actionBtn('Share');
+      shareBtn.title = 'Share recipe to the community feed';
+      shareBtn.addEventListener('click', () => this.share(r.conversation_id));
+      actions.appendChild(shareBtn);
+    }
     actions.appendChild(this._deleteBtn(r.conversation_id));
     el.appendChild(actions);
     return el;
@@ -260,13 +259,6 @@ const Home = {
     });
     actions.appendChild(viewBtn);
     actions.appendChild(forkBtn);
-    // The owner can unshare their own recipe straight from its feed card.
-    if (s.is_mine && s.conversation_id) {
-      const unshareBtn = this._actionBtn('Unshare');
-      unshareBtn.title = 'Remove from the community feed';
-      unshareBtn.addEventListener('click', () => this.toggleShare(s.conversation_id, true));
-      actions.appendChild(unshareBtn);
-    }
     el.appendChild(actions);
     return el;
   },
@@ -312,18 +304,13 @@ const Home = {
     this.refresh();
   },
 
-  async toggleShare(conversationId, isShared) {
+  async share(conversationId) {
     try {
-      if (isShared) {
-        if (!confirm('Unshare this recipe? Its ratings and favorites from other users will be removed.')) return;
-        await fetch(`/api/recipes/share/${conversationId}`, { method: 'DELETE' });
-      } else {
-        await fetch('/api/recipes/share', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ conversationId }),
-        });
-      }
+      await fetch('/api/recipes/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId }),
+      });
     } catch { /* refresh below reflects server truth */ }
     this.refresh();
     if (typeof Store !== 'undefined') Store.refresh();

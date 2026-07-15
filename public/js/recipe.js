@@ -218,8 +218,8 @@ const Recipe = {
     }).catch(() => {});
   },
 
-  // Share / Update / Unshare controls for the recipe of an owned
-  // conversation (shared state comes from the store's conversation list).
+  // Share / Update controls for the recipe of an owned conversation
+  // (shared state comes from the store's conversation list).
   renderShareControls() {
     if (!App.currentConversationId) return '';
     const conv = (typeof Store !== 'undefined')
@@ -227,8 +227,7 @@ const Recipe = {
       : null;
     if (conv?.is_shared) {
       return `
-        <button id="share-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">Update shared copy</button>
-        <button id="unshare-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 transition-colors">Unshare</button>`;
+        <button id="share-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">Update shared copy</button>`;
     }
     return `<button id="share-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">Share</button>`;
   },
@@ -249,13 +248,6 @@ const Recipe = {
       } catch {
         if (btn) btn.textContent = 'Share failed';
       }
-    });
-
-    display.querySelector('#unshare-btn')?.addEventListener('click', async () => {
-      if (!confirm('Unshare this recipe? Its ratings and favorites from other users will be removed.')) return;
-      await fetch(`/api/recipes/share/${App.currentConversationId}`, { method: 'DELETE' }).catch(() => {});
-      if (typeof Store !== 'undefined') await Store.refresh();
-      this.display(App.currentRecipe);
     });
 
     display.querySelectorAll('.servings-btn').forEach((btn) => {
