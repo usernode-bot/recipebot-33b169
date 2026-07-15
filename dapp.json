@@ -94,6 +94,11 @@
       "name": "Homepage shows Your recipes section",
       "path": "/",
       "expectText": "Your recipes"
+    },
+    {
+      "name": "Header back button exists (hidden on home)",
+      "path": "/",
+      "expectSelector": "#home-btn"
     }
   ]
 }
