@@ -361,13 +361,13 @@ const Chat = {
       console.log('[chat] ← conversation', data);
       App.currentConversationId = data.id;
       HashParams.set('c', data.id);
-      Sidebar.refresh();
+      Store.refresh();
     });
 
     es.addEventListener('title_update', (e) => {
       const data = JSON.parse(e.data);
       if (dedup(data)) return;
-      Sidebar.refresh();
+      Store.refresh();
     });
 
     es.addEventListener('rate_limit', (e) => {
@@ -732,7 +732,7 @@ const Chat = {
       if (conversationId && !App.currentConversationId) {
         App.currentConversationId = conversationId;
         HashParams.set('c', conversationId);
-        Sidebar.refresh();
+        Store.refresh();
       }
 
       this._activeReplyId = replyId;

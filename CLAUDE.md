@@ -39,9 +39,11 @@ view, and recipe forking. The assistant has `display_recipe`,
 
 Key architecture notes:
 
-- **Recipes live in `messages.recipe_data`** (JSONB); the sidebar's
-  recipe list is derived from the latest recipe message per
-  conversation. There is no separate recipes table.
+- **Recipes live in `messages.recipe_data`** (JSONB); the homepage's
+  "Your recipes" list is derived from the latest recipe message per
+  conversation. There is no separate recipes table. There is no
+  sidebar — search, new recipe, and the recipe/conversation lists all
+  live on the homepage.
 - **Replies are resumable**: chat POST returns 202 with a `replyId`;
   the LLM turn loop runs in the background, appending events to
   `pending_replies.events`, and the client follows via SSE at

@@ -4,7 +4,7 @@ const { getPool } = require('./pool');
 const log = require('../services/logger');
 
 // Sentinel owner for staging demo rows. In staging, list endpoints include
-// this user's rows so testers see a populated sidebar/recipe panel.
+// this user's rows so testers see a populated homepage/recipe panel.
 const DEMO_USER_ID = 0;
 const DEMO_CONV_ID = 900001;
 

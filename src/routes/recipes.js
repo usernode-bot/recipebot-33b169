@@ -197,7 +197,7 @@ function recipeRoutes(config) {
     }
   });
 
-  // The requester's favorited shared recipes (sidebar pin + homepage section).
+  // The requester's favorited shared recipes (homepage favorites section).
   router.get('/api/favorites', async (req, res) => {
     try {
       const { rows } = await pool.query(
