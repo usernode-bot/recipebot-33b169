@@ -180,7 +180,16 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
           </svg>
         </button>
-        <div id="user-menu" class="hidden absolute right-0 top-full mt-1 z-40 w-44 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg py-1">
+        <div id="user-menu" class="hidden absolute right-0 top-full mt-1 z-40 w-56 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg py-1">
+          <!-- "AI usage today" meter — populated by settings.js on each menu open -->
+          <div id="usage-section" class="px-3 py-2 border-b border-zinc-200 dark:border-zinc-800">
+            <p class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">AI usage today</p>
+            <p id="usage-amount" class="text-sm text-zinc-700 dark:text-zinc-200 mt-1 truncate">&hellip;</p>
+            <div id="usage-bar" class="hidden mt-1.5 h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
+              <div id="usage-bar-fill" class="h-full rounded-full bg-blue-500 transition-all" style="width:0%"></div>
+            </div>
+            <p id="usage-footnote" class="hidden text-[11px] text-zinc-400 dark:text-zinc-500 mt-1">Estimate &middot; resets at midnight UTC</p>
+          </div>
           <button id="open-settings" class="w-full text-left px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">App settings</button>
         </div>
       </div>

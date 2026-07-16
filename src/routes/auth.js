@@ -39,6 +39,39 @@ function authRoutes(config) {
     }
   });
 
+  // Today's (UTC) estimated LLM spend for the requester, for the "AI usage
+  // today" section of the user menu. Spend is tracked locally per API turn
+  // (see chat.js recordUsage) — the platform exposes no usage endpoint, so
+  // this is an estimate, not the proxy's own accounting.
+  router.get('/api/usage/today', async (req, res) => {
+    try {
+      let { rows } = await pool.query(
+        `SELECT date, input_tokens, output_tokens, estimated_microcents
+         FROM llm_usage WHERE user_id = $1 AND date = (NOW() AT TIME ZONE 'utc')::date`,
+        [req.user.id]
+      );
+      // Staging: fall back to the seeded demo user's row so testers see a
+      // populated meter (same convention as other staging demo fallbacks).
+      if (!rows.length && config.isStaging) {
+        ({ rows } = await pool.query(
+          `SELECT date, input_tokens, output_tokens, estimated_microcents
+           FROM llm_usage WHERE user_id = 0 AND date = (NOW() AT TIME ZONE 'utc')::date`
+        ));
+      }
+      const row = rows[0];
+      res.json({
+        date: row ? row.date : null,
+        inputTokens: row ? Number(row.input_tokens) : 0,
+        outputTokens: row ? Number(row.output_tokens) : 0,
+        estimatedCents: row ? Number(row.estimated_microcents) / 1e6 : 0,
+        llm: { enabled: isEnabled(config), mode: llmMode(config) },
+      });
+    } catch (err) {
+      log.error('auth', 'Failed to load usage', { message: err.message });
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   router.patch('/api/auth/preferences', async (req, res) => {
     const { diet, complexity, serving, tempUnit, model } = req.body;
 

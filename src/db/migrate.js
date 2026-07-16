@@ -21,6 +21,9 @@ async function migrate(config) {
   await pool.query(
     "DELETE FROM rate_limits WHERE date < CURRENT_DATE - INTERVAL '7 days'"
   );
+  await pool.query(
+    "DELETE FROM llm_usage WHERE date < (NOW() AT TIME ZONE 'utc')::date - INTERVAL '7 days'"
+  );
 
   // On startup, all 'processing' replies are dead (no background stream running)
   const { rowCount } = await pool.query(
@@ -184,6 +187,22 @@ async function seedStagingDemo(pool) {
      ON CONFLICT (shared_recipe_id, user_id) DO NOTHING`
   );
   log.info('db', 'Seeded staging shared recipes and ratings');
+
+  // Demo AI-usage row for the user-menu "AI usage today" meter (llm_usage is
+  // staging:private, so staging starts empty). Seeded fresh for *today*
+  // (UTC) each boot so it never goes stale; the upsert SETs fixed values
+  // rather than accumulating, so reboots don't inflate it. 45k in / 12k out
+  // at Sonnet 5 pricing = 31,500,000 microcents ≈ $0.32.
+  await pool.query(
+    `INSERT INTO llm_usage (user_id, date, input_tokens, output_tokens, estimated_microcents)
+     VALUES ($1, (NOW() AT TIME ZONE 'utc')::date, 45000, 12000, 31500000)
+     ON CONFLICT (user_id, date) DO UPDATE SET
+       input_tokens = EXCLUDED.input_tokens,
+       output_tokens = EXCLUDED.output_tokens,
+       estimated_microcents = EXCLUDED.estimated_microcents`,
+    [DEMO_USER_ID]
+  );
+  log.info('db', 'Seeded staging demo llm_usage row');
 }
 
 module.exports = { migrate, DEMO_USER_ID };

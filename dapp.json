@@ -66,6 +66,11 @@
       "expectSelector": "#settings-modal"
     },
     {
+      "name": "User menu AI usage section exists",
+      "path": "/",
+      "expectSelector": "#usage-section"
+    },
+    {
       "name": "Homepage recipe search renders",
       "path": "/",
       "expectSelector": "#home-search"

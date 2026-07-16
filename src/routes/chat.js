@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { EventEmitter } = require('events');
 const { getPool } = require('../db/pool');
-const { createMessage, isEnabled, buildSystemPrompt, getCreateParams, isValidModel } = require('../services/llm');
+const { createMessage, isEnabled, buildSystemPrompt, getCreateParams, isValidModel, estimateMicrocents } = require('../services/llm');
 const { validate, getSchemaReminder } = require('../services/recipe-validator');
 const { fetchWebpage } = require('../services/web');
 const { webSearch, init: initSearch } = require('../services/search');
@@ -392,6 +392,12 @@ async function streamWithToolHandling(
     totalUsage.input_tokens += response.usage?.input_tokens || 0;
     totalUsage.output_tokens += response.usage?.output_tokens || 0;
 
+    // Accumulate the user's daily spend estimate (shown in the user menu as
+    // "AI usage today"). Per-turn so a reply that errors mid-loop still
+    // counts its completed turns — matching what the proxy billed. Keyed on
+    // the UTC day to match the platform's midnight-UTC budget reset.
+    recordUsage(pool, userId, params.model, response.usage);
+
     let assistantText = '';
     const toolResults = [];
     let textFlushed = false;
@@ -453,6 +459,21 @@ async function streamWithToolHandling(
   }
 
   return { usage: totalUsage };
+}
+
+// Fire-and-forget upsert of one API turn's token usage into llm_usage.
+function recordUsage(pool, userId, model, usage) {
+  if (!usage) return;
+  const microcents = estimateMicrocents(model, usage);
+  pool.query(
+    `INSERT INTO llm_usage (user_id, date, input_tokens, output_tokens, estimated_microcents)
+     VALUES ($1, (NOW() AT TIME ZONE 'utc')::date, $2, $3, $4)
+     ON CONFLICT (user_id, date) DO UPDATE SET
+       input_tokens = llm_usage.input_tokens + EXCLUDED.input_tokens,
+       output_tokens = llm_usage.output_tokens + EXCLUDED.output_tokens,
+       estimated_microcents = llm_usage.estimated_microcents + EXCLUDED.estimated_microcents`,
+    [userId, usage.input_tokens || 0, usage.output_tokens || 0, microcents]
+  ).catch((err) => log.warn('chat', 'Failed to record llm usage', { message: err.message }));
 }
 
 async function handleToolCall(block, config, messages, systemPrompt, send, convId, pool, userId, responseLog) {
