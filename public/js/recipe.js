@@ -59,11 +59,28 @@ const Recipe = {
       const ratingBit = vs.rating_count
         ? ` · ★ ${Number(vs.avg_rating).toFixed(1)} (${vs.rating_count})`
         : '';
-      bylineHtml = `<p class="text-sm text-zinc-400 dark:text-zinc-500 mt-1">by ${this.escapeHtml(vs.is_mine ? 'you' : vs.username)}${ratingBit}</p>`;
+      const displayedVersion = App.viewingVersion ? App.viewingVersion.version : vs.current_version;
+      const versionBit = displayedVersion ? ` · v${displayedVersion}` : '';
+      const historyBit = vs.id && vs.current_version > 1
+        ? ` · <button id="history-btn" class="underline hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">History</button>`
+        : '';
+      bylineHtml = `<p class="text-sm text-zinc-400 dark:text-zinc-500 mt-1">by ${this.escapeHtml(vs.is_mine ? 'you' : vs.username)}${ratingBit}${versionBit}${historyBit}</p>`;
+    }
+
+    // Banner while viewing an older version of a shared recipe.
+    let versionBannerHtml = '';
+    if (App.viewingVersion && App.viewingShared &&
+        App.viewingVersion.version !== App.viewingShared.current_version) {
+      versionBannerHtml = `
+        <div class="flex items-center justify-between gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <span class="text-sm font-medium text-blue-800 dark:text-blue-200">Viewing v${App.viewingVersion.version} — current version is v${App.viewingShared.current_version}</span>
+          <button id="version-back-current" class="shrink-0 px-3 py-1 text-sm rounded-lg bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors">Back to current</button>
+        </div>`;
     }
 
     display.innerHTML = `
       <div class="space-y-5">
+        ${versionBannerHtml}
         <div>
           <h2 class="text-2xl font-bold tracking-tight">${this.escapeHtml(recipe.title)}</h2>
           ${bylineHtml}
@@ -109,6 +126,7 @@ const Recipe = {
 
         <div class="flex flex-wrap gap-2 pt-1">
           <button id="cook-btn" class="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors">🍳 Cook Mode</button>
+          ${this.renderForkControl()}
           ${this.renderShareControls()}
           <div class="relative">
             <button id="export-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">Export ▾</button>
@@ -219,27 +237,146 @@ const Recipe = {
   },
 
   // Share / Update controls for the recipe of an owned conversation
-  // (shared state comes from the store's conversation list).
+  // (shared state comes from the store's conversation list). When the
+  // shared copy already matches the latest recipe, the button is disabled.
   renderShareControls() {
     if (!App.currentConversationId) return '';
     const conv = (typeof Store !== 'undefined')
       ? Store.conversations.find((c) => c.id === App.currentConversationId)
       : null;
     if (conv?.is_shared) {
+      if (conv.shared_up_to_date) {
+        return `
+        <button id="share-btn" disabled title="Shared copy is up to date" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 opacity-60 cursor-default">Shared ✓</button>`;
+      }
       return `
         <button id="share-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">Update shared copy</button>`;
     }
     return `<button id="share-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">Share</button>`;
   },
 
+  // Fork button for the recipe view. Hidden in the unsaved-fork state
+  // (no conversation and not viewing a shared recipe) — forking an
+  // untouched fork would do nothing useful.
+  renderForkControl() {
+    if (!App.currentConversationId && !App.viewingShared) return '';
+    return `<button id="fork-btn" title="Fork this recipe into a new conversation" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">Fork</button>`;
+  },
+
+  // Modal prompt for an optional update note. Resolves the trimmed note
+  // ('' allowed) or null when cancelled.
+  promptShareNote() {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('share-note-modal');
+      const input = document.getElementById('share-note-input');
+      if (!modal || !input) return resolve('');
+      const confirmBtn = document.getElementById('share-note-confirm');
+      const cancelBtn = document.getElementById('share-note-cancel');
+      const closeBtn = document.getElementById('share-note-close');
+      const backdrop = document.getElementById('share-note-backdrop');
+
+      input.value = '';
+      modal.classList.remove('hidden');
+      input.focus();
+
+      const done = (val) => {
+        modal.classList.add('hidden');
+        confirmBtn.removeEventListener('click', onConfirm);
+        cancelBtn.removeEventListener('click', onCancel);
+        closeBtn.removeEventListener('click', onCancel);
+        backdrop.removeEventListener('click', onCancel);
+        resolve(val);
+      };
+      const onConfirm = () => done(input.value.trim());
+      const onCancel = () => done(null);
+      confirmBtn.addEventListener('click', onConfirm);
+      cancelBtn.addEventListener('click', onCancel);
+      closeBtn.addEventListener('click', onCancel);
+      backdrop.addEventListener('click', onCancel);
+    });
+  },
+
+  // ── Version history (shared recipes) ─────────────────────────
+
+  async openVersionHistory() {
+    const vs = App.viewingShared;
+    if (!vs?.id) return;
+    const modal = document.getElementById('version-history-modal');
+    const list = document.getElementById('version-history-list');
+    if (!modal || !list) return;
+    list.innerHTML = '<p class="text-sm text-zinc-400 dark:text-zinc-500">Loading…</p>';
+    modal.classList.remove('hidden');
+
+    try {
+      const res = await fetch(`/api/shared-recipes/${vs.id}/versions`);
+      if (!res.ok) throw new Error('versions failed');
+      const versions = await res.json();
+      if (versions.length) vs.current_version = versions[0].version;
+
+      list.innerHTML = '';
+      versions.forEach((v) => {
+        const isCurrent = v.version === vs.current_version;
+        const row = document.createElement('div');
+        row.className = 'flex items-start justify-between gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50';
+        const date = v.created_at ? new Date(v.created_at).toLocaleDateString() : '';
+        row.innerHTML = `
+          <div class="min-w-0">
+            <p class="text-sm font-medium">v${v.version}${isCurrent ? ' <span class="text-xs font-normal text-blue-500">current</span>' : ''}</p>
+            <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">by ${this.escapeHtml(v.username)}${date ? ` · ${date}` : ''}</p>
+            ${v.note ? `<p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">${this.escapeHtml(v.note)}</p>` : ''}
+          </div>
+          <button class="version-view-btn shrink-0 px-3 py-1.5 text-xs rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors">View</button>`;
+        row.querySelector('.version-view-btn').addEventListener('click', () => this.viewVersion(v));
+        list.appendChild(row);
+      });
+    } catch {
+      list.innerHTML = '<p class="text-sm text-red-500">Could not load version history</p>';
+    }
+  },
+
+  viewVersion(v) {
+    const vs = App.viewingShared;
+    document.getElementById('version-history-modal')?.classList.add('hidden');
+    if (!vs) return;
+    if (v.version === vs.current_version) return this.backToCurrentVersion();
+    App.viewingVersion = { version: v.version };
+    App.currentRecipe = v.recipe_data;
+    this.currentServings = v.recipe_data.default_servings;
+    this.servingScale = 1.0;
+    this.display(v.recipe_data);
+  },
+
+  backToCurrentVersion() {
+    const vs = App.viewingShared;
+    App.viewingVersion = null;
+    if (!vs?.currentData) return;
+    App.currentRecipe = vs.currentData;
+    this.currentServings = vs.currentData.default_servings;
+    this.servingScale = 1.0;
+    this.display(vs.currentData);
+  },
+
   bindActions(recipe, display) {
     display.querySelector('#share-btn')?.addEventListener('click', async () => {
       const btn = display.querySelector('#share-btn');
+      if (btn?.disabled) return;
+
+      // Updating an existing shared copy prompts for an optional note;
+      // the first share publishes v1 immediately.
+      const conv = (typeof Store !== 'undefined')
+        ? Store.conversations.find((c) => c.id === App.currentConversationId)
+        : null;
+      let note = '';
+      if (conv?.is_shared) {
+        note = await this.promptShareNote();
+        if (note === null) return; // cancelled
+      }
+
       try {
         const res = await fetch('/api/recipes/share', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ conversationId: App.currentConversationId }),
+          body: JSON.stringify({ conversationId: App.currentConversationId, note: note || undefined }),
         });
         if (!res.ok) throw new Error('share failed');
         if (btn) btn.textContent = 'Shared!';
@@ -249,6 +386,15 @@ const Recipe = {
         if (btn) btn.textContent = 'Share failed';
       }
     });
+
+    display.querySelector('#fork-btn')?.addEventListener('click', () => {
+      if (typeof Store === 'undefined') return;
+      const vs = App.viewingShared;
+      Store.forkRecipe(App.currentRecipe, vs && !vs.is_mine ? { username: vs.username } : null);
+    });
+
+    display.querySelector('#history-btn')?.addEventListener('click', () => this.openVersionHistory());
+    display.querySelector('#version-back-current')?.addEventListener('click', () => this.backToCurrentVersion());
 
     display.querySelectorAll('.servings-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -343,6 +489,12 @@ const Recipe = {
         }
         this.saveUIStateToServer();
       });
+    });
+
+    // Keep the summary-line macros label from toggling the <details> open
+    // state (the summary's default action fires on its click event).
+    display.querySelector('.ing-macros-summary-toggle')?.addEventListener('click', (e) => {
+      e.stopPropagation();
     });
 
     display.querySelector('#ing-macros-toggle')?.addEventListener('change', (e) => {
@@ -463,7 +615,11 @@ const Recipe = {
       if (!this.currentServings) this.currentServings = newRecipe.default_servings;
       this.display(newRecipe);
       this.saveUIStateToServer();
-      Store.refresh();
+      // Re-render once fresh conversation state arrives so the share button
+      // re-arms ("Shared ✓" → "Update shared copy") after accepting changes.
+      Store.refresh().then(() => {
+        if (!this.diffMode && !App.pendingRecipe) this.display(App.currentRecipe);
+      });
       if (App.pendingReplyId) {
         Chat._acknowledgeReply(App.pendingReplyId);
         App.pendingReplyId = null;
@@ -668,18 +824,19 @@ const Recipe = {
     recipe.steps.forEach((s) => { totalIngredients += (s.ingredients || []).length; });
 
     const showMacros = this._showIngMacros || false;
+    // The macros toggle sits on the summary line itself (right-aligned) and
+    // is only visible while the section is expanded (see app.css). Flex on
+    // <summary> drops the native disclosure marker, so a chevron stands in.
     let html = `
       <details class="rounded-xl bg-zinc-50 dark:bg-zinc-900/50">
-        <summary class="px-4 py-2.5 cursor-pointer text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
-          All Ingredients (${totalIngredients})
+        <summary class="px-4 py-2.5 cursor-pointer text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors flex items-center justify-between gap-2">
+          <span class="flex items-center gap-1.5"><span class="summary-chevron text-[0.6rem]">▶</span>All Ingredients (${totalIngredients})</span>
+          <label class="ing-macros-summary-toggle flex items-center gap-1.5 cursor-pointer text-xs text-zinc-400 dark:text-zinc-500 select-none">
+            <input type="checkbox" id="ing-macros-toggle" class="ingredient-check" ${showMacros ? 'checked' : ''}>
+            Macros per serving
+          </label>
         </summary>
         <div class="summary-grid px-4 pb-4 pt-2 ${showMacros ? 'show-macros' : ''}">
-          <div class="macros-toggle-row">
-            <label class="flex items-center gap-1.5 cursor-pointer text-xs text-zinc-400 dark:text-zinc-500 select-none">
-              <input type="checkbox" id="ing-macros-toggle" class="ingredient-check" ${showMacros ? 'checked' : ''}>
-              Macros per serving
-            </label>
-          </div>
     `;
 
     const servings = this.currentServings || recipe.default_servings || 1;
@@ -883,3 +1040,10 @@ const Recipe = {
     return str.length > len ? str.slice(0, len) + '...' : str;
   },
 };
+
+document.getElementById('version-history-close')?.addEventListener('click', () => {
+  document.getElementById('version-history-modal')?.classList.add('hidden');
+});
+document.getElementById('version-history-backdrop')?.addEventListener('click', () => {
+  document.getElementById('version-history-modal')?.classList.add('hidden');
+});

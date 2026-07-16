@@ -223,7 +223,7 @@ const Home = {
     head.innerHTML = `
       <div class="min-w-0">
         <h3 class="font-semibold text-sm truncate">${this.esc(recipe.title || 'Untitled')}</h3>
-        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">by ${s.is_mine ? 'you' : this.esc(s.username)}</p>
+        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">by ${s.is_mine ? 'you' : this.esc(s.username)}${s.current_version > 1 ? ` · v${s.current_version}` : ''}</p>
       </div>`;
     const heart = this._heartBtn(s.is_favorited);
     heart.addEventListener('click', () => this.toggleSharedFavorite(s.id, s.is_favorited));

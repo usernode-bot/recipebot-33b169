@@ -179,6 +179,27 @@ async function seedStagingDemo(pool) {
      ON CONFLICT (id) DO NOTHING`,
     [900002, 900002, 'staging-demo-chef', 900002, JSON.stringify(DEMO_RECIPE_2)]
   );
+  // Version history for the demo chef's shared recipe: v1 (chicken) → v2
+  // (tofu, matching its current recipe_data) so testers can browse history.
+  // Shared recipe 900001 gets its v1 from the schema backfill and is left
+  // deliberately stale (shared copy = chicken, conversation's latest recipe
+  // = tofu) so "Update shared copy" is active and the note flow is testable.
+  await pool.query(
+    `INSERT INTO shared_recipe_versions (shared_recipe_id, version, recipe_data, note, user_id, username)
+     VALUES ($1, 1, $2, NULL, 900002, 'staging-demo-chef'),
+            ($1, 2, $3, 'Swapped chicken for tofu to make it vegan', 900002, 'staging-demo-chef')
+     ON CONFLICT (shared_recipe_id, version) DO NOTHING`,
+    [900002, JSON.stringify(DEMO_RECIPE), JSON.stringify(DEMO_RECIPE_2)]
+  );
+  // The schema backfill runs before this seed on a fresh staging DB, so
+  // give 900001 its v1 explicitly (same semantics, idempotent).
+  await pool.query(
+    `INSERT INTO shared_recipe_versions (shared_recipe_id, version, recipe_data, note, user_id, username)
+     VALUES ($1, 1, $2, NULL, $3, 'staging-demo-user')
+     ON CONFLICT (shared_recipe_id, version) DO NOTHING`,
+    [900001, JSON.stringify(DEMO_RECIPE), DEMO_USER_ID]
+  );
+
   await pool.query(
     `INSERT INTO recipe_ratings (shared_recipe_id, user_id, rating) VALUES
        (900001, 900101, 5),

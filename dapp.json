@@ -104,6 +104,26 @@
       "name": "Header back button exists (hidden on home)",
       "path": "/",
       "expectSelector": "#home-btn"
+    },
+    {
+      "name": "Three-state theme toggle renders",
+      "path": "/",
+      "expectSelector": "#icon-system"
+    },
+    {
+      "name": "Update-note dialog exists",
+      "path": "/",
+      "expectSelector": "#share-note-modal"
+    },
+    {
+      "name": "Version history modal exists",
+      "path": "/",
+      "expectSelector": "#version-history-modal"
+    },
+    {
+      "name": "Community card shows seeded version badge",
+      "path": "/",
+      "expectText": "v2"
     }
   ]
 }

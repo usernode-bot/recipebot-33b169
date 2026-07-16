@@ -76,6 +76,27 @@ CREATE TABLE IF NOT EXISTS shared_recipes (
 CREATE UNIQUE INDEX IF NOT EXISTS shared_recipes_owner_conv
   ON shared_recipes (user_id, conversation_id);
 
+-- Version history for shared recipes: one row per publish (v1 = first
+-- share). shared_recipes.recipe_data stays the denormalized "current"
+-- copy; the current version number is computed as MAX(version).
+CREATE TABLE IF NOT EXISTS shared_recipe_versions (
+  id               SERIAL PRIMARY KEY,
+  shared_recipe_id INTEGER NOT NULL REFERENCES shared_recipes(id) ON DELETE CASCADE,
+  version          INTEGER NOT NULL,
+  recipe_data      JSONB NOT NULL,
+  note             TEXT,
+  user_id          INTEGER NOT NULL,
+  username         VARCHAR(255) NOT NULL,
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (shared_recipe_id, version)
+);
+
+-- Backfill: shares published before versioning existed become v1.
+INSERT INTO shared_recipe_versions (shared_recipe_id, version, recipe_data, user_id, username, created_at)
+SELECT s.id, 1, s.recipe_data, s.user_id, s.username, s.updated_at
+FROM shared_recipes s
+WHERE NOT EXISTS (SELECT 1 FROM shared_recipe_versions v WHERE v.shared_recipe_id = s.id);
+
 CREATE TABLE IF NOT EXISTS recipe_ratings (
   shared_recipe_id INTEGER NOT NULL REFERENCES shared_recipes(id) ON DELETE CASCADE,
   user_id          INTEGER NOT NULL,
