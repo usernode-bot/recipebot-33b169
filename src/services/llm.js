@@ -24,6 +24,35 @@ const MODELS = [
 
 const DEFAULT_MODEL = MODELS.find((m) => m.default).id;
 
+// Standard list prices in dollars per million tokens, used to estimate the
+// user's daily spend ("AI usage today" in the user menu). The platform proxy
+// does its own billing, so this is an estimate — standard (non-introductory)
+// prices are used deliberately as a conservative over-estimate.
+const MODEL_PRICING = {
+  'claude-sonnet-5': { input: 3, output: 15 },
+  'claude-haiku-4-5': { input: 1, output: 5 },
+  'claude-opus-4-8': { input: 5, output: 25 },
+};
+
+// Estimate the cost of one Messages API response in microcents (1e-6 cents),
+// from its `usage` block. P $/MTok works out to exactly P*100 microcents per
+// token, so accumulation stays integer-exact.
+// Cache reads bill at 0.1x input rate, cache writes at 1.25x (unused today,
+// but the fields cost nothing to handle). Unknown models fall back to
+// Sonnet 5 pricing.
+function estimateMicrocents(model, usage) {
+  if (!usage) return 0;
+  const pricing = MODEL_PRICING[model] || MODEL_PRICING['claude-sonnet-5'];
+  const inputMicrocentsPerTok = pricing.input * 100;
+  const outputMicrocentsPerTok = pricing.output * 100;
+  const cost =
+    (usage.input_tokens || 0) * inputMicrocentsPerTok +
+    (usage.output_tokens || 0) * outputMicrocentsPerTok +
+    (usage.cache_read_input_tokens || 0) * inputMicrocentsPerTok * 0.1 +
+    (usage.cache_creation_input_tokens || 0) * inputMicrocentsPerTok * 1.25;
+  return Math.round(cost);
+}
+
 function isValidModel(id) {
   return typeof id === 'string' && MODELS.some((m) => m.id === id);
 }
@@ -314,6 +343,7 @@ module.exports = {
   MODELS,
   DEFAULT_MODEL,
   isValidModel,
+  estimateMicrocents,
   buildSystemPrompt,
   buildMessages,
   getCreateParams,

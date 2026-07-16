@@ -38,6 +38,20 @@ CREATE TABLE IF NOT EXISTS rate_limits (
   PRIMARY KEY (user_id, date)
 );
 
+-- Per-user daily LLM spend, accumulated per API turn from response.usage.
+-- date is always the UTC day (see chat.js / auth.js queries) so "today"
+-- matches the platform's midnight-UTC budget reset. estimated_microcents
+-- is 1/1,000,000 of a cent — integer-exact accumulation; converted to
+-- cents only at the API boundary.
+CREATE TABLE IF NOT EXISTS llm_usage (
+  user_id              INTEGER NOT NULL,
+  date                 DATE NOT NULL,
+  input_tokens         BIGINT NOT NULL DEFAULT 0,
+  output_tokens        BIGINT NOT NULL DEFAULT 0,
+  estimated_microcents BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, date)
+);
+
 CREATE TABLE IF NOT EXISTS user_settings (
   user_id     INTEGER PRIMARY KEY,
   username    VARCHAR(255),
@@ -93,6 +107,7 @@ DROP TABLE IF EXISTS feedback;
 -- Owner-only content: 1:1 chats with the bot, diet preferences.
 -- Copied schema-only into staging; seeded there by migrate.js.
 COMMENT ON TABLE conversations   IS 'staging:private';
+COMMENT ON TABLE llm_usage       IS 'staging:private';
 COMMENT ON TABLE messages        IS 'staging:private';
 COMMENT ON TABLE pending_replies IS 'staging:private';
 COMMENT ON TABLE user_settings   IS 'staging:private';

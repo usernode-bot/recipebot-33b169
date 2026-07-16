@@ -1,6 +1,8 @@
 // User menu (header) + App settings modal with the per-user AI model picker.
 // The model list comes from /api/auth/me (App.llm.models); the choice is
 // saved immediately into the same preferences JSONB the recipe chips use.
+// The menu also shows "AI usage today" — the app's local spend estimate
+// (GET /api/usage/today) against the per-app cap from usernode.getLlmAccess().
 (function () {
   const menuBtn = document.getElementById('user-menu-btn');
   const menu = document.getElementById('user-menu');
@@ -18,7 +20,83 @@
     e.stopPropagation();
     const nowHidden = menu.classList.toggle('hidden');
     menuBtn.setAttribute('aria-expanded', String(!nowHidden));
+    if (!nowHidden) refreshUsage();
   });
+
+  function fmtCents(cents) {
+    if (cents > 0 && cents < 1) return '< $0.01';
+    return '$' + (cents / 100).toFixed(2);
+  }
+
+  // Per-app daily cap in cents, via the bridge. Read-only: never call
+  // requestLlmAccess() here — opening the menu must not pop the consent
+  // dialog. No shell / rejected / not granted all mean "cap unknown".
+  async function fetchDailyCapCents() {
+    if (!App.llm || App.llm.mode !== 'proxy') return null;
+    if (typeof usernode === 'undefined' || !usernode.getLlmAccess) return null;
+    try {
+      const state = await usernode.getLlmAccess();
+      if (state && state.granted && typeof state.dailyCapCents === 'number') {
+        return state.dailyCapCents;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function refreshUsage() {
+    const section = document.getElementById('usage-section');
+    const amountEl = document.getElementById('usage-amount');
+    const barEl = document.getElementById('usage-bar');
+    const fillEl = document.getElementById('usage-bar-fill');
+    const footnoteEl = document.getElementById('usage-footnote');
+    if (!section || !amountEl) return;
+
+    // Muted "…" placeholder while loading — no reflow on refresh.
+    section.classList.remove('hidden');
+    amountEl.textContent = '…';
+    amountEl.className = 'text-sm text-zinc-400 dark:text-zinc-500 mt-1 truncate';
+    barEl.classList.add('hidden');
+    footnoteEl.classList.add('hidden');
+
+    let usage;
+    try {
+      const res = await fetch('/api/usage/today');
+      if (!res.ok) throw new Error('usage fetch failed');
+      usage = await res.json();
+    } catch {
+      // Endpoint unreachable — hide the section; the menu still works.
+      section.classList.add('hidden');
+      return;
+    }
+
+    const cents = usage.estimatedCents || 0;
+
+    // LLM disabled (staging/standalone) with nothing recorded: a muted line
+    // instead of a $0.00 meter. With data (e.g. the staging demo row) the
+    // spend still renders so testers can see the meter.
+    if (usage.llm && !usage.llm.enabled && cents === 0) {
+      amountEl.textContent = 'AI is unavailable in this environment';
+      return;
+    }
+
+    const capCents = await fetchDailyCapCents();
+    amountEl.className = 'text-sm text-zinc-700 dark:text-zinc-200 mt-1 truncate';
+    footnoteEl.classList.remove('hidden');
+
+    if (capCents != null && capCents > 0) {
+      amountEl.textContent = `${fmtCents(cents)} of ${fmtCents(capCents)} used today`;
+      const pct = Math.min(100, (cents / capCents) * 100);
+      fillEl.style.width = pct + '%';
+      fillEl.className =
+        'h-full rounded-full transition-all ' +
+        (pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-blue-500');
+      barEl.classList.remove('hidden');
+    } else {
+      amountEl.textContent = `≈ ${fmtCents(cents)} used today`;
+    }
+  }
 
   document.addEventListener('click', (e) => {
     if (menu.classList.contains('hidden')) return;
