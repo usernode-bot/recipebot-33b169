@@ -31,6 +31,7 @@ const Store = {
     App.currentRecipe = null;
     App.pendingRecipe = null;
     App.viewingShared = null;
+    App.viewingVersion = null;
     App.showView('chat');
     HashParams.set('c', id);
     if (!opts?.restore) {
@@ -52,11 +53,16 @@ const Store = {
     App.currentConversationId = null;
     App.pendingRecipe = null;
     App.currentRecipe = item.data;
+    App.viewingVersion = null;
     App.viewingShared = {
+      id: item.id,
       username: item.username,
       is_mine: item.is_mine,
       avg_rating: item.avg_rating,
       rating_count: item.rating_count,
+      current_version: item.current_version || 1,
+      // Kept so "Back to current" can restore after viewing an old version.
+      currentData: item.data,
     };
     Recipe.currentServings = item.data.default_servings;
     Recipe.servingScale = 1.0;
@@ -71,6 +77,7 @@ const Store = {
     App.currentConversationId = null;
     App.currentRecipe = recipeData;
     App.viewingShared = meta ? { username: meta.username } : null;
+    App.viewingVersion = null;
     Recipe.currentServings = recipeData.default_servings;
     Recipe.display(recipeData);
 

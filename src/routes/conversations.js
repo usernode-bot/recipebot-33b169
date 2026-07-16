@@ -18,7 +18,12 @@ function conversationRoutes(config) {
            EXISTS (SELECT 1 FROM recipe_favorites f
                    WHERE f.conversation_id = c.id AND f.user_id = $1) AS is_favorited,
            EXISTS (SELECT 1 FROM shared_recipes s
-                   WHERE s.conversation_id = c.id) AS is_shared
+                   WHERE s.conversation_id = c.id) AS is_shared,
+           EXISTS (SELECT 1 FROM shared_recipes s
+                   WHERE s.conversation_id = c.id
+                     AND s.recipe_data = (SELECT m.recipe_data FROM messages m
+                                          WHERE m.conversation_id = c.id AND m.recipe_data IS NOT NULL
+                                          ORDER BY m.created_at DESC LIMIT 1)) AS shared_up_to_date
          FROM conversations c
          WHERE ${ownerClause('c.user_id')} ORDER BY c.created_at DESC`,
         [req.user.id]

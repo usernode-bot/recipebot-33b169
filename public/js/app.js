@@ -3,9 +3,12 @@ window.App = {
   currentConversationId: null,
   currentRecipe: null,
   pendingRecipe: null,
-  // Set while viewing a shared recipe read-only ({ username, avg_rating,
-  // rating_count }); chatting from that state auto-forks the recipe.
+  // Set while viewing a shared recipe read-only ({ id, username, avg_rating,
+  // rating_count, current_version, currentData }); chatting from that state
+  // auto-forks the recipe.
   viewingShared: null,
+  // Set while viewing an old version of a shared recipe ({ version }).
+  viewingVersion: null,
   currentView: 'chat',
 
   preferences: {
@@ -234,6 +237,7 @@ function setupNewConversation() {
     App.currentRecipe = null;
     App.pendingRecipe = null;
     App.viewingShared = null;
+    App.viewingVersion = null;
     App.showView('chat');
     HashParams.clear();
     if (typeof Chat !== 'undefined') Chat.clear();
@@ -243,12 +247,41 @@ function setupNewConversation() {
   });
 }
 
+// Three-state theme toggle: System → Light → Dark → System. The mode is
+// stored in localStorage.theme ('light' | 'dark' | 'system'; missing key =
+// system); the button icon reflects the selected mode, not the effective
+// theme. In system mode the app follows the OS preference live.
 function setupDarkMode() {
   const toggle = document.getElementById('dark-mode-toggle');
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+  const ORDER = ['system', 'light', 'dark'];
+  const LABELS = { system: 'System', light: 'Light', dark: 'Dark' };
+
+  const getMode = () =>
+    ORDER.includes(localStorage.theme) ? localStorage.theme : 'system';
+
+  function apply() {
+    const mode = getMode();
+    const dark = mode === 'dark' || (mode === 'system' && media.matches);
+    document.documentElement.classList.toggle('dark', dark);
+    toggle.title = `Theme: ${LABELS[mode]}`;
+    for (const m of ORDER) {
+      const icon = document.getElementById(m === 'system' ? 'icon-system' : m === 'light' ? 'icon-sun' : 'icon-moon');
+      if (icon) icon.classList.toggle('hidden', m !== mode);
+    }
+  }
+
   toggle.addEventListener('click', () => {
-    const isDark = document.documentElement.classList.toggle('dark');
-    localStorage.theme = isDark ? 'dark' : 'light';
+    const next = ORDER[(ORDER.indexOf(getMode()) + 1) % ORDER.length];
+    localStorage.theme = next;
+    apply();
   });
+
+  media.addEventListener('change', () => {
+    if (getMode() === 'system') apply();
+  });
+
+  apply();
 }
 
 function setupTextareaResize() {

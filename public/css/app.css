@@ -288,9 +288,20 @@
   visibility: visible;
 }
 
-.macros-toggle-row {
-  grid-column: 4 / -1;
-  padding-bottom: 0.25rem;
+/* The "Macros per serving" toggle lives on the <summary> line; only show
+   it while the ingredient summary is expanded. */
+details:not([open]) .ing-macros-summary-toggle {
+  display: none;
+}
+
+/* Flex on <summary> drops the native disclosure marker — this chevron
+   replaces it. */
+.summary-chevron {
+  transition: transform 0.15s;
+}
+
+details[open] .summary-chevron {
+  transform: rotate(90deg);
 }
 
 .ing-actions {
