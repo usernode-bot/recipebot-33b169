@@ -124,6 +124,16 @@
       "name": "Community card shows seeded version badge",
       "path": "/",
       "expectText": "v2"
+    },
+    {
+      "name": "Accepted edit reopens without accept screen",
+      "path": "/?c=900003",
+      "expectSelector": "#cook-btn"
+    },
+    {
+      "name": "Undecided edit still shows accept screen",
+      "path": "/?c=900004",
+      "expectSelector": "#diff-accept"
     }
   ]
 }

@@ -136,6 +136,56 @@ const DEMO_RECIPE_2 = {
   ],
 };
 
+// Edited-recipe variants for the issue #16 regression seeds — distinct
+// titles so the dapp.json tests (and testers) can tell the two apart.
+const DEMO_RECIPE_ACCEPTED = { ...DEMO_RECIPE_2, title: 'Staging Demo Accepted Tofu Stir Fry' };
+const DEMO_RECIPE_PENDING = { ...DEMO_RECIPE_2, title: 'Staging Demo Pending Tofu Stir Fry' };
+
+// Regression seeds for issue #16 (accept-edit screen reappearing): a
+// conversation whose recipe was edited, with a pending_replies row in a
+// given terminal state. Message/reply timestamps are staggered explicitly
+// because the client compares message created_at against the reply's
+// created_at to decide whether to re-show the Accept/Reject diff (a
+// multi-row INSERT would give every row the same NOW()).
+async function seedEditDecisionDemo(pool, convId, title, newRecipe, replyId, replyStatus) {
+  await pool.query(
+    `INSERT INTO conversations (id, user_id, title, preferences)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (id) DO NOTHING`,
+    [convId, DEMO_USER_ID, title, JSON.stringify({ complexity: 'normal', serving: 'normal' })]
+  );
+
+  const { rows } = await pool.query(
+    'SELECT 1 FROM messages WHERE conversation_id = $1 LIMIT 1',
+    [convId]
+  );
+  if (rows.length === 0) {
+    await pool.query(
+      `INSERT INTO messages (conversation_id, role, content, recipe_data, created_at) VALUES
+       ($1, 'user', 'Staging demo: make me a quick chicken stir fry', NULL, NOW() - interval '11 min'),
+       ($1, 'assistant', $2, $3, NOW() - interval '10 min'),
+       ($1, 'user', 'Staging demo: now make it vegan', NULL, NOW() - interval '6 min'),
+       ($1, 'assistant', $4, $5, NOW() - interval '4 min')`,
+      [
+        convId,
+        `[Recipe: ${DEMO_RECIPE.title}]`,
+        JSON.stringify(DEMO_RECIPE),
+        `[Recipe: ${newRecipe.title}]`,
+        JSON.stringify(newRecipe),
+      ]
+    );
+  }
+
+  // Reply created between the old and new recipe messages, so the client
+  // treats the newer recipe message as this reply's proposed edit.
+  await pool.query(
+    `INSERT INTO pending_replies (id, conversation_id, user_id, status, events, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, '[]', NOW() - interval '5 min', NOW() - interval '4 min')
+     ON CONFLICT (id) DO NOTHING`,
+    [replyId, convId, DEMO_USER_ID, replyStatus]
+  );
+}
+
 async function seedStagingDemo(pool) {
   // Idempotent: fixed high IDs, ON CONFLICT DO NOTHING. SERIAL sequences
   // start far below 900001, so app-created rows won't collide.
@@ -163,6 +213,18 @@ async function seedStagingDemo(pool) {
     );
     log.info('db', 'Seeded staging demo conversation');
   }
+
+  // Issue #16 regression seeds: an already-accepted edit (must open to the
+  // normal recipe view) and an undecided edit (must open to the diff).
+  await seedEditDecisionDemo(
+    pool, 900003, 'Staging demo — Accepted edit stir fry',
+    DEMO_RECIPE_ACCEPTED, 900301, 'acknowledged'
+  );
+  await seedEditDecisionDemo(
+    pool, 900004, 'Staging demo — Pending edit stir fry',
+    DEMO_RECIPE_PENDING, 900302, 'done'
+  );
+  log.info('db', 'Seeded staging edit-decision demo conversations');
 
   // Social features: seed the community feed with two shared recipes from
   // two distinct fake creators, plus ratings so aggregates visibly render.
