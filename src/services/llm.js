@@ -79,9 +79,15 @@ function llmMode(config) {
   return 'disabled';
 }
 
+// Hard ceiling on a single Messages API call. The proxy/upstream can stall
+// indefinitely on rare occasions; without a bound the background reply loop
+// hangs forever and the client spinner never resolves. Callers can pass a
+// tighter `timeoutMs` (e.g. the recipe fix-up retry).
+const LLM_TIMEOUT_MS = 120_000;
+
 // Non-streaming Messages API call. `userToken` is the requester's platform
 // JWT, forwarded so the proxy can bill/authorize the right user.
-async function createMessage(config, params, userToken) {
+async function createMessage(config, params, userToken, { timeoutMs = LLM_TIMEOUT_MS } = {}) {
   const mode = llmMode(config);
 
   if (mode === 'disabled') {
@@ -101,11 +107,30 @@ async function createMessage(config, params, userToken) {
     headers['x-api-key'] = config.anthropicApiKey;
   }
 
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(params),
-  });
+  let resp;
+  try {
+    resp = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(params),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (e) {
+    const timedOut = e.name === 'TimeoutError' || e.name === 'AbortError';
+    log.error('llm', timedOut ? 'Messages API call timed out' : 'Messages API request failed', {
+      mode,
+      timeout_ms: timeoutMs,
+      error: e.message,
+    });
+    const err = new Error(timedOut
+      ? `LLM request timed out after ${timeoutMs}ms`
+      : `LLM request failed: ${e.message}`);
+    err.code = timedOut ? 'timeout' : 'network_error';
+    err.userMessage = timedOut
+      ? 'The AI request timed out. Please try again.'
+      : 'The AI request failed. Please try again.';
+    throw err;
+  }
 
   if (!resp.ok) {
     let body = null;

@@ -196,6 +196,11 @@
   animation: spin 1s linear infinite;
 }
 
+.status-line .status-icon.status-icon-error,
+:is(.dark .status-line .status-icon.status-icon-error) {
+  color: #ef4444;
+}
+
 :is(.dark .status-line) {
   color: #71718a;
 }
