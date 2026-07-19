@@ -109,6 +109,8 @@ const Chat = {
   async loadMessages(conversationId) {
     this.clear();
     this.messages = [];
+    App.pendingReplyId = null;
+    this._ackOnDone = null;
 
     if (!conversationId) return;
 
@@ -229,6 +231,7 @@ const Chat = {
           console.warn('[chat] reply no longer processing:', status);
           this._finalizeActiveStatus();
           this._removeSpinner();
+          if (status === 'done') this._flushDeferredAck();
           if (status === 'error' || status === 'not_found') {
             const errEl = document.createElement('div');
             errEl.className = 'msg-assistant px-4 py-2.5';
@@ -352,7 +355,12 @@ const Chat = {
       console.log('[chat] ← recipe');
       currentTextEl = null;
       this._appendStatusLine(wrapper, `Created recipe: ${data.title}`, false);
-      if (typeof Recipe !== 'undefined') Recipe.handleRecipeEvent(data);
+      if (typeof Recipe !== 'undefined') {
+        // A modification renders the Accept/Reject diff — record which reply
+        // it belongs to so the decision can be persisted server-side.
+        if (App.currentRecipe) App.pendingReplyId = replyId;
+        Recipe.handleRecipeEvent(data);
+      }
     });
 
     es.addEventListener('conversation', (e) => {
@@ -387,6 +395,7 @@ const Chat = {
       if (dedup(data)) return;
       this._finalizeActiveStatus();
       this._removeSpinner();
+      this._flushDeferredAck();
       this._cleanupStream();
     });
 
@@ -438,6 +447,28 @@ const Chat = {
 
   _acknowledgeReply(replyId) {
     fetch(`/api/chat/${replyId}/acknowledge`, { method: 'PATCH' }).catch(() => {});
+  },
+
+  // Persist an Accept/Reject decision for the diff currently on screen.
+  // If the reply is still streaming, defer the PATCH until 'done' — an
+  // early acknowledge would make the stale checker see a non-'processing'
+  // status and kill the live stream.
+  resolveDiffReply() {
+    const id = App.pendingReplyId;
+    App.pendingReplyId = null;
+    if (!id) return;
+    if (this.streaming && this._activeReplyId === id) {
+      this._ackOnDone = id;
+    } else {
+      this._acknowledgeReply(id);
+    }
+  },
+
+  _flushDeferredAck() {
+    if (this._ackOnDone) {
+      this._acknowledgeReply(this._ackOnDone);
+      this._ackOnDone = null;
+    }
   },
 
   _cleanupStream() {
@@ -622,6 +653,8 @@ const Chat = {
   clear() {
     this._cleanupStream();
     this.messages = [];
+    App.pendingReplyId = null;
+    this._ackOnDone = null;
     const container = document.getElementById('chat-messages');
     const welcome = document.getElementById('chat-welcome');
     container.innerHTML = '';

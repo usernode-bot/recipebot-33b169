@@ -105,7 +105,7 @@ function conversationRoutes(config) {
       );
 
       const { rows: pendingRows } = await pool.query(
-        `SELECT id, status, created_at FROM pending_replies WHERE conversation_id = $1 AND user_id = $2 AND status IN ('processing', 'done') ORDER BY created_at DESC LIMIT 1`,
+        `SELECT id, status, created_at FROM pending_replies WHERE conversation_id = $1 AND ${config.isStaging ? 'user_id IN ($2, 0)' : 'user_id = $2'} AND status IN ('processing', 'done') ORDER BY created_at DESC LIMIT 1`,
         [convId, req.user.id]
       );
       const pendingReply = pendingRows.length ? {

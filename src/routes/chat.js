@@ -331,7 +331,7 @@ async function runBackgroundStream(
     send('done', {});
 
     await pool.query(
-      `UPDATE pending_replies SET status = 'done', updated_at = NOW() WHERE id = $1`,
+      `UPDATE pending_replies SET status = 'done', updated_at = NOW() WHERE id = $1 AND status = 'processing'`,
       [replyId]
     );
   } catch (err) {
@@ -346,7 +346,7 @@ async function runBackgroundStream(
     }
 
     await pool.query(
-      `UPDATE pending_replies SET status = 'error', updated_at = NOW() WHERE id = $1`,
+      `UPDATE pending_replies SET status = 'error', updated_at = NOW() WHERE id = $1 AND status = 'processing'`,
       [replyId]
     ).catch(() => {});
   } finally {

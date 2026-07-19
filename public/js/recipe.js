@@ -620,19 +620,13 @@ const Recipe = {
       Store.refresh().then(() => {
         if (!this.diffMode && !App.pendingRecipe) this.display(App.currentRecipe);
       });
-      if (App.pendingReplyId) {
-        Chat._acknowledgeReply(App.pendingReplyId);
-        App.pendingReplyId = null;
-      }
+      Chat.resolveDiffReply();
     });
 
     display.querySelector('#diff-reject')?.addEventListener('click', () => {
       App.pendingRecipe = null;
       this.display(App.currentRecipe);
-      if (App.pendingReplyId) {
-        Chat._acknowledgeReply(App.pendingReplyId);
-        App.pendingReplyId = null;
-      }
+      Chat.resolveDiffReply();
     });
   },
 
