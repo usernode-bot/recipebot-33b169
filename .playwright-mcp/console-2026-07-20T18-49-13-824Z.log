@@ -1,0 +1,11 @@
+[      52ms] [LOG] [bridge top 127.0.0.1:3100] loaded; inIframe=false hasNativeChannel=false hasUsernode=undefined @ http://127.0.0.1:3100/:51
+[     156ms] [WARNING] cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation @ http://127.0.0.1:3100/:51
+[     535ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:3100/api/auth/me:0
+[     535ms] [WARNING] [app] Not authenticated — open this app inside Usernode @ http://127.0.0.1:3100/:51
+[     544ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:3100/api/conversations:0
+[     544ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:3100/api/recipes:0
+[     544ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:3100/api/favorites:0
+[     544ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:3100/api/shared-recipes:0
+[     544ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:3100/api/recipes:0
+[     544ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:3100/api/favorites:0
+[     544ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:3100/api/conversations:0
