@@ -10,6 +10,11 @@ const log = require('../services/logger');
 
 const MAX_VALIDATION_RETRIES = 2;
 
+// Tighter timeout for the recipe fix-up call ("Fixing recipe format..."):
+// the user is already waiting on a spinner at that point, so fail fast
+// rather than sitting on the default LLM timeout.
+const RECIPE_FIXUP_TIMEOUT_MS = 60_000;
+
 const replyEmitters = new Map();
 
 function getOrCreateEmitter(replyId) {
@@ -363,6 +368,12 @@ async function streamWithToolHandling(
   let currentMessages = [...messages];
   let totalUsage = { input_tokens: 0, output_tokens: 0 };
 
+  // Recipe-validation fix-up state, shared across turns: `attempts` counts
+  // how many fix-up rounds we've asked the model for (bounded by
+  // MAX_VALIDATION_RETRIES), and `pending` marks that the NEXT createMessage
+  // call is a fix-up call — it gets a tighter timeout and '[recipe]' logging.
+  const fixState = { attempts: 0, pending: null };
+
   for (let turn = 0; turn < 5; turn++) {
     const params = getCreateParams(config, currentMessages, systemPrompt, { model: userModel });
 
@@ -376,7 +387,55 @@ async function streamWithToolHandling(
       })),
     });
 
-    const response = await createMessage(config, params, userToken);
+    const fixup = fixState.pending;
+    if (fixup) {
+      log.info('recipe', 'Fix-up call starting', {
+        attempt: fixup.attempt,
+        max_attempts: MAX_VALIDATION_RETRIES,
+        model: params.model,
+        timeout_ms: RECIPE_FIXUP_TIMEOUT_MS,
+      });
+    }
+
+    let response;
+    try {
+      response = await createMessage(
+        config, params, userToken,
+        fixup ? { timeoutMs: RECIPE_FIXUP_TIMEOUT_MS } : {}
+      );
+    } catch (err) {
+      if (fixup) {
+        log.error('recipe', 'Fix-up call failed', {
+          attempt: fixup.attempt,
+          elapsed_ms: Date.now() - fixup.startedAt,
+          code: err.code,
+          error: err.message,
+        });
+        err.userMessage = err.code === 'timeout'
+          ? 'Fixing the recipe format timed out. Please try again.'
+          : (err.userMessage || 'Fixing the recipe format failed. Please try again.');
+      }
+      throw err;
+    }
+
+    if (fixup) {
+      fixState.pending = null;
+      const calledDisplayRecipe = response.content.some(
+        (b) => b.type === 'tool_use' && b.name === 'display_recipe'
+      );
+      log.info('recipe', 'Fix-up response received', {
+        attempt: fixup.attempt,
+        elapsed_ms: Date.now() - fixup.startedAt,
+        stop_reason: response.stop_reason,
+        called_display_recipe: calledDisplayRecipe,
+      });
+      if (!calledDisplayRecipe) {
+        log.warn('recipe', 'Fix-up turn made no display_recipe call', {
+          attempt: fixup.attempt,
+          stop_reason: response.stop_reason,
+        });
+      }
+    }
 
     log.debug('chat', `Turn ${turn} response`, {
       stop_reason: response.stop_reason,
@@ -414,7 +473,7 @@ async function streamWithToolHandling(
           textFlushed = true;
         }
         const toolResult = await handleToolCall(
-          block, config, currentMessages, systemPrompt, send, convId, pool, userId, responseLog
+          block, config, currentMessages, systemPrompt, send, convId, pool, userId, responseLog, fixState
         );
         toolResults.push({ toolUseId: block.id, result: toolResult });
       }
@@ -458,6 +517,18 @@ async function streamWithToolHandling(
     }
   }
 
+  // The turn cap was reached with a fix-up round still owed to the user —
+  // without this, the stream would end with 'done' and the "Fixing recipe
+  // format..." spinner would resolve with no recipe and no explanation.
+  if (fixState.pending) {
+    log.error('recipe', 'Turn limit reached with recipe fix-up still pending', {
+      attempt: fixState.pending.attempt,
+    });
+    const err = new Error('Recipe fix-up incomplete at turn limit');
+    err.userMessage = "I couldn't format that recipe correctly. Please try asking again.";
+    throw err;
+  }
+
   return { usage: totalUsage };
 }
 
@@ -476,7 +547,7 @@ function recordUsage(pool, userId, model, usage) {
   ).catch((err) => log.warn('chat', 'Failed to record llm usage', { message: err.message }));
 }
 
-async function handleToolCall(block, config, messages, systemPrompt, send, convId, pool, userId, responseLog) {
+async function handleToolCall(block, config, messages, systemPrompt, send, convId, pool, userId, responseLog, fixState) {
   const lastEntry = () => responseLog[responseLog.length - 1];
 
   if (block.name === 'web_search') {
@@ -501,17 +572,24 @@ async function handleToolCall(block, config, messages, systemPrompt, send, convI
   }
 
   if (block.name === 'display_recipe') {
-    return await handleRecipeDisplay(block.input, send, convId, pool, userId);
+    return await handleRecipeDisplay(block.input, send, convId, pool, userId, fixState);
   }
 
   return 'Unknown tool';
 }
 
-async function handleRecipeDisplay(recipeData, send, convId, pool, userId) {
-  let recipe = recipeData;
-  let { valid, errors } = validate(recipe);
+async function handleRecipeDisplay(recipeData, send, convId, pool, userId, fixState) {
+  const recipe = recipeData;
+  const { valid, errors } = validate(recipe);
 
   if (valid) {
+    if (fixState.attempts > 0) {
+      log.info('recipe', 'Fix-up succeeded — valid recipe after retry', {
+        attempt: fixState.attempts,
+        title: recipe.title,
+      });
+      fixState.attempts = 0;
+    }
     send('recipe', recipe);
     await updateConversationTitle(pool, convId, recipe.title, send);
     await pool.query(
@@ -522,18 +600,25 @@ async function handleRecipeDisplay(recipeData, send, convId, pool, userId) {
     return 'Recipe displayed successfully.';
   }
 
-  log.warn('recipe', 'Validation failed', { errors });
+  log.warn('recipe', 'Validation failed', { attempt: fixState.attempts, errors });
 
-  for (let attempt = 1; attempt <= MAX_VALIDATION_RETRIES; attempt++) {
+  if (fixState.attempts < MAX_VALIDATION_RETRIES) {
+    fixState.attempts += 1;
+    fixState.pending = { attempt: fixState.attempts, startedAt: Date.now() };
     send('status', { text: 'Fixing recipe format...' });
-
-    const retryResult = `Recipe validation failed with these errors:\n${errors.join('\n')}\n\nPlease fix the issues and call display_recipe again.\n\n${getSchemaReminder()}`;
-
-    log.warn('recipe', `Validation retry ${attempt}`, { errors });
-    return retryResult;
+    log.warn('recipe', 'Requesting fix-up from model', {
+      attempt: fixState.attempts,
+      max_attempts: MAX_VALIDATION_RETRIES,
+      errors,
+    });
+    return `Recipe validation failed with these errors:\n${errors.join('\n')}\n\nPlease fix the issues and call display_recipe again.\n\n${getSchemaReminder()}`;
   }
 
-  log.error('recipe', 'Validation failed after retries, sending best-effort', { errors });
+  log.error('recipe', 'Validation failed after retries, sending best-effort', {
+    attempts: fixState.attempts,
+    errors,
+  });
+  fixState.attempts = 0;
   send('warning', { text: 'Recipe may have formatting issues' });
   send('recipe', recipe);
   await updateConversationTitle(pool, convId, recipe.title || 'Untitled', send);

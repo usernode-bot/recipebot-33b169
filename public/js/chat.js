@@ -10,6 +10,7 @@ const Chat = {
 
   _statusIconSpinner: `<svg class="status-icon spinning" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="8" stroke-linecap="round"/></svg>`,
   _statusIconCheck: `<svg class="status-icon" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  _statusIconError: `<svg class="status-icon status-icon-error" viewBox="0 0 16 16" fill="none"><path d="M4.5 4.5L11.5 11.5M11.5 4.5L4.5 11.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
 
   _createSpinner() {
     const el = document.createElement('div');
@@ -32,6 +33,20 @@ const Chat = {
         icon.classList.remove('spinning');
         icon.outerHTML = this._statusIconCheck;
       }
+      this._activeStatusLine = null;
+    }
+  },
+
+  // Like _finalizeActiveStatus, but for failures: an in-flight status line
+  // (e.g. "Fixing recipe format...") gets an ✕ instead of a checkmark so the
+  // user can see which step died.
+  _failActiveStatus() {
+    if (this._activeStatusLine) {
+      const icon = this._activeStatusLine.querySelector('.status-icon');
+      if (icon) {
+        icon.outerHTML = this._statusIconError;
+      }
+      this._activeStatusLine.classList.add('status-line-error');
       this._activeStatusLine = null;
     }
   },
@@ -229,7 +244,11 @@ const Chat = {
           const { status } = await res.json();
           if (status === 'processing') return;
           console.warn('[chat] reply no longer processing:', status);
-          this._finalizeActiveStatus();
+          if (status === 'error' || status === 'not_found') {
+            this._failActiveStatus();
+          } else {
+            this._finalizeActiveStatus();
+          }
           this._removeSpinner();
           if (status === 'done') this._flushDeferredAck();
           if (status === 'error' || status === 'not_found') {
@@ -408,7 +427,7 @@ const Chat = {
         const data = JSON.parse(e.data);
         if (dedup(data)) return;
         this._removeSpinner();
-        this._finalizeActiveStatus();
+        this._failActiveStatus();
         const errEl = document.createElement('div');
         errEl.className = 'msg-assistant px-4 py-2.5';
         errEl.textContent = data.error || 'Something went wrong.';
