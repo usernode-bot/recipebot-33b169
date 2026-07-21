@@ -1,0 +1,13 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - heading "Recipe Bot" [level=1] [ref=e4]
+    - generic [ref=e5]:
+      - 'button "Theme: System" [ref=e6] [cursor=pointer]'
+      - button "?" [ref=e9] [cursor=pointer]
+  - generic [ref=e12]:
+    - generic [ref=e13]:
+      - searchbox "Search recipes..." [ref=e14]
+      - button "+ New recipe" [ref=e15] [cursor=pointer]
+    - generic [ref=e16]:
+      - paragraph [ref=e19]: No recipes yet
+      - paragraph [ref=e20]: Start a conversation to create a recipe, then share it to the community feed.
