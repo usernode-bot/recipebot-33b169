@@ -86,6 +86,17 @@ function validate(recipe) {
     errors.push('prep_time must be a string');
   }
 
+  // tags / provenance are optional additions — type-checked only when
+  // present so recipes generated before they existed stay valid, and a
+  // missing tags array never triggers the fix-up retry loop.
+  if (recipe.tags !== undefined && !Array.isArray(recipe.tags)) {
+    errors.push('tags must be an array of strings when present');
+  }
+  if (recipe.provenance !== undefined && recipe.provenance !== null &&
+      typeof recipe.provenance !== 'object') {
+    errors.push('provenance must be an object when present');
+  }
+
   if (recipe.cook_time !== undefined && typeof recipe.cook_time !== 'string') {
     errors.push('cook_time must be a string');
   }

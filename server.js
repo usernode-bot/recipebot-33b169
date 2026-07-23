@@ -7,6 +7,8 @@ const { authRoutes } = require('./src/routes/auth');
 const { conversationRoutes } = require('./src/routes/conversations');
 const { recipeRoutes } = require('./src/routes/recipes');
 const { chatRoutes } = require('./src/routes/chat');
+const { collectionRoutes } = require('./src/routes/collections');
+const { publicRoutes } = require('./src/routes/public');
 const log = require('./src/services/logger');
 
 const config = loadConfig();
@@ -21,10 +23,15 @@ app.get('/health', (_req, res) => {
 });
 
 app.use(authMiddleware(config));
+// Public recipe pages (/r/:slug + /api/public/…) are registered before the
+// auth-gated catch-all; GETs outside /api pass the middleware untokened and
+// /api/public/ is explicitly exempted in src/middleware/auth.js.
+app.use(publicRoutes(config));
 app.use(authRoutes(config));
 app.use(conversationRoutes(config));
 app.use(recipeRoutes(config));
 app.use(chatRoutes(config));
+app.use(collectionRoutes(config));
 
 app.use(express.static(path.join(__dirname, 'public')));
 

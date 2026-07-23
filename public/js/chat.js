@@ -742,6 +742,16 @@ const Chat = {
 
     if (!App.currentConversationId && App.currentRecipe) {
       body.forkRecipe = App.currentRecipe;
+      // Remix lineage: record which shared recipe (and version) this fork
+      // came from. Own recipes and unattributed imports carry no source.
+      const vs = App.viewingShared;
+      if (vs && !vs.is_mine && vs.id) {
+        body.forkSource = {
+          sharedRecipeId: vs.id,
+          version: (App.viewingVersion && App.viewingVersion.version) || vs.current_version || 1,
+          username: vs.username,
+        };
+      }
     }
 
     console.log('[chat] → request', body);

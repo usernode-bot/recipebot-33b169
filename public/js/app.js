@@ -134,8 +134,15 @@ window.HashParams = {
   const hp = HashParams.get();
   // ?c=<id> is a deep-link fallback for contexts that can't set a hash
   // (dapp.json test routes); the hash param wins when both are present.
-  const queryC = new URLSearchParams(location.search).get('c');
-  if (hp.c && typeof Store !== 'undefined') {
+  const query = new URLSearchParams(location.search);
+  const queryC = query.get('c');
+  // ?join=<token> / #join=<token> — group-cookbook invite link landing.
+  const joinToken = hp.join || query.get('join');
+  if (joinToken && typeof Home !== 'undefined') {
+    App.showView('home');
+    HashParams.set('join', null);
+    Home.handleJoinToken(joinToken);
+  } else if (hp.c && typeof Store !== 'undefined') {
     Store.selectConversation(parseInt(hp.c), { restore: true });
   } else if (queryC && typeof Store !== 'undefined') {
     Store.selectConversation(parseInt(queryC), { restore: true });

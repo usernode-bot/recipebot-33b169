@@ -38,7 +38,7 @@ function chatRoutes(config) {
   initSearch(config);
 
   router.post('/api/chat', rateLimitMiddleware(config), async (req, res) => {
-    const { conversationId, message, preferences, forkRecipe } = req.body;
+    const { conversationId, message, preferences, forkRecipe, forkSource } = req.body;
 
     if (!message?.trim()) {
       return res.status(400).json({ error: 'Message required' });
@@ -73,9 +73,25 @@ function chatRoutes(config) {
       if (!convId) {
         const title = forkRecipe?.title ? `Fork: ${forkRecipe.title}` : 'New conversation';
         const convPrefs = preferences || {};
+
+        // Remix lineage: when the fork came from a shared recipe, record
+        // the source on the conversation. Copied onto the published
+        // snapshot at publish time (see recipes.js share endpoint).
+        let src = { id: null, version: null, username: null };
+        if (forkRecipe && forkSource && parseInt(forkSource.sharedRecipeId)) {
+          src = {
+            id: parseInt(forkSource.sharedRecipeId),
+            version: parseInt(forkSource.version) || null,
+            username: typeof forkSource.username === 'string'
+              ? forkSource.username.slice(0, 255) : null,
+          };
+        }
+
         const { rows } = await pool.query(
-          'INSERT INTO conversations (user_id, title, preferences) VALUES ($1, $2, $3) RETURNING id',
-          [req.user.id, title, JSON.stringify(convPrefs)]
+          `INSERT INTO conversations
+             (user_id, title, preferences, forked_from_shared_id, forked_from_version, forked_from_username)
+           VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+          [req.user.id, title, JSON.stringify(convPrefs), src.id, src.version, src.username]
         );
         convId = rows[0].id;
         convCreated = { id: convId, preferences: convPrefs };

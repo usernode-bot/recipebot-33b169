@@ -106,6 +106,7 @@ const CookingMode = {
           <div class="py-16 text-center">
             <p class="text-3xl mb-4">🎉</p>
             <p class="text-xl text-zinc-500 dark:text-zinc-400">You're done! Enjoy your meal.</p>
+            <button id="cm-made-it" class="mt-6 px-6 py-3 text-base rounded-xl bg-green-600 hover:bg-green-500 text-white font-medium transition-colors">☑ Made it</button>
           </div>
         </div>
       </div>
@@ -115,6 +116,18 @@ const CookingMode = {
     this.overlay = el;
 
     el.querySelector('#cm-exit').addEventListener('click', () => this.exit());
+    // "Made it" from the natural moment — the end-of-cook screen. Only
+    // shown when there's a target to mark (own conversation or shared).
+    const madeBtn = el.querySelector('#cm-made-it');
+    if (madeBtn) {
+      if (!App.currentConversationId && !App.viewingShared?.id) {
+        madeBtn.classList.add('hidden');
+      } else {
+        madeBtn.addEventListener('click', () => {
+          if (typeof Recipe !== 'undefined') Recipe.markMadeIt(madeBtn);
+        });
+      }
+    }
     document.addEventListener('keydown', this.handleKey);
 
     el.querySelectorAll('.timer-start-btn').forEach((btn) => {

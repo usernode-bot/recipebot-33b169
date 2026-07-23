@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { getPool } = require('./pool');
 const log = require('../services/logger');
 
@@ -37,6 +38,38 @@ async function migrate(config) {
   if (config.isStaging) {
     await seedStagingDemo(pool);
   }
+
+  // Backfill public share slugs for every shared recipe that predates the
+  // public-page feature (owner decision: ALL previously published recipes
+  // get public pages — no republish gate). Idempotent (WHERE share_slug IS
+  // NULL) and collision-safe (unique index + retry). Runs after the staging
+  // seed so seeded rows get slugs on the same boot.
+  await backfillShareSlugs(pool);
+}
+
+async function backfillShareSlugs(pool) {
+  const { rows } = await pool.query(
+    'SELECT id FROM shared_recipes WHERE share_slug IS NULL'
+  );
+  let filled = 0;
+  for (const row of rows) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const slug = crypto.randomBytes(8).toString('base64url');
+      try {
+        await pool.query(
+          'UPDATE shared_recipes SET share_slug = $2 WHERE id = $1 AND share_slug IS NULL',
+          [row.id, slug]
+        );
+        filled++;
+        break;
+      } catch (err) {
+        if (err.code !== '23505') throw err; // retry only on unique violation
+      }
+    }
+  }
+  if (filled > 0) {
+    log.info('db', `Backfilled share slugs for ${filled} shared recipes`);
+  }
 }
 
 const DEMO_RECIPE = {
@@ -46,6 +79,7 @@ const DEMO_RECIPE = {
   default_servings: 4,
   prep_time: '15 min',
   cook_time: '10 min',
+  tags: ['chinese', 'dinner', 'one-pot'],
   notes: 'Staging demo data — works with tofu instead of chicken.',
   steps: [
     {
@@ -106,6 +140,7 @@ const DEMO_RECIPE_2 = {
   ...DEMO_RECIPE,
   title: 'Staging Demo Tofu Stir Fry',
   description: 'Vegan variant of the staging demo stir fry.',
+  tags: ['chinese', 'dinner', 'one-pot', 'vegan'],
   notes: 'Staging demo data.',
   steps: [
     {
@@ -270,6 +305,112 @@ async function seedStagingDemo(pool) {
      ON CONFLICT (shared_recipe_id, user_id) DO NOTHING`
   );
   log.info('db', 'Seeded staging shared recipes and ratings');
+
+  // ── Social-features seeds (collections, cookbook, lineage, made-it,
+  //    comments, tags, share slug) ─────────────────────────────────────
+
+  // Fixed share slug for 900001 so dapp.json tests can hit /r/<slug>.
+  await pool.query(
+    `UPDATE shared_recipes SET share_slug = 'staging-demo-recipe' WHERE id = 900001`
+  );
+  // Tag mirror columns for the seeded shares (recipe_data already carries
+  // the same tags via DEMO_RECIPE/DEMO_RECIPE_2).
+  await pool.query(
+    `UPDATE shared_recipes SET tags = $2::text[] WHERE id = $1`,
+    [900001, DEMO_RECIPE.tags]
+  );
+  await pool.query(
+    `UPDATE shared_recipes SET tags = $2::text[] WHERE id = $1`,
+    [900002, DEMO_RECIPE_2.tags]
+  );
+
+  // Remix lineage: a third shared recipe forked from 900001 so the
+  // "remixed from" credit line and remix list render.
+  const DEMO_REMIX = {
+    ...DEMO_RECIPE_2,
+    title: 'Staging Demo Remixed Stir Fry',
+    description: 'A remix of the staging demo stir fry, seeded to show lineage.',
+    tags: ['chinese', 'dinner', 'vegan'],
+  };
+  await pool.query(
+    `INSERT INTO shared_recipes
+       (id, user_id, username, conversation_id, recipe_data, tags,
+        forked_from_shared_id, forked_from_version, forked_from_username)
+     VALUES (900005, 900005, 'staging-demo-remixer', 900005, $1, $2::text[], 900001, 1, 'staging-demo-user')
+     ON CONFLICT (id) DO NOTHING`,
+    [JSON.stringify(DEMO_REMIX), DEMO_REMIX.tags]
+  );
+  await pool.query(
+    `INSERT INTO shared_recipe_versions (shared_recipe_id, version, recipe_data, note, user_id, username)
+     VALUES (900005, 1, $1, NULL, 900005, 'staging-demo-remixer')
+     ON CONFLICT (shared_recipe_id, version) DO NOTHING`,
+    [JSON.stringify(DEMO_REMIX)]
+  );
+
+  // Collections: a private one for user 0 (with a snapshot-only item that
+  // simulates a deleted source), a public one for the feed rail, and a
+  // group cookbook with members + a fixed invite token for the join flow.
+  await pool.query(
+    `INSERT INTO collections (id, user_id, username, name, description, visibility) VALUES
+       (900001, 0, 'staging-demo-user', 'Staging Demo Weeknight', 'Quick dinners seeded for staging.', 'private'),
+       (900002, 0, 'staging-demo-user', 'Staging Demo Community Picks', 'A public seeded collection.', 'public'),
+       (900003, 0, 'staging-demo-user', 'Staging Demo Family Cookbook', 'Shared cookbook seeded for staging.', 'group')
+     ON CONFLICT (id) DO NOTHING`
+  );
+  const SNAPSHOT_ONLY = {
+    ...DEMO_RECIPE,
+    title: 'Staging Demo Deleted-Source Casserole',
+    description: 'Saved copy whose original shared recipe was deleted — renders from its snapshot.',
+  };
+  await pool.query(
+    `INSERT INTO collection_items
+       (id, collection_id, added_by_user_id, added_by_username, shared_recipe_id, conversation_id, recipe_snapshot, snapshot_title)
+     VALUES
+       (900001, 900001, 0, 'staging-demo-user', 900001, NULL, $1, $2),
+       (900002, 900001, 0, 'staging-demo-user', NULL, NULL, $3, $4),
+       (900003, 900002, 0, 'staging-demo-user', 900002, NULL, $5, $6),
+       (900004, 900003, 0, 'staging-demo-user', NULL, 900001, $1, $2),
+       (900005, 900003, 900101, 'staging-demo-cook', 900005, NULL, $7, $8)
+     ON CONFLICT (id) DO NOTHING`,
+    [
+      JSON.stringify(DEMO_RECIPE), DEMO_RECIPE.title,
+      JSON.stringify(SNAPSHOT_ONLY), SNAPSHOT_ONLY.title,
+      JSON.stringify(DEMO_RECIPE_2), DEMO_RECIPE_2.title,
+      JSON.stringify(DEMO_REMIX), DEMO_REMIX.title,
+    ]
+  );
+  await pool.query(
+    `INSERT INTO collection_members (collection_id, user_id, username, role) VALUES
+       (900003, 0, 'staging-demo-user', 'owner'),
+       (900003, 900101, 'staging-demo-cook', 'member'),
+       (900003, 900102, 'staging-demo-baker', 'member')
+     ON CONFLICT (collection_id, user_id) DO NOTHING`
+  );
+  await pool.query(
+    `INSERT INTO collection_invites (token, collection_id, created_by)
+     VALUES ('staging-demo-invite', 900003, 0)
+     ON CONFLICT (token) DO NOTHING`
+  );
+
+  // Made-it marks: cooked-counts + one note on the shared recipe, plus one
+  // mark on the demo conversation for the "made 1×" box label.
+  await pool.query(
+    `INSERT INTO made_it_marks (id, user_id, username, shared_recipe_id, conversation_id, note) VALUES
+       (900001, 900101, 'staging-demo-cook', 900001, NULL, 'Staging demo note: came out great, added extra ginger.'),
+       (900002, 900102, 'staging-demo-baker', 900001, NULL, NULL),
+       (900003, 900101, 'staging-demo-cook', 900001, NULL, NULL),
+       (900004, 0, 'staging-demo-user', NULL, 900001, NULL)
+     ON CONFLICT (id) DO NOTHING`
+  );
+
+  // Comments: one live, one soft-deleted (renders as "comment deleted").
+  await pool.query(
+    `INSERT INTO recipe_comments (id, shared_recipe_id, user_id, username, body, deleted_at) VALUES
+       (900001, 900001, 900103, 'staging-demo-critic', 'Staging demo comment: worked perfectly on a weeknight.', NULL),
+       (900002, 900001, 900102, 'staging-demo-baker', 'Staging demo deleted comment', NOW())
+     ON CONFLICT (id) DO NOTHING`
+  );
+  log.info('db', 'Seeded staging collections, cookbook, lineage, made-it and comments');
 
   // Demo AI-usage row for the user-menu "AI usage today" meter (llm_usage is
   // staging:private, so staging starts empty). Seeded fresh for *today*
