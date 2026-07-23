@@ -15,6 +15,8 @@ function conversationRoutes(config) {
     try {
       const { rows } = await pool.query(
         `SELECT c.id, c.title, c.created_at,
+           (SELECT s.share_slug FROM shared_recipes s
+            WHERE s.conversation_id = c.id LIMIT 1) AS share_slug,
            EXISTS (SELECT 1 FROM recipe_favorites f
                    WHERE f.conversation_id = c.id AND f.user_id = $1) AS is_favorited,
            EXISTS (SELECT 1 FROM shared_recipes s
@@ -144,10 +146,11 @@ function conversationRoutes(config) {
   router.delete('/api/conversations/:id', async (req, res) => {
     try {
       const convId = parseInt(req.params.id);
-      await pool.query(
+      const { rowCount: deleted } = await pool.query(
         'DELETE FROM conversations WHERE id = $1 AND user_id = $2',
         [convId, req.user.id]
       );
+      if (!deleted) return res.json({ ok: true });
       // No FK exists across the private/public boundary — clean up the
       // published snapshot (cascades its ratings/favorites) and any
       // own-conversation favorite explicitly.
@@ -158,6 +161,18 @@ function conversationRoutes(config) {
       await pool.query(
         'DELETE FROM recipe_favorites WHERE conversation_id = $1 AND user_id = $2',
         [convId, req.user.id]
+      );
+      // Same cross-boundary cleanup for the new dual-target tables:
+      // conversation-target made-it marks and collection items go with the
+      // conversation (shared-target rows cascade via FK; shared-target
+      // collection items survive via their snapshot instead).
+      await pool.query(
+        'DELETE FROM made_it_marks WHERE conversation_id = $1',
+        [convId]
+      );
+      await pool.query(
+        'DELETE FROM collection_items WHERE conversation_id = $1',
+        [convId]
       );
       log.info('conversations', 'Deleted', { id: convId });
       res.json({ ok: true });

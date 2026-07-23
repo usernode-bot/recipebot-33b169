@@ -134,6 +134,61 @@
       "name": "Undecided edit still shows accept screen",
       "path": "/?c=900004",
       "expectSelector": "#diff-accept"
+    },
+    {
+      "name": "Collections section renders",
+      "path": "/",
+      "expectSelector": "#home-collections"
+    },
+    {
+      "name": "Seeded private collection appears",
+      "path": "/",
+      "expectText": "Staging Demo Weeknight"
+    },
+    {
+      "name": "Seeded group cookbook appears",
+      "path": "/",
+      "expectText": "Staging Demo Family Cookbook"
+    },
+    {
+      "name": "Remix lineage credit shows on feed card",
+      "path": "/",
+      "expectText": "remixed from staging-demo-user"
+    },
+    {
+      "name": "Cooked-count shows on feed card",
+      "path": "/",
+      "expectText": "cooked 3×"
+    },
+    {
+      "name": "Tag filter chips render",
+      "path": "/",
+      "expectText": "one-pot"
+    },
+    {
+      "name": "Add-to-collection picker exists",
+      "path": "/",
+      "expectSelector": "#collection-pick-modal"
+    },
+    {
+      "name": "Made-it dialog exists",
+      "path": "/",
+      "expectSelector": "#made-it-modal"
+    },
+    {
+      "name": "Public recipe page renders without login",
+      "path": "/r/staging-demo-recipe",
+      "expectText": "Staging Demo Chicken Stir Fry"
+    },
+    {
+      "name": "Public page shows made-it note",
+      "path": "/r/staging-demo-recipe",
+      "expectText": "came out great"
+    },
+    {
+      "name": "Public page lists remixes",
+      "path": "/r/staging-demo-recipe",
+      "expectText": "Staging Demo Remixed Stir Fry"
     }
   ]
 }

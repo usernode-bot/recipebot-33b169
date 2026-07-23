@@ -1,5 +1,11 @@
 window.App = {
   currentUser: null,
+  // True once boot establishes there is no signed-in user — the app then
+  // runs in browse-only anonymous mode (public feed + public collections,
+  // sign-in prompts on every ownership/AI action).
+  isAnonymous: false,
+  // Where accounts live; every sign-in prompt links here.
+  PLATFORM_APP_URL: 'https://social-vibecoding.usernodelabs.org/#app/recipebot-33b169/full',
   currentConversationId: null,
   currentRecipe: null,
   pendingRecipe: null,
@@ -41,6 +47,24 @@ App.showView = function (view) {
   if (isHome && typeof Home !== 'undefined') Home.refresh();
 };
 
+// Anonymous mode: one dialog for every ownership/AI affordance. The reason
+// line tells the visitor what signing in unlocks; the primary button opens
+// the app inside Usernode where their account lives.
+App.promptSignIn = function (reason) {
+  const modal = document.getElementById('sign-in-modal');
+  if (!modal) return;
+  const reasonEl = document.getElementById('sign-in-reason');
+  if (reasonEl) reasonEl.textContent = reason || 'Sign in to do this';
+  modal.classList.remove('hidden');
+  const close = () => {
+    modal.classList.add('hidden');
+    document.getElementById('sign-in-cancel').onclick = null;
+    document.getElementById('sign-in-backdrop').onclick = null;
+  };
+  document.getElementById('sign-in-cancel').onclick = close;
+  document.getElementById('sign-in-backdrop').onclick = close;
+};
+
 window.HashParams = {
   get() {
     const raw = location.hash.replace(/^#/, '');
@@ -71,9 +95,22 @@ window.HashParams = {
 };
 
 (async function init() {
+  // app.js loads first (see the script tags in index.html) — wait for the
+  // rest of the bundle (Store/Home/Chat/…) before booting. Without this,
+  // the tokenless anonymous path runs synchronously and reaches
+  // App.showView('home') before home.js has even loaded.
+  if (document.readyState === 'loading') {
+    await new Promise((resolve) =>
+      document.addEventListener('DOMContentLoaded', resolve, { once: true }));
+  }
+
   // Signed in automatically via the platform iframe token — no login page.
+  // With no token at all we skip the probe (guaranteed 401) and go straight
+  // to anonymous browse mode.
   try {
-    const res = await fetch('/api/auth/me');
+    const res = window.UsernodeAuth?.token
+      ? await fetch('/api/auth/me')
+      : { ok: false };
     if (res.ok) {
       const data = await res.json();
       App.currentUser = data.user;
@@ -114,10 +151,24 @@ window.HashParams = {
         if (sendBtn) sendBtn.disabled = true;
       }
     } else {
-      console.warn('[app] Not authenticated — open this app inside Usernode');
+      console.warn('[app] Not authenticated — running in anonymous browse mode');
     }
   } catch (e) {
     console.warn('[app] Failed to load user', e);
+  }
+
+  // No signed-in user → anonymous browse mode. Show the header Sign in
+  // button and put the chat input into its sign-in-prompt state.
+  App.isAnonymous = !App.currentUser;
+  if (App.isAnonymous) {
+    document.getElementById('sign-in-btn')?.classList.remove('hidden');
+    const input = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-btn');
+    if (input) {
+      input.disabled = true;
+      input.placeholder = 'Sign in to cook with the AI.';
+    }
+    if (sendBtn) sendBtn.disabled = true;
   }
 
   setupMobileTabs();
@@ -134,8 +185,23 @@ window.HashParams = {
   const hp = HashParams.get();
   // ?c=<id> is a deep-link fallback for contexts that can't set a hash
   // (dapp.json test routes); the hash param wins when both are present.
-  const queryC = new URLSearchParams(location.search).get('c');
-  if (hp.c && typeof Store !== 'undefined') {
+  const query = new URLSearchParams(location.search);
+  const queryC = query.get('c');
+  // ?join=<token> / #join=<token> — group-cookbook invite link landing.
+  const joinToken = hp.join || query.get('join');
+  if (App.isAnonymous) {
+    // Conversations are owner-scoped and joining needs an account —
+    // anonymous deep links land on the browse homepage.
+    App.showView('home');
+    if (joinToken) {
+      HashParams.set('join', null);
+      App.promptSignIn('Sign in to join this cookbook');
+    }
+  } else if (joinToken && typeof Home !== 'undefined') {
+    App.showView('home');
+    HashParams.set('join', null);
+    Home.handleJoinToken(joinToken);
+  } else if (hp.c && typeof Store !== 'undefined') {
     Store.selectConversation(parseInt(hp.c), { restore: true });
   } else if (queryC && typeof Store !== 'undefined') {
     Store.selectConversation(parseInt(queryC), { restore: true });
@@ -238,6 +304,7 @@ function setupPreferences() {
 
 function setupNewConversation() {
   document.getElementById('new-conversation-btn').addEventListener('click', () => {
+    if (App.isAnonymous) return App.promptSignIn('Sign in to create recipes with the AI');
     App.currentConversationId = null;
     App.currentRecipe = null;
     App.pendingRecipe = null;

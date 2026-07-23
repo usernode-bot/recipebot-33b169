@@ -1,3 +1,23 @@
+/* ── Editorial type: Fraunces for display, Inter for body ─────────── */
+body {
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+}
+
+h1, h2, h3, .font-display {
+  font-family: Fraunces, Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+/* Brass kicker — the small uppercase label above editorial cards. */
+.kicker {
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #C9A227;
+}
+
 /* Chat panel states */
 @media (min-width: 1024px) {
   #chat-panel.chat-open {
@@ -41,37 +61,37 @@
 
 /* Preference button states — !important needed to override Tailwind utilities */
 .pref-btn.active {
-  border-color: #00c8ff !important;
-  background: rgba(0, 200, 255, 0.1) !important;
-  color: #00c8ff !important;
+  border-color: #E07A3F !important;
+  background: rgba(224, 122, 63, 0.1) !important;
+  color: #b85a24 !important;
 }
 
 /* Chat message styles */
 .msg-user {
-  background: #dde8fb;
-  color: #1a1a2e;
+  background: #F7E3D0;
+  color: #1F2B47;
   border-radius: 1rem 1rem 0.25rem 1rem;
   max-width: 85%;
   margin-left: auto;
 }
 
 :is(.dark .msg-user) {
-  background: rgba(0, 200, 255, 0.12);
-  color: #e4e4f0;
-  border: 1px solid rgba(0, 200, 255, 0.2);
+  background: rgba(224, 122, 63, 0.14);
+  color: #F3EDDF;
+  border: 1px solid rgba(224, 122, 63, 0.28);
 }
 
 .msg-assistant {
-  background: #eeeef6;
-  color: #1a1a2e;
+  background: #F3EDDF;
+  color: #1F2B47;
   border-radius: 1rem 1rem 1rem 0.25rem;
   max-width: 85%;
 }
 
 :is(.dark .msg-assistant) {
-  background: #1a1a30;
-  color: #e4e4f0;
-  border: 1px solid #2e2e50;
+  background: #28304B;
+  color: #F3EDDF;
+  border: 1px solid #333B54;
 }
 
 
@@ -84,19 +104,19 @@
 }
 
 .status-toggle:hover {
-  color: #6e6e8a;
+  color: #5A6378;
 }
 
 :is(.dark .status-toggle:hover) {
-  color: #9898b0;
+  color: #8B90A2;
 }
 
 .status-detail {
   font-family: ui-monospace, monospace;
   font-size: 0.75rem;
-  color: #6e6e8a;
-  background: #f6f6fb;
-  border: 1px solid #d4d4e4;
+  color: #5A6378;
+  background: #F3EDDF;
+  border: 1px solid #E7DFCC;
   border-radius: 0.5rem;
   padding: 0.5rem 0.75rem;
   margin-bottom: 0.25rem;
@@ -107,33 +127,33 @@
 }
 
 :is(.dark .status-detail) {
-  color: #9898b0;
-  background: #12122a;
-  border-color: #2e2e50;
+  color: #8B90A2;
+  background: #1A2138;
+  border-color: #333B54;
 }
 
 .status-link {
-  color: #5b8dd9;
+  color: #b85a24;
   text-decoration: underline;
   text-decoration-style: dotted;
   text-underline-offset: 2px;
 }
 
 .status-link:hover {
-  color: #3b6dbf;
+  color: #96461A;
 }
 
 :is(.dark .status-link) {
-  color: #6ea8ff;
+  color: #E8935B;
 }
 
 :is(.dark .status-link:hover) {
-  color: #90c0ff;
+  color: #F0B48A;
 }
 
 /* Thinking / loading indicator */
 .thinking-indicator {
-  color: rgb(161, 161, 170);
+  color: #8B90A2;
   font-size: 0.875rem;
 }
 
@@ -160,7 +180,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #a1a1aa;
+  background: #C9BC9C;
   animation: dotBounce 1.2s ease-in-out infinite;
 }
 
@@ -168,7 +188,7 @@
 .streaming-spinner .dot:nth-child(3) { animation-delay: 0.3s; }
 
 :is(.dark .streaming-spinner .dot) {
-  background: #71717a;
+  background: #454D66;
 }
 
 @keyframes dotBounce {
@@ -181,7 +201,7 @@
   align-items: center;
   gap: 6px;
   font-size: 0.8rem;
-  color: #8b8ba0;
+  color: #8B90A2;
   line-height: 1.5;
 }
 
@@ -189,7 +209,7 @@
   flex-shrink: 0;
   width: 14px;
   height: 14px;
-  color: #a1a1aa;
+  color: #C9BC9C;
 }
 
 .status-line .status-icon.spinning {
@@ -202,11 +222,11 @@
 }
 
 :is(.dark .status-line) {
-  color: #71718a;
+  color: #7A82A0;
 }
 
 :is(.dark .status-line .status-icon) {
-  color: #71717a;
+  color: #5A6378;
 }
 
 @keyframes spin {
@@ -216,20 +236,20 @@
 
 /* Send button streaming state */
 #send-btn.btn-streaming {
-  background: #a1a1aa;
+  background: #C9BC9C;
   cursor: not-allowed;
 }
 
 #send-btn.btn-streaming:hover {
-  background: #a1a1aa;
+  background: #C9BC9C;
 }
 
 :is(.dark #send-btn.btn-streaming) {
-  background: #52525b;
+  background: #454D66;
 }
 
 :is(.dark #send-btn.btn-streaming:hover) {
-  background: #52525b;
+  background: #454D66;
 }
 
 #send-btn .send-spinner {
@@ -243,13 +263,13 @@
 }
 
 .step-card.step-active {
-  background: #dcfce9 !important;
-  border-color: #86efac;
+  background: #EDF2DC !important;
+  border-color: #C6D39A;
 }
 
 :is(.dark .step-card.step-active) {
-  background: rgba(16, 185, 129, 0.13) !important;
-  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(148, 173, 82, 0.16) !important;
+  border-color: rgba(148, 173, 82, 0.35);
 }
 
 /* Macro pills */
@@ -341,7 +361,7 @@ details[open] .summary-chevron {
   -webkit-appearance: none;
   width: 1rem;
   height: 1rem;
-  border: 2px solid #9898b0;
+  border: 2px solid #B9AE8F;
   border-radius: 0.25rem;
   background: transparent;
   cursor: pointer;
@@ -351,8 +371,8 @@ details[open] .summary-chevron {
 }
 
 .ingredient-check:checked {
-  background: #0090cc;
-  border-color: #0090cc;
+  background: #b85a24;
+  border-color: #b85a24;
 }
 
 .ingredient-check:checked::after {
@@ -368,17 +388,17 @@ details[open] .summary-chevron {
 }
 
 :is(.dark .ingredient-check) {
-  border-color: #484870;
-  background: #1a1a30;
+  border-color: #454D66;
+  background: #1F2B47;
 }
 
 :is(.dark .ingredient-check:checked) {
-  background: #00c8ff;
-  border-color: #00c8ff;
+  background: #E07A3F;
+  border-color: #E07A3F;
 }
 
 .ingredient-check:focus-visible {
-  outline: 2px solid #00c8ff;
+  outline: 2px solid #E07A3F;
   outline-offset: 2px;
 }
 
@@ -395,27 +415,27 @@ details[open] .summary-chevron {
 /* Recipe diff styles */
 .diff-removed {
   text-decoration: line-through;
-  color: #d42050;
-  background: rgba(212, 32, 80, 0.08);
+  color: #B0422A;
+  background: rgba(176, 66, 42, 0.09);
   padding: 0 2px;
   border-radius: 2px;
 }
 
 :is(.dark .diff-removed) {
-  color: #ff3366;
-  background: rgba(255, 51, 102, 0.1);
+  color: #E8795B;
+  background: rgba(232, 121, 91, 0.12);
 }
 
 .diff-added {
-  color: #00a060;
-  background: rgba(0, 160, 96, 0.08);
+  color: #5F7A34;
+  background: rgba(95, 122, 52, 0.1);
   padding: 0 2px;
   border-radius: 2px;
 }
 
 :is(.dark .diff-added) {
-  color: #00e088;
-  background: rgba(0, 224, 136, 0.1);
+  color: #A3BE60;
+  background: rgba(163, 190, 96, 0.12);
 }
 
 /* Scrollbar styling */
@@ -428,20 +448,20 @@ details[open] .summary-chevron {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #b0b0c8;
+  background: #D8CDB0;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #9898b0;
+  background: #C4B790;
 }
 
 :is(.dark) ::-webkit-scrollbar-thumb {
-  background: #2e2e50;
+  background: #333B54;
 }
 
 :is(.dark) ::-webkit-scrollbar-thumb:hover {
-  background: #484870;
+  background: #454D66;
 }
 
 /* Subtle background glow */
@@ -452,12 +472,12 @@ body::before {
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(ellipse at 25% 50%, rgba(0, 200, 255, 0.03) 0%, transparent 60%),
-    radial-gradient(ellipse at 75% 20%, rgba(124, 92, 255, 0.02) 0%, transparent 60%);
+    radial-gradient(ellipse at 25% 50%, rgba(201, 162, 39, 0.05) 0%, transparent 60%),
+    radial-gradient(ellipse at 75% 20%, rgba(224, 122, 63, 0.04) 0%, transparent 60%);
 }
 
 :is(.dark) body::before {
   background:
-    radial-gradient(ellipse at 25% 50%, rgba(0, 200, 255, 0.04) 0%, transparent 60%),
-    radial-gradient(ellipse at 75% 20%, rgba(124, 92, 255, 0.025) 0%, transparent 60%);
+    radial-gradient(ellipse at 25% 50%, rgba(201, 162, 39, 0.04) 0%, transparent 60%),
+    radial-gradient(ellipse at 75% 20%, rgba(224, 122, 63, 0.03) 0%, transparent 60%);
 }

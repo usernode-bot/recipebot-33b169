@@ -39,7 +39,7 @@ const CookingMode = {
 
     const el = document.createElement('div');
     el.id = 'cooking-overlay';
-    el.className = 'fixed inset-0 z-50 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col';
+    el.className = 'fixed inset-0 z-50 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col';
 
     let stepsHtml = '';
     recipe.steps.forEach((step, i) => {
@@ -78,7 +78,7 @@ const CookingMode = {
 
       const isActive = Recipe?.activeSteps?.has(String(i));
       stepsHtml += `
-        <div class="cm-step step-card rounded-2xl p-6 md:p-8 my-4 cursor-pointer bg-zinc-50 dark:bg-zinc-900/50${isActive ? ' step-active' : ''}" data-step="${i}">
+        <div class="cm-step step-card rounded-2xl p-6 md:p-8 my-4 cursor-pointer bg-zinc-100/70 dark:bg-zinc-900/50${isActive ? ' step-active' : ''}" data-step="${i}">
           <div class="text-sm font-medium text-blue-500 dark:text-blue-400 mb-3">Step ${i + 1} of ${recipe.steps.length}</div>
           <p class="text-2xl md:text-3xl leading-relaxed font-light">${this.escapeHtml(step.description)}</p>
           ${temp ? `<div class="text-xl text-orange-500 dark:text-orange-400 mt-3">${temp}</div>` : ''}
@@ -106,6 +106,7 @@ const CookingMode = {
           <div class="py-16 text-center">
             <p class="text-3xl mb-4">🎉</p>
             <p class="text-xl text-zinc-500 dark:text-zinc-400">You're done! Enjoy your meal.</p>
+            <button id="cm-made-it" class="mt-6 px-6 py-3 text-base rounded-xl bg-green-600 hover:bg-green-500 text-white font-medium transition-colors">☑ Made it</button>
           </div>
         </div>
       </div>
@@ -115,6 +116,18 @@ const CookingMode = {
     this.overlay = el;
 
     el.querySelector('#cm-exit').addEventListener('click', () => this.exit());
+    // "Made it" from the natural moment — the end-of-cook screen. Only
+    // shown when there's a target to mark (own conversation or shared).
+    const madeBtn = el.querySelector('#cm-made-it');
+    if (madeBtn) {
+      if (!App.currentConversationId && !App.viewingShared?.id) {
+        madeBtn.classList.add('hidden');
+      } else {
+        madeBtn.addEventListener('click', () => {
+          if (typeof Recipe !== 'undefined') Recipe.markMadeIt(madeBtn);
+        });
+      }
+    }
     document.addEventListener('keydown', this.handleKey);
 
     el.querySelectorAll('.timer-start-btn').forEach((btn) => {

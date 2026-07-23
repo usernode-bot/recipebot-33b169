@@ -91,31 +91,78 @@
     })();
   </script>
   <script src="https://social-vibecoding.usernodelabs.org/usernode-bridge/v1/bridge.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = {
     darkMode: 'class',
     theme: {
       extend: {
+        fontFamily: {
+          sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          serif: ['Fraunces', 'Georgia', 'serif'],
+        },
         colors: {
+          // Warm-paper editorial palette. The light half of the scale is
+          // paper (page #FAF6EE, panels #F3EDDF, hairlines #E7DFCC); the
+          // dark half is the same ink the text is set in (#1F2B47), so
+          // dark mode reads as "ink paper at night".
           zinc: {
-            50:  '#f6f6fb',
-            100: '#eeeef6',
-            200: '#d4d4e4',
-            300: '#b0b0c8',
-            400: '#9898b0',
-            500: '#6e6e8a',
-            600: '#4e4e6a',
-            700: '#484870',
-            800: '#2e2e50',
-            900: '#1a1a30',
-            950: '#08080f',
+            50:  '#FAF6EE',
+            100: '#F3EDDF',
+            200: '#E7DFCC',
+            300: '#D8CDB0',
+            400: '#8B90A2',
+            500: '#5A6378',
+            600: '#454D66',
+            700: '#333B54',
+            800: '#28304B',
+            900: '#1F2B47',
+            950: '#141A2B',
           },
+          // Paprika accent for primary actions and links.
           blue: {
-            400: '#00c8ff',
-            500: '#00b8ee',
-            600: '#0090cc',
-            700: '#0070a0',
+            50:  '#FBEFE4',
+            100: '#F7E3D0',
+            200: '#F3DCC6',
+            300: '#F0B48A',
+            400: '#E8935B',
+            500: '#E07A3F',
+            600: '#b85a24',
+            700: '#96461A',
+            800: '#6B3413',
+            900: '#4A2A15',
+            950: '#38200F',
           },
+          // Brass — kickers, badges, stars.
+          brass: { 400: '#D3B33E', 500: '#C9A227', 600: '#A8861D' },
+          amber: { 50: '#FBF4DC', 400: '#D3B33E', 500: '#C9A227', 600: '#A8861D', 950: '#3A300A' },
+          teal:  { 400: '#D3B33E', 500: '#C9A227', 600: '#A8861D' },
+          yellow: {
+            50:  '#FBF4DC',
+            100: '#F5EBC8',
+            200: '#EFE1B3',
+            400: '#C9A227',
+            500: '#C9A227',
+            600: '#A8861D',
+            800: '#6B5A12',
+            900: '#4A3D0E',
+          },
+          // Warm olive success family (made-it, timers, diff-added blocks).
+          green: {
+            50:  '#EFF3E1',
+            400: '#94AD52',
+            500: '#7F9147',
+            600: '#5F7A34',
+            950: '#232B14',
+          },
+          // Temperatures render in the paprika family too.
+          orange: { 50: '#FBEFE4', 400: '#E07A3F', 500: '#b85a24', 600: '#96461A', 950: '#38200F' },
+          // Favorited hearts: warm terracotta.
+          pink: { 400: '#D96A4E', 500: '#C9563B' },
+          // Macro pills (fat) — muted plum that sits on paper.
+          violet: { 50: '#F2EDF4', 400: '#9D86B4', 500: '#8A72A3', 600: '#755E8E', 950: '#2A2138' },
         },
       },
     },
@@ -140,7 +187,7 @@
     })();
   </script>
 </head>
-<body class="bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 h-screen overflow-hidden flex flex-col">
+<body class="bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 h-screen overflow-hidden flex flex-col">
 
   <!-- Header -->
   <header class="flex items-center justify-between px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
@@ -178,6 +225,8 @@
       </button>
       <button id="shortcuts-help-btn" class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-sm font-mono font-bold" title="Keyboard shortcuts">?</button>
       <span id="rate-limit-display" class="text-xs text-zinc-500 hidden sm:inline"></span>
+      <!-- Anonymous mode: shown by app.js when there is no signed-in user -->
+      <a id="sign-in-btn" class="hidden px-3 py-1.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors" href="https://social-vibecoding.usernodelabs.org/#app/recipebot-33b169/full">Sign in</a>
       <div class="relative">
         <button id="user-menu-btn" class="hidden items-center gap-1.5 p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" title="Account menu" aria-haspopup="true" aria-expanded="false">
           <svg class="w-5 h-5 sm:hidden text-zinc-400 dark:text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -223,7 +272,7 @@
   </div>
 
   <!-- Persistent timer bar (visible when cook mode timers are running outside overlay) -->
-  <div id="timer-bar" class="hidden items-center gap-2 px-4 py-1.5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 shrink-0 flex-wrap">
+  <div id="timer-bar" class="hidden items-center gap-2 px-4 py-1.5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/50 shrink-0 flex-wrap">
     <span class="text-xs text-zinc-400 dark:text-zinc-500">Timers</span>
     <div id="timer-bar-items" class="flex flex-wrap gap-2"></div>
     <button id="timer-bar-resume" class="text-xs text-blue-500 hover:text-blue-400 ml-auto">Resume cooking</button>
@@ -243,6 +292,24 @@
             + New recipe
           </button>
         </div>
+        <!-- Collection detail (opened from a collection card; hides the box sections) -->
+        <div id="collection-view" class="hidden"></div>
+
+        <section id="home-collections">
+          <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
+            <h2 class="text-base font-semibold flex items-center gap-2">
+              <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+              Collections
+            </h2>
+            <div class="flex gap-2">
+              <button id="new-collection-btn" class="px-3 py-1.5 text-xs rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors">+ Collection</button>
+              <button id="new-cookbook-btn" class="px-3 py-1.5 text-xs rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors">+ Group cookbook</button>
+            </div>
+          </div>
+          <div id="home-collections-list" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
+          <p id="home-collections-empty" class="hidden text-sm text-zinc-400 dark:text-zinc-600">No collections yet — create one, or start a group cookbook and invite your people.</p>
+        </section>
+
         <section id="home-favorites" class="hidden">
           <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
             <svg class="w-4 h-4 text-pink-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
@@ -269,7 +336,16 @@
             <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6-4a3 3 0 11-3-3m-9 3a3 3 0 10-3-3"/></svg>
             Community recipes
           </h2>
+          <!-- Tag filter chips (built from tag frequencies by home.js) -->
+          <div id="home-tag-filters" class="hidden flex flex-wrap gap-1.5 mb-3"></div>
           <div id="home-community-list" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
+        </section>
+        <section id="home-public-collections" class="hidden">
+          <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
+            <svg class="w-4 h-4 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+            Community collections
+          </h2>
+          <div id="home-public-collections-list" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
         </section>
         <div id="home-empty" class="hidden text-center text-zinc-500 py-16">
           <svg class="w-12 h-12 mx-auto mb-3 text-zinc-300 dark:text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -387,20 +463,92 @@
     })();
   </script>
 
-  <!-- Update shared copy: optional note dialog (opened from the recipe view) -->
+  <!-- Publish / update shared copy: creator tags + optional update note -->
   <div id="share-note-modal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center">
     <div class="absolute inset-0 bg-black/50" id="share-note-backdrop"></div>
-    <div class="relative bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl">
+    <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="text-base font-semibold">Update shared copy</h3>
+        <h3 id="share-note-title" class="text-base font-semibold">Share to the community feed</h3>
         <button id="share-note-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>
       </div>
-      <label for="share-note-input" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">What changed? (optional)</label>
-      <textarea id="share-note-input" rows="3" maxlength="500" placeholder="e.g. Reduced the salt, added ginger"
-        class="w-full rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+      <label class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">Tags — confirm or edit what the AI proposed</label>
+      <div id="share-tags-list" class="flex flex-wrap gap-1.5 mb-2"></div>
+      <input id="share-tag-input" type="text" maxlength="32" placeholder="add a tag and press Enter"
+        class="w-full rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3">
+      <div id="share-note-field">
+        <label for="share-note-input" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">What changed? (optional)</label>
+        <textarea id="share-note-input" rows="3" maxlength="500" placeholder="e.g. Reduced the salt, added ginger"
+          class="w-full rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+      </div>
       <div class="flex justify-end gap-2 mt-4">
         <button id="share-note-cancel" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">Cancel</button>
-        <button id="share-note-confirm" class="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors">Update</button>
+        <button id="share-note-confirm" class="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors">Share</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sign-in prompt (anonymous mode): shown on any ownership/AI action -->
+  <div id="sign-in-modal" class="hidden fixed inset-0 z-[70] flex items-end sm:items-center justify-center">
+    <div class="absolute inset-0 bg-black/50" id="sign-in-backdrop"></div>
+    <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-sm p-5 m-0 sm:m-4 shadow-xl text-center">
+      <p class="kicker mb-2">RecipeBot</p>
+      <h3 id="sign-in-reason" class="text-lg font-semibold mb-2">Sign in to do this</h3>
+      <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-4">Your box, cookbooks, and the AI cook live in your Usernode account. It takes a moment — this recipe will still be here.</p>
+      <a id="sign-in-go" class="block w-full px-4 py-2.5 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors" href="https://social-vibecoding.usernodelabs.org/#app/recipebot-33b169/full">Open RecipeBot in Usernode →</a>
+      <button id="sign-in-cancel" class="mt-2 w-full px-4 py-2.5 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">Keep browsing</button>
+    </div>
+  </div>
+
+  <!-- "Made it" dialog: optional note -->
+  <div id="made-it-modal" class="hidden fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+    <div class="absolute inset-0 bg-black/50" id="made-it-backdrop"></div>
+    <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-semibold">You made it! 🎉</h3>
+        <button id="made-it-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>
+      </div>
+      <label for="made-it-note" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">How did it go? (optional)</label>
+      <textarea id="made-it-note" rows="3" maxlength="500" placeholder="e.g. Doubled the garlic — no regrets"
+        class="w-full rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+      <div class="flex justify-end gap-2 mt-4">
+        <button id="made-it-cancel" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">Cancel</button>
+        <button id="made-it-confirm" class="px-4 py-2 text-sm rounded-xl bg-green-600 hover:bg-green-500 text-white font-medium transition-colors">Mark made it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add-to-collection picker -->
+  <div id="collection-pick-modal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div class="absolute inset-0 bg-black/50" id="collection-pick-backdrop"></div>
+    <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl max-h-[80vh] flex flex-col">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-semibold">Add to collection</h3>
+        <button id="collection-pick-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>
+      </div>
+      <div id="collection-pick-list" class="space-y-2 overflow-y-auto"></div>
+      <div class="flex gap-2 mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+        <input id="collection-pick-new-name" type="text" maxlength="120" placeholder="New collection name"
+          class="flex-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <button id="collection-pick-create" class="px-3 py-1.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors shrink-0">Create &amp; add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- New collection / cookbook dialog -->
+  <div id="new-collection-modal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div class="absolute inset-0 bg-black/50" id="new-collection-backdrop"></div>
+    <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl">
+      <div class="flex items-center justify-between mb-3">
+        <h3 id="new-collection-title" class="text-base font-semibold">New collection</h3>
+        <button id="new-collection-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>
+      </div>
+      <label for="new-collection-name" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">Name</label>
+      <input id="new-collection-name" type="text" maxlength="120" placeholder="e.g. Weeknight dinners"
+        class="w-full rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3">
+      <p id="new-collection-hint" class="hidden text-xs text-zinc-500 dark:text-zinc-400 mb-3">A group cookbook is a shared collection — you'll get an invite link to send to family and friends.</p>
+      <div class="flex justify-end gap-2">
+        <button id="new-collection-cancel" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">Cancel</button>
+        <button id="new-collection-confirm" class="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors">Create</button>
       </div>
     </div>
   </div>
@@ -408,7 +556,7 @@
   <!-- Shared recipe version history modal -->
   <div id="version-history-modal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center">
     <div class="absolute inset-0 bg-black/50" id="version-history-backdrop"></div>
-    <div class="relative bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl max-h-[80vh] flex flex-col">
+    <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl max-h-[80vh] flex flex-col">
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-base font-semibold">Version history</h3>
         <button id="version-history-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>
@@ -420,7 +568,7 @@
   <!-- App settings modal (opened from the user menu) -->
   <div id="settings-modal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center">
     <div class="absolute inset-0 bg-black/50" id="settings-backdrop"></div>
-    <div class="relative bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl">
+    <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-base font-semibold">App Settings</h3>
         <button id="settings-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>

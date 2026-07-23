@@ -61,6 +61,11 @@ const Store = {
       avg_rating: item.avg_rating,
       rating_count: item.rating_count,
       current_version: item.current_version || 1,
+      share_slug: item.share_slug || null,
+      forked_from_shared_id: item.forked_from_shared_id || null,
+      forked_from_username: item.forked_from_username || null,
+      made_count: item.made_count || 0,
+      remix_count: item.remix_count || 0,
       // Kept so "Back to current" can restore after viewing an old version.
       currentData: item.data,
     };
@@ -72,11 +77,19 @@ const Store = {
     HashParams.clear();
   },
 
+  // meta (when forking someone else's shared recipe) carries the lineage
+  // source: { username, id, current_version } — Chat.send forwards it as
+  // forkSource so the fork records where it came from.
   forkRecipe(recipeData, meta) {
     App.showView('chat');
     App.currentConversationId = null;
     App.currentRecipe = recipeData;
-    App.viewingShared = meta ? { username: meta.username } : null;
+    App.viewingShared = meta ? {
+      username: meta.username,
+      id: meta.id || null,
+      current_version: meta.current_version || null,
+      is_mine: false,
+    } : null;
     App.viewingVersion = null;
     Recipe.currentServings = recipeData.default_servings;
     Recipe.display(recipeData);
@@ -107,4 +120,6 @@ const Store = {
   },
 };
 
-Store.refresh();
+// Boot refresh only makes sense with a platform token — anonymous visitors
+// have no conversations/recipes/favorites, and skipping avoids 401 noise.
+if (window.UsernodeAuth?.token) Store.refresh();

@@ -61,11 +61,22 @@ const Recipe = {
         : '';
       const displayedVersion = App.viewingVersion ? App.viewingVersion.version : vs.current_version;
       const versionBit = displayedVersion ? ` · v${displayedVersion}` : '';
-      const historyBit = vs.id && vs.current_version > 1
+      const madeBit = vs.made_count ? ` · cooked ${vs.made_count}×` : '';
+      const historyBit = vs.id && vs.current_version > 1 && !App.isAnonymous
         ? ` · <button id="history-btn" class="underline hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">History</button>`
         : '';
-      bylineHtml = `<p class="text-sm text-zinc-400 dark:text-zinc-500 mt-1">by ${this.escapeHtml(vs.is_mine ? 'you' : vs.username)}${ratingBit}${versionBit}${historyBit}</p>`;
+      bylineHtml = `<p class="text-sm text-zinc-400 dark:text-zinc-500 mt-1">by ${this.escapeHtml(vs.is_mine ? 'you' : vs.username)}${ratingBit}${versionBit}${madeBit}${historyBit}</p>`;
+      if (vs.forked_from_username) {
+        bylineHtml += `<p class="text-sm text-zinc-400 dark:text-zinc-500 mt-0.5">⑂ remixed from ${this.escapeHtml(vs.forked_from_username)}'s recipe</p>`;
+      }
     }
+
+    // Tag chips on the recipe view (from the recipe JSON).
+    const tagChipsHtml = (recipe.tags && recipe.tags.length)
+      ? `<div class="flex flex-wrap gap-1 mt-2">${recipe.tags.slice(0, 8).map((t) =>
+          `<span class="px-2 py-0.5 text-[11px] rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">${this.escapeHtml(t)}</span>`
+        ).join('')}</div>`
+      : '';
 
     // Banner while viewing an older version of a shared recipe.
     let versionBannerHtml = '';
@@ -85,6 +96,7 @@ const Recipe = {
           <h2 class="text-2xl font-bold tracking-tight">${this.escapeHtml(recipe.title)}</h2>
           ${bylineHtml}
           ${recipe.description ? `<p class="text-zinc-500 dark:text-zinc-400 text-sm mt-1.5 leading-relaxed">${this.renderInline(recipe.description)}</p>` : ''}
+          ${tagChipsHtml}
         </div>
 
         <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
@@ -126,8 +138,11 @@ const Recipe = {
 
         <div class="flex flex-wrap gap-2 pt-1">
           <button id="cook-btn" class="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors">🍳 Cook Mode</button>
+          ${this.renderMadeItControl()}
           ${this.renderForkControl()}
           ${this.renderShareControls()}
+          ${this.renderCollectionControl()}
+          ${this.renderShareLinkControl()}
           <div class="relative">
             <button id="export-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">Export ▾</button>
             <div id="export-menu" class="hidden absolute top-full mt-1 left-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg overflow-hidden z-10 min-w-[160px]">
@@ -148,12 +163,18 @@ const Recipe = {
           ${recipe.steps.map((step, i) => this.renderStep(step, i, ingredientScale)).join('')}
         </div>
 
-        ${recipe.notes ? `<div class="mt-3 p-4 bg-zinc-50 dark:bg-zinc-900/50 rounded-xl text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed"><strong class="text-zinc-700 dark:text-zinc-300">Notes:</strong> ${this.renderInline(recipe.notes)}</div>` : ''}
+        ${recipe.notes ? `<div class="mt-3 p-4 bg-zinc-100/70 dark:bg-zinc-900/50 rounded-xl text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed"><strong class="text-zinc-700 dark:text-zinc-300">Notes:</strong> ${this.renderInline(recipe.notes)}</div>` : ''}
+
+        <div id="social-section"></div>
       </div>
     `;
 
     this.bindActions(recipe, display);
     this.restoreUIState(display);
+    // Made-it gallery, remixes and comments for published recipes.
+    if (App.viewingShared?.id && !App.currentConversationId) {
+      this.loadSocialSection(App.viewingShared.id);
+    }
   },
 
   saveUIState(display) {
@@ -263,17 +284,44 @@ const Recipe = {
     return `<button id="fork-btn" title="Fork this recipe into a new conversation" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">Fork</button>`;
   },
 
-  // Modal prompt for an optional update note. Resolves the trimmed note
-  // ('' allowed) or null when cancelled.
-  promptShareNote() {
+  // "Made it" for an owned conversation or a published recipe.
+  renderMadeItControl() {
+    if (!App.currentConversationId && !App.viewingShared?.id) return '';
+    return `<button id="made-it-btn" title="Mark that you cooked this (optional note)" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">☑ Made it</button>`;
+  },
+
+  // Add to a collection (own conversation or a published recipe).
+  renderCollectionControl() {
+    if (!App.currentConversationId && !App.viewingShared?.id) return '';
+    return `<button id="add-collection-btn" title="Add this recipe to a collection" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">+ Collection</button>`;
+  },
+
+  // Copy the public share link (published recipes only).
+  _currentShareSlug() {
+    if (App.viewingShared?.share_slug) return App.viewingShared.share_slug;
+    if (App.currentConversationId && typeof Store !== 'undefined') {
+      const conv = Store.conversations.find((c) => c.id === App.currentConversationId);
+      if (conv?.is_shared && conv.share_slug) return conv.share_slug;
+    }
+    return null;
+  },
+
+  renderShareLinkControl() {
+    if (!this._currentShareSlug()) return '';
+    return `<button id="copy-link-btn" title="Copy the public share link — anyone can view and cook it, no login" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">🔗 Link</button>`;
+  },
+
+  // ── "Made it" ────────────────────────────────────────────────
+
+  promptMadeItNote() {
     return new Promise((resolve) => {
-      const modal = document.getElementById('share-note-modal');
-      const input = document.getElementById('share-note-input');
+      const modal = document.getElementById('made-it-modal');
+      const input = document.getElementById('made-it-note');
       if (!modal || !input) return resolve('');
-      const confirmBtn = document.getElementById('share-note-confirm');
-      const cancelBtn = document.getElementById('share-note-cancel');
-      const closeBtn = document.getElementById('share-note-close');
-      const backdrop = document.getElementById('share-note-backdrop');
+      const confirmBtn = document.getElementById('made-it-confirm');
+      const cancelBtn = document.getElementById('made-it-cancel');
+      const closeBtn = document.getElementById('made-it-close');
+      const backdrop = document.getElementById('made-it-backdrop');
 
       input.value = '';
       modal.classList.remove('hidden');
@@ -293,6 +341,242 @@ const Recipe = {
       cancelBtn.addEventListener('click', onCancel);
       closeBtn.addEventListener('click', onCancel);
       backdrop.addEventListener('click', onCancel);
+    });
+  },
+
+  async markMadeIt(btn) {
+    if (App.isAnonymous) return App.promptSignIn('Sign in to mark recipes you cooked');
+    const note = await this.promptMadeItNote();
+    if (note === null) return; // cancelled
+    const target = App.currentConversationId
+      ? { conversationId: App.currentConversationId }
+      : App.viewingShared?.id ? { sharedRecipeId: App.viewingShared.id } : null;
+    if (!target) return;
+    try {
+      const res = await fetch('/api/made-it', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...target, note: note || undefined }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      if (btn) btn.textContent = `☑ Made it ✓ (${data.made_count}×)`;
+      if (App.viewingShared) {
+        App.viewingShared.made_count = data.made_count;
+        if (App.viewingShared.id) this.loadSocialSection(App.viewingShared.id);
+      }
+    } catch {
+      if (btn) btn.textContent = 'Failed — try again';
+    }
+  },
+
+  // ── Publish dialog: creator tags + optional update note ─────────
+
+  // Resolves { tags, note } or null when cancelled. AI-proposed tags from
+  // the recipe JSON pre-fill the chips; the creator confirms/edits.
+  promptPublish(recipe, { isUpdate } = {}) {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('share-note-modal');
+      const input = document.getElementById('share-note-input');
+      if (!modal || !input) return resolve({ tags: undefined, note: '' });
+      const confirmBtn = document.getElementById('share-note-confirm');
+      const cancelBtn = document.getElementById('share-note-cancel');
+      const closeBtn = document.getElementById('share-note-close');
+      const backdrop = document.getElementById('share-note-backdrop');
+      const titleEl = document.getElementById('share-note-title');
+      const noteField = document.getElementById('share-note-field');
+      const tagsList = document.getElementById('share-tags-list');
+      const tagInput = document.getElementById('share-tag-input');
+
+      const tags = Array.isArray(recipe?.tags)
+        ? recipe.tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean)
+        : [];
+      const renderTags = () => {
+        tagsList.innerHTML = '';
+        if (!tags.length) {
+          tagsList.innerHTML = '<span class="text-xs text-zinc-400 dark:text-zinc-500">No tags yet — add some below (e.g. cuisine, diet, course, method)</span>';
+        }
+        tags.forEach((t, idx) => {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'px-2.5 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-600 transition-colors';
+          chip.textContent = `${t} ✕`;
+          chip.title = 'Remove tag';
+          chip.addEventListener('click', () => { tags.splice(idx, 1); renderTags(); });
+          tagsList.appendChild(chip);
+        });
+      };
+
+      titleEl.textContent = isUpdate ? 'Update shared copy' : 'Share to the community feed';
+      confirmBtn.textContent = isUpdate ? 'Update' : 'Share';
+      noteField.style.display = isUpdate ? '' : 'none';
+      input.value = '';
+      tagInput.value = '';
+      renderTags();
+      modal.classList.remove('hidden');
+
+      const onTagKey = (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const t = tagInput.value.trim().toLowerCase().slice(0, 32);
+        if (t && !tags.includes(t) && tags.length < 12) {
+          tags.push(t);
+          renderTags();
+        }
+        tagInput.value = '';
+      };
+      tagInput.addEventListener('keydown', onTagKey);
+
+      const done = (val) => {
+        modal.classList.add('hidden');
+        confirmBtn.removeEventListener('click', onConfirm);
+        cancelBtn.removeEventListener('click', onCancel);
+        closeBtn.removeEventListener('click', onCancel);
+        backdrop.removeEventListener('click', onCancel);
+        tagInput.removeEventListener('keydown', onTagKey);
+        resolve(val);
+      };
+      const onConfirm = () => done({ tags: tags.slice(), note: input.value.trim() });
+      const onCancel = () => done(null);
+      confirmBtn.addEventListener('click', onConfirm);
+      cancelBtn.addEventListener('click', onCancel);
+      closeBtn.addEventListener('click', onCancel);
+      backdrop.addEventListener('click', onCancel);
+    });
+  },
+
+  // ── Social section (made-it gallery, remixes, comments) ─────────
+
+  async loadSocialSection(sharedId) {
+    const container = document.getElementById('social-section');
+    if (!container) return;
+    try {
+      // Anonymous mode reads everything from the slug-keyed public payload
+      // (one fetch: comments + made-it notes + remixes). The recipe-id
+      // endpoints stay behind the JWT gate.
+      if (App.isAnonymous) {
+        const slug = App.viewingShared?.share_slug;
+        if (!slug) return;
+        const res = await fetch(`/api/public/recipes/${encodeURIComponent(slug)}`);
+        if (!res.ok || document.getElementById('social-section') !== container) return;
+        const pub = await res.json();
+        const comments = (pub.comments || []).map((c) => ({ ...c, deleted: false, is_mine: false }));
+        const madeIt = pub.made_it_notes || [];
+        this.renderSocialSection(container, sharedId, madeIt, comments, pub.remixes || [], {
+          madeCount: pub.made_count || madeIt.length,
+        });
+        return;
+      }
+
+      const [madeRes, commentsRes, remixRes] = await Promise.all([
+        fetch(`/api/shared-recipes/${sharedId}/made-it`),
+        fetch(`/api/shared-recipes/${sharedId}/comments`),
+        fetch(`/api/shared-recipes/${sharedId}/remixes`),
+      ]);
+      if (document.getElementById('social-section') !== container) return;
+      const madeIt = madeRes.ok ? await madeRes.json() : [];
+      const comments = commentsRes.ok ? await commentsRes.json() : [];
+      const remixes = remixRes.ok ? await remixRes.json() : [];
+      this.renderSocialSection(container, sharedId, madeIt, comments, remixes);
+    } catch { /* leave section empty */ }
+  },
+
+  renderSocialSection(container, sharedId, madeIt, comments, remixes, opts) {
+    // Anonymous payloads carry only NOTED made-it marks; opts.madeCount
+    // carries the true cooked-count for the heading.
+    const madeCount = opts?.madeCount ?? madeIt.length;
+    let html = '<div class="space-y-4 mt-2 pt-4 border-t border-zinc-200 dark:border-zinc-800">';
+
+    if (remixes.length) {
+      html += `<div>
+        <h3 class="text-sm font-semibold mb-2">⑂ ${remixes.length} remix${remixes.length === 1 ? '' : 'es'}</h3>
+        <div class="space-y-1">`;
+      remixes.slice(0, 10).forEach((r) => {
+        html += `<p class="text-sm text-zinc-500 dark:text-zinc-400">${this.escapeHtml(r.title || 'Untitled')} <span class="text-zinc-400 dark:text-zinc-500">by ${this.escapeHtml(r.username)}</span>${r.share_slug ? ` · <a class="text-blue-500 hover:text-blue-400" href="/r/${this.escapeHtml(r.share_slug)}" target="_blank" rel="noopener">view</a>` : ''}</p>`;
+      });
+      html += '</div></div>';
+    }
+
+    const notes = madeIt.filter((m) => m.note);
+    if (madeCount) {
+      html += `<div>
+        <h3 class="text-sm font-semibold mb-2">☑ Made it (${madeCount})</h3>`;
+      if (notes.length) {
+        html += '<div class="space-y-2">';
+        notes.slice(0, 10).forEach((m) => {
+          html += `<div class="p-3 rounded-lg bg-zinc-100/70 dark:bg-zinc-900/50 text-sm">
+            <span class="font-medium">${this.escapeHtml(m.username)}</span>
+            <p class="text-zinc-500 dark:text-zinc-400 mt-0.5">${this.escapeHtml(m.note)}</p>
+          </div>`;
+        });
+        html += '</div>';
+      } else if (madeIt.length) {
+        html += `<p class="text-xs text-zinc-400 dark:text-zinc-500">${madeIt.map((m) => this.escapeHtml(m.username)).slice(0, 8).join(', ')} cooked this.</p>`;
+      }
+      html += '</div>';
+    }
+
+    const commentEntry = App.isAnonymous
+      ? `<button id="comment-signin" class="w-full px-4 py-2 text-sm rounded-lg bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 text-left transition-colors mt-2">Sign in to comment…</button>`
+      : `<form id="comment-form" class="flex gap-2 mt-2">
+        <input id="comment-input" type="text" maxlength="1000" placeholder="Add a comment…"
+          class="flex-1 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <button type="submit" class="px-4 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors shrink-0">Post</button>
+      </form>`;
+    html += `<div>
+      <h3 class="text-sm font-semibold mb-2">Comments (${comments.filter((c) => !c.deleted).length})</h3>
+      <div id="comments-list" class="space-y-2"></div>
+      ${commentEntry}
+    </div>`;
+
+    html += '</div>';
+    container.innerHTML = html;
+
+    const list = container.querySelector('#comments-list');
+    const isRecipeOwner = App.viewingShared?.is_mine;
+    if (!comments.length) {
+      list.innerHTML = '<p class="text-xs text-zinc-400 dark:text-zinc-500">No comments yet.</p>';
+    }
+    comments.forEach((c) => {
+      const row = document.createElement('div');
+      row.className = 'p-3 rounded-lg bg-zinc-100/70 dark:bg-zinc-900/50 text-sm flex items-start justify-between gap-2';
+      if (c.deleted) {
+        row.innerHTML = '<p class="text-xs italic text-zinc-400 dark:text-zinc-600">comment deleted</p>';
+      } else {
+        row.innerHTML = `<div class="min-w-0">
+          <span class="font-medium">${this.escapeHtml(c.username)}</span>
+          <p class="text-zinc-500 dark:text-zinc-400 mt-0.5 break-words">${this.escapeHtml(c.body)}</p>
+        </div>`;
+        if (c.is_mine || isRecipeOwner) {
+          const del = document.createElement('button');
+          del.className = 'text-xs text-zinc-400 hover:text-red-500 transition-colors shrink-0';
+          del.textContent = 'Delete';
+          del.addEventListener('click', async () => {
+            await fetch(`/api/comments/${c.id}`, { method: 'DELETE' }).catch(() => {});
+            this.loadSocialSection(sharedId);
+          });
+          row.appendChild(del);
+        }
+      }
+      list.appendChild(row);
+    });
+
+    container.querySelector('#comment-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = container.querySelector('#comment-input');
+      const body = input.value.trim();
+      if (!body) return;
+      input.value = '';
+      await fetch(`/api/shared-recipes/${sharedId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body }),
+      }).catch(() => {});
+      this.loadSocialSection(sharedId);
+    });
+
+    container.querySelector('#comment-signin')?.addEventListener('click', () => {
+      App.promptSignIn('Sign in to comment on recipes');
     });
   },
 
@@ -361,25 +645,27 @@ const Recipe = {
       const btn = display.querySelector('#share-btn');
       if (btn?.disabled) return;
 
-      // Updating an existing shared copy prompts for an optional note;
-      // the first share publishes v1 immediately.
+      // Publish dialog: confirm creator tags (AI-proposed) every time; the
+      // "what changed" note is only asked when updating a shared copy.
       const conv = (typeof Store !== 'undefined')
         ? Store.conversations.find((c) => c.id === App.currentConversationId)
         : null;
-      let note = '';
-      if (conv?.is_shared) {
-        note = await this.promptShareNote();
-        if (note === null) return; // cancelled
-      }
+      const result = await this.promptPublish(recipe, { isUpdate: !!conv?.is_shared });
+      if (result === null) return; // cancelled
 
       try {
         const res = await fetch('/api/recipes/share', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ conversationId: App.currentConversationId, note: note || undefined }),
+          body: JSON.stringify({
+            conversationId: App.currentConversationId,
+            note: result.note || undefined,
+            tags: result.tags,
+          }),
         });
         if (!res.ok) throw new Error('share failed');
         if (btn) btn.textContent = 'Shared!';
+        if (App.currentRecipe) App.currentRecipe.tags = result.tags;
         if (typeof Store !== 'undefined') await Store.refresh();
         setTimeout(() => this.display(App.currentRecipe), 800);
       } catch {
@@ -387,10 +673,31 @@ const Recipe = {
       }
     });
 
+    display.querySelector('#made-it-btn')?.addEventListener('click', (e) => {
+      this.markMadeIt(e.currentTarget);
+    });
+
+    display.querySelector('#add-collection-btn')?.addEventListener('click', () => {
+      if (App.isAnonymous) return App.promptSignIn('Sign in to save recipes to your box');
+      if (typeof Home === 'undefined') return;
+      const target = App.currentConversationId
+        ? { conversationId: App.currentConversationId }
+        : App.viewingShared?.id ? { sharedRecipeId: App.viewingShared.id } : null;
+      if (target) Home.openCollectionPicker(target);
+    });
+
+    display.querySelector('#copy-link-btn')?.addEventListener('click', (e) => {
+      const slug = this._currentShareSlug();
+      if (slug && typeof Home !== 'undefined') Home.copyShareLink(slug, e.currentTarget);
+    });
+
     display.querySelector('#fork-btn')?.addEventListener('click', () => {
+      if (App.isAnonymous) return App.promptSignIn('Sign in to fork and remix recipes');
       if (typeof Store === 'undefined') return;
       const vs = App.viewingShared;
-      Store.forkRecipe(App.currentRecipe, vs && !vs.is_mine ? { username: vs.username } : null);
+      Store.forkRecipe(App.currentRecipe, vs && !vs.is_mine ? {
+        username: vs.username, id: vs.id, current_version: vs.current_version,
+      } : null);
     });
 
     display.querySelector('#history-btn')?.addEventListener('click', () => this.openVersionHistory());
@@ -822,8 +1129,8 @@ const Recipe = {
     // is only visible while the section is expanded (see app.css). Flex on
     // <summary> drops the native disclosure marker, so a chevron stands in.
     let html = `
-      <details class="rounded-xl bg-zinc-50 dark:bg-zinc-900/50">
-        <summary class="px-4 py-2.5 cursor-pointer text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors flex items-center justify-between gap-2">
+      <details class="rounded-xl bg-zinc-100/70 dark:bg-zinc-900/50">
+        <summary class="px-4 py-2.5 cursor-pointer text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors flex items-center justify-between gap-2">
           <span class="flex items-center gap-1.5"><span class="summary-chevron text-[0.6rem]">▶</span>All Ingredients (${totalIngredients})</span>
           <label class="ing-macros-summary-toggle flex items-center gap-1.5 cursor-pointer text-xs text-zinc-400 dark:text-zinc-500 select-none">
             <input type="checkbox" id="ing-macros-toggle" class="ingredient-check" ${showMacros ? 'checked' : ''}>
@@ -953,7 +1260,7 @@ const Recipe = {
     const titleHtml = step.title ? `<h4 class="text-sm font-semibold mb-1">${this.escapeHtml(step.title)}</h4>` : '';
 
     return `
-      <div class="step-card flex gap-4 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900/50" data-step="${index}">
+      <div class="step-card flex gap-4 p-4 rounded-xl bg-zinc-100/70 dark:bg-zinc-900/50" data-step="${index}">
         <div class="step-number shrink-0 w-8 h-8 rounded-full bg-blue-600 dark:bg-blue-400 text-white dark:text-zinc-950 flex items-center justify-center text-sm font-bold mt-0.5">${index + 1}</div>
         <div class="flex-1 min-w-0">
           ${titleHtml}

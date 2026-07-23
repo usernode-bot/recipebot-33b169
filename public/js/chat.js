@@ -539,7 +539,7 @@ const Chat = {
         const isActive = o.value === selected;
         return `<span class="pref-btn-locked px-2.5 py-1 text-xs rounded-full border ${
           isActive
-            ? 'border-[#00c8ff] bg-[rgba(0,200,255,0.1)] text-[#00c8ff]'
+            ? 'border-[#E07A3F] bg-[rgba(224,122,63,0.1)] text-[#b85a24] dark:text-[#E8935B]'
             : 'border-zinc-200 dark:border-zinc-800 text-zinc-300 dark:text-zinc-600'
         }">${o.label}</span>`;
       }).join('');
@@ -702,6 +702,11 @@ const Chat = {
   async send(message) {
     if (this.streaming || !message.trim()) return;
 
+    if (App.isAnonymous) {
+      App.promptSignIn('Sign in to cook with the AI');
+      return;
+    }
+
     if (App.llm && !App.llm.enabled) {
       this.appendMessage('assistant', 'AI is unavailable in this environment, so chat is disabled here.');
       return;
@@ -742,6 +747,16 @@ const Chat = {
 
     if (!App.currentConversationId && App.currentRecipe) {
       body.forkRecipe = App.currentRecipe;
+      // Remix lineage: record which shared recipe (and version) this fork
+      // came from. Own recipes and unattributed imports carry no source.
+      const vs = App.viewingShared;
+      if (vs && !vs.is_mine && vs.id) {
+        body.forkSource = {
+          sharedRecipeId: vs.id,
+          version: (App.viewingVersion && App.viewingVersion.version) || vs.current_version || 1,
+          username: vs.username,
+        };
+      }
     }
 
     console.log('[chat] → request', body);

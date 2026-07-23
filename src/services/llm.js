@@ -169,6 +169,13 @@ When calling display_recipe, every step must include:
 
 Also include at the top level: version (always 1), title, description, default_servings, prep_time, cook_time, and notes if relevant.
 
+Also propose 2-6 tags for the recipe in the top-level "tags" array (lowercase). Pick from these suggested vocabularies where they fit, plus free-form tags when needed:
+- cuisine: italian, mexican, indian, chinese, japanese, thai, french, middle eastern, ethiopian, american
+- diet: vegetarian, vegan, gluten-free, dairy-free, high-protein, low-carb
+- course: breakfast, lunch, dinner, dessert, snack, side, drink
+- method: one-pot, no-oven, grill, slow-cook, air-fryer, no-cook, baking
+The user confirms tags when they publish, so propose your best guess.
+
 If the recipe produces naturally countable items (tacos, cookies, mozzarella sticks, pancakes, etc.), include serving_item with count (items per serving) and name (plural item name). Omit serving_item for recipes like soups, stews, bowls, or anything not naturally counted.
 
 Use common US volume units (tsp, tbsp, cup, etc.). Provide accurate macro estimates for every ingredient.
@@ -204,6 +211,11 @@ const TOOLS = [
         prep_time: { type: 'string' },
         cook_time: { type: 'string' },
         notes: { type: 'string' },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional. 2-6 lowercase tags across cuisine / diet / course / method (e.g. "indian", "vegetarian", "dinner", "one-pot") plus free-form. The creator confirms them at publish time.',
+        },
         serving_item: {
           type: 'object',
           description: 'Optional. For recipes where servings are naturally countable items (e.g. 4 mozzarella sticks, 3 tacos, 2 pancakes). Omit for recipes like soups, stews, bowls, etc.',
