@@ -62,7 +62,7 @@ const Recipe = {
       const displayedVersion = App.viewingVersion ? App.viewingVersion.version : vs.current_version;
       const versionBit = displayedVersion ? ` · v${displayedVersion}` : '';
       const madeBit = vs.made_count ? ` · cooked ${vs.made_count}×` : '';
-      const historyBit = vs.id && vs.current_version > 1
+      const historyBit = vs.id && vs.current_version > 1 && !App.isAnonymous
         ? ` · <button id="history-btn" class="underline hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">History</button>`
         : '';
       bylineHtml = `<p class="text-sm text-zinc-400 dark:text-zinc-500 mt-1">by ${this.escapeHtml(vs.is_mine ? 'you' : vs.username)}${ratingBit}${versionBit}${madeBit}${historyBit}</p>`;
@@ -345,6 +345,7 @@ const Recipe = {
   },
 
   async markMadeIt(btn) {
+    if (App.isAnonymous) return App.promptSignIn('Sign in to mark recipes you cooked');
     const note = await this.promptMadeItNote();
     if (note === null) return; // cancelled
     const target = App.currentConversationId
@@ -450,6 +451,23 @@ const Recipe = {
     const container = document.getElementById('social-section');
     if (!container) return;
     try {
+      // Anonymous mode reads everything from the slug-keyed public payload
+      // (one fetch: comments + made-it notes + remixes). The recipe-id
+      // endpoints stay behind the JWT gate.
+      if (App.isAnonymous) {
+        const slug = App.viewingShared?.share_slug;
+        if (!slug) return;
+        const res = await fetch(`/api/public/recipes/${encodeURIComponent(slug)}`);
+        if (!res.ok || document.getElementById('social-section') !== container) return;
+        const pub = await res.json();
+        const comments = (pub.comments || []).map((c) => ({ ...c, deleted: false, is_mine: false }));
+        const madeIt = pub.made_it_notes || [];
+        this.renderSocialSection(container, sharedId, madeIt, comments, pub.remixes || [], {
+          madeCount: pub.made_count || madeIt.length,
+        });
+        return;
+      }
+
       const [madeRes, commentsRes, remixRes] = await Promise.all([
         fetch(`/api/shared-recipes/${sharedId}/made-it`),
         fetch(`/api/shared-recipes/${sharedId}/comments`),
@@ -463,7 +481,10 @@ const Recipe = {
     } catch { /* leave section empty */ }
   },
 
-  renderSocialSection(container, sharedId, madeIt, comments, remixes) {
+  renderSocialSection(container, sharedId, madeIt, comments, remixes, opts) {
+    // Anonymous payloads carry only NOTED made-it marks; opts.madeCount
+    // carries the true cooked-count for the heading.
+    const madeCount = opts?.madeCount ?? madeIt.length;
     let html = '<div class="space-y-4 mt-2 pt-4 border-t border-zinc-200 dark:border-zinc-800">';
 
     if (remixes.length) {
@@ -477,9 +498,9 @@ const Recipe = {
     }
 
     const notes = madeIt.filter((m) => m.note);
-    if (madeIt.length) {
+    if (madeCount) {
       html += `<div>
-        <h3 class="text-sm font-semibold mb-2">☑ Made it (${madeIt.length})</h3>`;
+        <h3 class="text-sm font-semibold mb-2">☑ Made it (${madeCount})</h3>`;
       if (notes.length) {
         html += '<div class="space-y-2">';
         notes.slice(0, 10).forEach((m) => {
@@ -489,20 +510,23 @@ const Recipe = {
           </div>`;
         });
         html += '</div>';
-      } else {
+      } else if (madeIt.length) {
         html += `<p class="text-xs text-zinc-400 dark:text-zinc-500">${madeIt.map((m) => this.escapeHtml(m.username)).slice(0, 8).join(', ')} cooked this.</p>`;
       }
       html += '</div>';
     }
 
-    html += `<div>
-      <h3 class="text-sm font-semibold mb-2">Comments (${comments.filter((c) => !c.deleted).length})</h3>
-      <div id="comments-list" class="space-y-2"></div>
-      <form id="comment-form" class="flex gap-2 mt-2">
+    const commentEntry = App.isAnonymous
+      ? `<button id="comment-signin" class="w-full px-4 py-2 text-sm rounded-lg bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 text-left transition-colors mt-2">Sign in to comment…</button>`
+      : `<form id="comment-form" class="flex gap-2 mt-2">
         <input id="comment-input" type="text" maxlength="1000" placeholder="Add a comment…"
           class="flex-1 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
         <button type="submit" class="px-4 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors shrink-0">Post</button>
-      </form>
+      </form>`;
+    html += `<div>
+      <h3 class="text-sm font-semibold mb-2">Comments (${comments.filter((c) => !c.deleted).length})</h3>
+      <div id="comments-list" class="space-y-2"></div>
+      ${commentEntry}
     </div>`;
 
     html += '</div>';
@@ -549,6 +573,10 @@ const Recipe = {
         body: JSON.stringify({ body }),
       }).catch(() => {});
       this.loadSocialSection(sharedId);
+    });
+
+    container.querySelector('#comment-signin')?.addEventListener('click', () => {
+      App.promptSignIn('Sign in to comment on recipes');
     });
   },
 
@@ -650,6 +678,7 @@ const Recipe = {
     });
 
     display.querySelector('#add-collection-btn')?.addEventListener('click', () => {
+      if (App.isAnonymous) return App.promptSignIn('Sign in to save recipes to your box');
       if (typeof Home === 'undefined') return;
       const target = App.currentConversationId
         ? { conversationId: App.currentConversationId }
@@ -663,9 +692,12 @@ const Recipe = {
     });
 
     display.querySelector('#fork-btn')?.addEventListener('click', () => {
+      if (App.isAnonymous) return App.promptSignIn('Sign in to fork and remix recipes');
       if (typeof Store === 'undefined') return;
       const vs = App.viewingShared;
-      Store.forkRecipe(App.currentRecipe, vs && !vs.is_mine ? { username: vs.username } : null);
+      Store.forkRecipe(App.currentRecipe, vs && !vs.is_mine ? {
+        username: vs.username, id: vs.id, current_version: vs.current_version,
+      } : null);
     });
 
     display.querySelector('#history-btn')?.addEventListener('click', () => this.openVersionHistory());

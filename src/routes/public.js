@@ -55,6 +55,13 @@ function publicRoutes(config) {
        ORDER BY created_at DESC LIMIT 25`,
       [rec.id]
     );
+    const { rows: remixes } = await pool.query(
+      `SELECT s.recipe_data->>'title' AS title, s.username, s.share_slug, s.created_at
+       FROM shared_recipes s
+       WHERE s.forked_from_shared_id = $1
+       ORDER BY s.created_at DESC LIMIT 25`,
+      [rec.id]
+    );
 
     return {
       username: rec.username,
@@ -71,6 +78,7 @@ function publicRoutes(config) {
       } : null,
       comments,
       made_it_notes: madeIt,
+      remixes,
       updated_at: rec.updated_at,
     };
   }
@@ -83,6 +91,126 @@ function publicRoutes(config) {
       res.json(data);
     } catch (err) {
       log.error('public', 'Public recipe failed', { message: err.message });
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // ── Anonymous SPA data sources ────────────────────────────────────
+  // The logged-out app browses through these. Same row shapes as the
+  // authenticated endpoints minus every personalized field (my_rating /
+  // is_favorited / is_mine) and minus user ids — usernames only.
+
+  // Community feed. Mirrors GET /api/shared-recipes (recipes.js) closely
+  // enough that the SPA's card builders and Store.openShared render the
+  // rows unchanged. ?tags=a,b filters by array overlap.
+  router.get('/api/public/feed', async (req, res) => {
+    try {
+      const tagFilter = typeof req.query.tags === 'string'
+        ? req.query.tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean).slice(0, 12)
+        : [];
+      const params = [];
+      let where = '';
+      if (tagFilter.length) {
+        params.push(tagFilter);
+        where = `WHERE s.tags && $${params.length}::text[]`;
+      }
+      const { rows } = await pool.query(
+        `SELECT s.id, s.username, s.recipe_data AS data, s.tags, s.share_slug,
+                s.created_at, s.updated_at,
+                s.forked_from_shared_id, s.forked_from_version, s.forked_from_username,
+                COALESCE((SELECT MAX(v.version) FROM shared_recipe_versions v
+                          WHERE v.shared_recipe_id = s.id), 1)::int AS current_version,
+                COALESCE((SELECT AVG(r.rating) FROM recipe_ratings r
+                          WHERE r.shared_recipe_id = s.id), 0)::float AS avg_rating,
+                (SELECT COUNT(*) FROM recipe_ratings r
+                 WHERE r.shared_recipe_id = s.id)::int AS rating_count,
+                (SELECT COUNT(*) FROM made_it_marks mm WHERE mm.shared_recipe_id = s.id)::int AS made_count,
+                (SELECT COUNT(*) FROM recipe_comments rc
+                 WHERE rc.shared_recipe_id = s.id AND rc.deleted_at IS NULL)::int AS comment_count,
+                (SELECT COUNT(*) FROM shared_recipes s2 WHERE s2.forked_from_shared_id = s.id)::int AS remix_count
+         FROM shared_recipes s
+         ${where}
+         ORDER BY s.created_at DESC`,
+        params
+      );
+      res.set('Cache-Control', 'public, max-age=60');
+      res.json(rows);
+    } catch (err) {
+      log.error('public', 'Public feed failed', { message: err.message });
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Public collections rail. Strictly visibility='public'; never member
+  // lists, member counts, or invite tokens.
+  router.get('/api/public/collections', async (req, res) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT c.id, c.name, c.description, c.username, c.created_at,
+                (SELECT COUNT(*) FROM collection_items i
+                 WHERE i.collection_id = c.id)::int AS item_count
+         FROM collections c
+         WHERE c.visibility = 'public'
+         ORDER BY c.created_at DESC`
+      );
+      res.set('Cache-Control', 'public, max-age=60');
+      res.json(rows);
+    } catch (err) {
+      log.error('public', 'Public collections failed', { message: err.message });
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Public collection detail. 404 unless visibility='public' (numeric-id
+  // probing can only reveal already-public collections). Items appear only
+  // when their shared_recipe_id resolves to a LIVE shared recipe —
+  // snapshot-only items (deleted source) and own-conversation items are
+  // omitted: the snapshot is the saver's private copy, and serving it
+  // publicly would defeat the "delete = takedown" contract.
+  router.get('/api/public/collections/:id', async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (!id) return res.status(404).json({ error: 'Collection not found' });
+    try {
+      const { rows: coll } = await pool.query(
+        `SELECT c.id, c.name, c.description, c.username, c.visibility, c.created_at
+         FROM collections c
+         WHERE c.id = $1 AND c.visibility = 'public'`,
+        [id]
+      );
+      if (!coll.length) return res.status(404).json({ error: 'Collection not found' });
+
+      const { rows: items } = await pool.query(
+        `SELECT i.id, i.shared_recipe_id, i.added_by_username, i.created_at,
+                s.recipe_data AS data, s.username, s.share_slug, s.tags
+         FROM collection_items i
+         JOIN shared_recipes s ON s.id = i.shared_recipe_id
+         WHERE i.collection_id = $1
+         ORDER BY i.created_at DESC`,
+        [id]
+      );
+
+      res.set('Cache-Control', 'public, max-age=60');
+      res.json({
+        ...coll[0],
+        is_owner: false,
+        is_member: false,
+        invite_token: null,
+        members: [],
+        items: items.map((i) => ({
+          id: i.id,
+          shared_recipe_id: i.shared_recipe_id,
+          conversation_id: null,
+          added_by_username: i.added_by_username,
+          created_at: i.created_at,
+          share_slug: i.share_slug,
+          data: i.data,
+          username: i.username,
+          tags: i.tags,
+          snapshot_only: false,
+        })),
+      });
+    } catch (err) {
+      log.error('public', 'Public collection failed', { message: err.message });
       res.status(500).json({ error: 'Internal server error' });
     }
   });
@@ -238,6 +366,10 @@ function recipePage(data, pageUrl) {
   <h2>Steps</h2>
   <div id="steps"></div>
   <div id="notes"></div>
+  <div id="remixes-section" style="display:none">
+    <h2>Remixes</h2>
+    <div id="remixes"></div>
+  </div>
   <div id="madeit-section" style="display:none">
     <h2>Made it</h2>
     <div id="madeit"></div>
@@ -248,6 +380,7 @@ function recipePage(data, pageUrl) {
   </div>
   <div class="foot">
     Shared by <b id="foot-user"></b> on RecipeBot — recipes without the ads or the life story.
+    <a href="/">Browse more recipes →</a> ·
     <a href="${PLATFORM_APP_URL}">Cook, remix, and keep your own box →</a>
   </div>
 </div>
@@ -351,6 +484,14 @@ var DATA = ${payload};
   document.getElementById('foot-user').textContent = DATA.username;
   if (r.notes) {
     document.getElementById('notes').innerHTML = '<h2>Notes</h2><div class="note">' + esc(r.notes) + '</div>';
+  }
+  if (DATA.remixes && DATA.remixes.length) {
+    document.getElementById('remixes-section').style.display = '';
+    document.getElementById('remixes').innerHTML = DATA.remixes.map(function (x) {
+      var name = esc(x.title || 'Untitled') + ' <span style="opacity:.7">by ' + esc(x.username) + '</span>';
+      return '<div class="note">' + (x.share_slug
+        ? '<a href="/r/' + esc(x.share_slug) + '">' + name + '</a>' : name) + '</div>';
+    }).join('');
   }
   if (DATA.made_it_notes && DATA.made_it_notes.length) {
     document.getElementById('madeit-section').style.display = '';

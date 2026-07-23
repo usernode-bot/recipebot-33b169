@@ -120,4 +120,6 @@ const Store = {
   },
 };
 
-Store.refresh();
+// Boot refresh only makes sense with a platform token — anonymous visitors
+// have no conversations/recipes/favorites, and skipping avoids 401 noise.
+if (window.UsernodeAuth?.token) Store.refresh();

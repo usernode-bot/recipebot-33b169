@@ -184,6 +184,11 @@
       "name": "Public page shows made-it note",
       "path": "/r/staging-demo-recipe",
       "expectText": "came out great"
+    },
+    {
+      "name": "Public page lists remixes",
+      "path": "/r/staging-demo-recipe",
+      "expectText": "Staging Demo Remixed Stir Fry"
     }
   ]
 }

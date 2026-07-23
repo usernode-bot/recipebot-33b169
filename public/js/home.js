@@ -22,6 +22,26 @@ const Home = {
 
   async refresh() {
     try {
+      // Anonymous browse mode reads only the GET-only /api/public/ surface;
+      // the personal box sections stay empty and hidden.
+      if (App.isAnonymous) {
+        const [feedRes, pubCollRes] = await Promise.all([
+          fetch('/api/public/feed'),
+          fetch('/api/public/collections'),
+        ]);
+        this.shared = feedRes.ok ? await feedRes.json() : [];
+        this.publicCollections = pubCollRes.ok ? await pubCollRes.json() : [];
+        this.mine = [];
+        this.favorites = [];
+        this.conversations = [];
+        this.collections = [];
+        if (this.activeCollection) {
+          await this.reloadActiveCollection();
+        }
+        this.render();
+        return;
+      }
+
       const [sharedRes, mineRes, favRes, convRes, collRes, pubCollRes] = await Promise.all([
         fetch('/api/shared-recipes'),
         fetch('/api/recipes'),
@@ -91,9 +111,11 @@ const Home = {
     const bareConvs = this.conversations.filter(
       (c) => !recipeConvIds.has(c.id) && matches(c.title || 'New conversation'));
 
-    // Collections section (always visible — it's the box's organizer).
+    // Collections section (the box's organizer) — hidden entirely for
+    // anonymous visitors: an empty personal box is noise, not a prompt.
+    collSection?.classList.toggle('hidden', !!App.isAnonymous);
     const collList = document.getElementById('home-collections-list');
-    if (collList) {
+    if (collList && !App.isAnonymous) {
       collList.innerHTML = '';
       const colls = this.collections.filter((c) => matches(c.name));
       colls.forEach((c) => collList.appendChild(this.collectionCard(c)));
@@ -345,9 +367,11 @@ const Home = {
         <h3 class="font-semibold text-sm truncate">${this.esc(recipe.title || 'Untitled')}</h3>
         <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">by ${s.is_mine ? 'you' : this.esc(s.username)}${s.current_version > 1 ? ` · v${s.current_version}` : ''}${remixBit}</p>
       </div>`;
-    const heart = this._heartBtn(s.is_favorited);
-    heart.addEventListener('click', () => this.toggleSharedFavorite(s.id, s.is_favorited));
-    head.appendChild(heart);
+    if (!App.isAnonymous) {
+      const heart = this._heartBtn(s.is_favorited);
+      heart.addEventListener('click', () => this.toggleSharedFavorite(s.id, s.is_favorited));
+      head.appendChild(heart);
+    }
     el.appendChild(head);
 
     if (recipe.description) {
@@ -381,6 +405,7 @@ const Home = {
     viewBtn.addEventListener('click', () => this.viewShared(s));
     const forkBtn = this._actionBtn('Fork');
     forkBtn.addEventListener('click', () => {
+      if (App.isAnonymous) return App.promptSignIn('Sign in to fork and remix recipes');
       if (typeof Store !== 'undefined') {
         Store.forkRecipe(recipe, s.is_mine ? null : {
           username: s.username, id: s.id, current_version: s.current_version,
@@ -391,8 +416,10 @@ const Home = {
     actions.appendChild(forkBtn);
     const collectBtn = this._actionBtn('Save');
     collectBtn.title = 'Save to a collection (keeps your own copy)';
-    collectBtn.addEventListener('click', () =>
-      this.openCollectionPicker({ sharedRecipeId: s.id }));
+    collectBtn.addEventListener('click', () => {
+      if (App.isAnonymous) return App.promptSignIn('Sign in to save recipes to your box');
+      this.openCollectionPicker({ sharedRecipeId: s.id });
+    });
     actions.appendChild(collectBtn);
     if (s.share_slug) {
       const linkBtn = this._actionBtn('Link');
@@ -426,7 +453,9 @@ const Home = {
       : 'No ratings yet';
     row.appendChild(summary);
 
-    if (!s.is_mine) {
+    // Anonymous visitors see the average summary only — rating is an
+    // ownership action.
+    if (!s.is_mine && !App.isAnonymous) {
       const stars = document.createElement('span');
       stars.className = 'inline-flex items-center';
       stars.title = s.my_rating ? `Your rating: ${s.my_rating}` : 'Rate this recipe';
@@ -486,9 +515,15 @@ const Home = {
     return el;
   },
 
+  // Anonymous visitors read public collections through the /api/public/
+  // surface (public-visibility only, live shared items only, no members).
+  _collectionUrl(id) {
+    return App.isAnonymous ? `/api/public/collections/${id}` : `/api/collections/${id}`;
+  },
+
   async openCollection(id) {
     try {
-      const res = await fetch(`/api/collections/${id}`);
+      const res = await fetch(this._collectionUrl(id));
       if (!res.ok) return;
       this.activeCollection = await res.json();
       this.render();
@@ -498,7 +533,7 @@ const Home = {
   async reloadActiveCollection() {
     if (!this.activeCollection) return;
     try {
-      const res = await fetch(`/api/collections/${this.activeCollection.id}`);
+      const res = await fetch(this._collectionUrl(this.activeCollection.id));
       if (res.ok) this.activeCollection = await res.json();
       else this.activeCollection = null;
     } catch { /* keep stale copy */ }
@@ -638,12 +673,14 @@ const Home = {
       }
     });
     actions.appendChild(viewBtn);
-    const removeBtn = this._actionBtn('Remove');
-    removeBtn.addEventListener('click', async () => {
-      await fetch(`/api/collections/${c.id}/items/${item.id}`, { method: 'DELETE' }).catch(() => {});
-      this.refresh();
-    });
-    actions.appendChild(removeBtn);
+    if (!App.isAnonymous) {
+      const removeBtn = this._actionBtn('Remove');
+      removeBtn.addEventListener('click', async () => {
+        await fetch(`/api/collections/${c.id}/items/${item.id}`, { method: 'DELETE' }).catch(() => {});
+        this.refresh();
+      });
+      actions.appendChild(removeBtn);
+    }
     el.appendChild(actions);
     return el;
   },

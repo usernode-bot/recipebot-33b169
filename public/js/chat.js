@@ -702,6 +702,11 @@ const Chat = {
   async send(message) {
     if (this.streaming || !message.trim()) return;
 
+    if (App.isAnonymous) {
+      App.promptSignIn('Sign in to cook with the AI');
+      return;
+    }
+
     if (App.llm && !App.llm.enabled) {
       this.appendMessage('assistant', 'AI is unavailable in this environment, so chat is disabled here.');
       return;

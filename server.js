@@ -35,17 +35,18 @@ app.use(collectionRoutes(config));
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// HTML shell: serve the app if authenticated. Unauthenticated top-level
-// visits (share links pasted into a browser — Sec-Fetch-Dest: document)
-// are sent to the platform's chromeless view of this app, where the shell
-// embeds it with a real token so the link just works. Every other
-// tokenless case gets the "open in Usernode" landing page instead of a
-// redirect, so the platform shell is never loaded INSIDE its own app
-// iframe and stray visits still don't reveal the app.
+// HTML shell: served to everyone. Signed-in users (platform iframe token)
+// get the full app; unauthenticated top-level visits get the same shell in
+// its logged-out anonymous mode — browse-only, fed exclusively by the
+// GET-only /api/public/* endpoints, with sign-in prompts on every
+// ownership/AI action (deliberate owner-confirmed deviation from the
+// scaffold's auth-gated-shell default: only published content is
+// reachable anonymously). Tokenless non-document stragglers still get the
+// "open in Usernode" landing page.
 app.get('*', (req, res) => {
   if (!req.user) {
-    if (req.get('sec-fetch-dest') === 'document') {
-      return res.redirect(302, 'https://social-vibecoding.usernodelabs.org/#app/recipebot-33b169/full');
+    if (req.get('sec-fetch-dest') === 'document' && req.accepts('html')) {
+      return res.sendFile(path.join(__dirname, 'public', 'index.html'));
     }
     return res.status(401).send(`<!doctype html><meta charset=utf-8><title>Open in Usernode</title>
 <body style="font-family:system-ui;background:#09090b;color:#e4e4e7;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0">
