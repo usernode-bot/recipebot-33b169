@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const { getPool } = require('../db/pool');
-const { isEnabled, llmMode, MODELS, DEFAULT_MODEL, isValidModel } = require('../services/llm');
+const { isEnabled, llmMode, MODELS, DEFAULT_MODEL, isValidModel, isValidLanguage } = require('../services/llm');
 const log = require('../services/logger');
 
 // Identity comes from the platform JWT (see src/middleware/auth.js).
@@ -73,7 +73,7 @@ function authRoutes(config) {
   });
 
   router.patch('/api/auth/preferences', async (req, res) => {
-    const { diet, complexity, serving, tempUnit, model } = req.body;
+    const { diet, complexity, serving, tempUnit, model, language } = req.body;
 
     if (model != null && !isValidModel(model)) {
       return res.status(400).json({ error: 'Unknown model' });
@@ -84,6 +84,9 @@ function authRoutes(config) {
       complexity: complexity || 'normal',
       serving: serving || 'normal',
       tempUnit: tempUnit === 'F' ? 'F' : 'C',
+      // UI + AI-output language; unknown values are silently dropped to 'en'
+      // (mirroring how tempUnit is coerced rather than rejected).
+      language: isValidLanguage(language) ? language : 'en',
     };
     if (isValidModel(model)) prefs.model = model;
 

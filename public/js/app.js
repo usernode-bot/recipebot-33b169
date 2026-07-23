@@ -22,8 +22,38 @@ window.App = {
     complexity: 'normal',
     serving: 'normal',
     model: null,
+    language: 'en',
   },
 };
+
+// Activate the saved/detected language before anything renders (i18n.js and
+// the locale dictionaries load before this file — see index.html).
+if (typeof I18N !== 'undefined') {
+  I18N.init();
+  App.preferences.language = I18N.lang;
+}
+
+// Central language switch: updates the UI immediately, persists to
+// localStorage (via I18N.set) and — when signed in — to the account
+// preferences, same as the diet/units/model chips.
+App.setLanguage = function (code) {
+  if (typeof I18N === 'undefined' || !I18N.isSupported(code)) return;
+  if (code === I18N.lang) return;
+  I18N.set(code);
+  App.preferences.language = code;
+  if (!App.isAnonymous && App.currentUser) savePreferences();
+};
+
+// Re-render dynamic views when the language changes. Static markup is
+// re-applied by I18N.set itself; this covers JS-built content.
+document.addEventListener('i18n:change', () => {
+  if (App.currentView === 'home' && typeof Home !== 'undefined') Home.render();
+  if (typeof Recipe !== 'undefined' && App.currentRecipe && !Recipe.diffMode &&
+      App.currentView !== 'home' && !App.pendingRecipe) {
+    Recipe.display(App.currentRecipe);
+  }
+  renderLanguageMenu();
+});
 
 // Toggle between the homepage feed and the chat + recipe layout.
 App.showView = function (view) {
@@ -54,7 +84,7 @@ App.promptSignIn = function (reason) {
   const modal = document.getElementById('sign-in-modal');
   if (!modal) return;
   const reasonEl = document.getElementById('sign-in-reason');
-  if (reasonEl) reasonEl.textContent = reason || 'Sign in to do this';
+  if (reasonEl) reasonEl.textContent = reason || t('signin.title');
   modal.classList.remove('hidden');
   const close = () => {
     modal.classList.add('hidden');
@@ -128,6 +158,11 @@ window.HashParams = {
 
       if (data.user.preferences) {
         const tempUnit = data.user.preferences.tempUnit === 'F' ? 'F' : 'C';
+        // The account language wins over the device's localStorage choice
+        // for signed-in users; the device value is then mirrored by I18N.set.
+        const savedLang = (typeof I18N !== 'undefined' && I18N.isSupported(data.user.preferences.language))
+          ? data.user.preferences.language
+          : (typeof I18N !== 'undefined' ? I18N.lang : 'en');
         App.preferences = {
           diet: data.user.preferences.diet || null,
           complexity: data.user.preferences.complexity || 'normal',
@@ -135,7 +170,11 @@ window.HashParams = {
           tempUnit,
           // Effective model (saved choice validated server-side, else default)
           model: (data.llm && data.llm.model) || null,
+          language: savedLang,
         };
+        if (typeof I18N !== 'undefined' && savedLang !== I18N.lang) {
+          I18N.set(savedLang);
+        }
         if (typeof Recipe !== 'undefined') {
           Recipe.useCelsius = tempUnit !== 'F';
         }
@@ -146,7 +185,8 @@ window.HashParams = {
         const sendBtn = document.getElementById('send-btn');
         if (input) {
           input.disabled = true;
-          input.placeholder = 'AI is unavailable in this environment (staging previews have no AI access).';
+          input.placeholder = t('chat.aiUnavailablePlaceholder');
+          input.dataset.i18nPlaceholder = 'chat.aiUnavailablePlaceholder';
         }
         if (sendBtn) sendBtn.disabled = true;
       }
@@ -166,11 +206,13 @@ window.HashParams = {
     const sendBtn = document.getElementById('send-btn');
     if (input) {
       input.disabled = true;
-      input.placeholder = 'Sign in to cook with the AI.';
+      input.placeholder = t('chat.signInPlaceholder');
+      input.dataset.i18nPlaceholder = 'chat.signInPlaceholder';
     }
     if (sendBtn) sendBtn.disabled = true;
   }
 
+  setupLanguageToggle();
   setupMobileTabs();
   setupPreferences();
   const prefEl = document.getElementById('preferences');
@@ -195,7 +237,7 @@ window.HashParams = {
     App.showView('home');
     if (joinToken) {
       HashParams.set('join', null);
-      App.promptSignIn('Sign in to join this cookbook');
+      App.promptSignIn(t('signin.joinCookbook'));
     }
   } else if (joinToken && typeof Home !== 'undefined') {
     App.showView('home');
@@ -209,6 +251,54 @@ window.HashParams = {
     App.showView('home');
   }
 })();
+
+// Header globe dropdown: one row per supported language, shown in its own
+// language, checkmark on the active one. Works signed-in and signed-out.
+function renderLanguageMenu() {
+  const menu = document.getElementById('language-menu');
+  if (!menu || typeof I18N === 'undefined') return;
+  menu.innerHTML = '';
+  I18N.LANGS.forEach((l) => {
+    const active = l.code === I18N.lang;
+    const btn = document.createElement('button');
+    btn.className =
+      'w-full text-left px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center justify-between gap-2 ' +
+      (active ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-zinc-700 dark:text-zinc-200');
+    btn.dataset.lang = l.code;
+    const name = document.createElement('span');
+    name.textContent = l.native;
+    btn.appendChild(name);
+    if (active) {
+      const check = document.createElement('span');
+      check.textContent = '✓';
+      btn.appendChild(check);
+    }
+    btn.addEventListener('click', () => {
+      menu.classList.add('hidden');
+      document.getElementById('language-toggle')?.setAttribute('aria-expanded', 'false');
+      App.setLanguage(l.code);
+    });
+    menu.appendChild(btn);
+  });
+}
+
+function setupLanguageToggle() {
+  const toggle = document.getElementById('language-toggle');
+  const menu = document.getElementById('language-menu');
+  if (!toggle || !menu) return;
+  renderLanguageMenu();
+  toggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const nowHidden = menu.classList.toggle('hidden');
+    toggle.setAttribute('aria-expanded', String(!nowHidden));
+  });
+  document.addEventListener('click', (e) => {
+    if (menu.classList.contains('hidden')) return;
+    if (menu.contains(e.target) || toggle.contains(e.target)) return;
+    menu.classList.add('hidden');
+    toggle.setAttribute('aria-expanded', 'false');
+  });
+}
 
 function setupHomeButton() {
   document.getElementById('home-btn')?.addEventListener('click', () => {
@@ -304,7 +394,7 @@ function setupPreferences() {
 
 function setupNewConversation() {
   document.getElementById('new-conversation-btn').addEventListener('click', () => {
-    if (App.isAnonymous) return App.promptSignIn('Sign in to create recipes with the AI');
+    if (App.isAnonymous) return App.promptSignIn(t('signin.createRecipes'));
     App.currentConversationId = null;
     App.currentRecipe = null;
     App.pendingRecipe = null;
@@ -327,7 +417,6 @@ function setupDarkMode() {
   const toggle = document.getElementById('dark-mode-toggle');
   const media = window.matchMedia('(prefers-color-scheme: dark)');
   const ORDER = ['system', 'light', 'dark'];
-  const LABELS = { system: 'System', light: 'Light', dark: 'Dark' };
 
   const getMode = () =>
     ORDER.includes(localStorage.theme) ? localStorage.theme : 'system';
@@ -336,7 +425,7 @@ function setupDarkMode() {
     const mode = getMode();
     const dark = mode === 'dark' || (mode === 'system' && media.matches);
     document.documentElement.classList.toggle('dark', dark);
-    toggle.title = `Theme: ${LABELS[mode]}`;
+    toggle.title = t('theme.label', { mode: t(`theme.${mode}`) });
     for (const m of ORDER) {
       const icon = document.getElementById(m === 'system' ? 'icon-system' : m === 'light' ? 'icon-sun' : 'icon-moon');
       if (icon) icon.classList.toggle('hidden', m !== mode);
@@ -352,6 +441,9 @@ function setupDarkMode() {
   media.addEventListener('change', () => {
     if (getMode() === 'system') apply();
   });
+
+  // Keep the tooltip in the active language.
+  document.addEventListener('i18n:change', apply);
 
   apply();
 }

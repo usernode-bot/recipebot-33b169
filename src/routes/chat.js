@@ -293,15 +293,20 @@ async function runBackgroundStream(
 ) {
   const responseLog = [];
 
+  // Log entries carry structured fields (kind/query/url/title) alongside the
+  // English `text` so the client can render them in the user's language;
+  // `text` stays as the fallback for rows persisted before this existed.
   const trackingSend = (event, data) => {
     if (event === 'thinking') {
-      responseLog.push({ type: 'thinking', text: 'Thinking...', detail: data.text });
+      responseLog.push({ type: 'thinking', kind: 'thinking', text: 'Thinking...', detail: data.text });
     } else if (event === 'status') {
       const entry = { type: 'status', text: data.text };
+      if (data.kind) entry.kind = data.kind;
+      if (data.query) entry.query = data.query;
       if (data.url) entry.url = data.url;
       responseLog.push(entry);
     } else if (event === 'recipe') {
-      responseLog.push({ type: 'recipe', text: `Created recipe: ${data.title}` });
+      responseLog.push({ type: 'recipe', kind: 'recipe', title: data.title, text: `Created recipe: ${data.title}` });
     }
     send(event, data);
   };
@@ -567,7 +572,7 @@ async function handleToolCall(block, config, messages, systemPrompt, send, convI
   const lastEntry = () => responseLog[responseLog.length - 1];
 
   if (block.name === 'web_search') {
-    send('status', { text: `Searching: ${block.input.query}` });
+    send('status', { text: `Searching: ${block.input.query}`, kind: 'search', query: block.input.query });
     const result = await webSearch(block.input.query);
     if (result.error) return result.error;
     if (!result.results?.length) return 'No search results found.';
@@ -581,7 +586,7 @@ async function handleToolCall(block, config, messages, systemPrompt, send, convI
   }
 
   if (block.name === 'fetch_webpage') {
-    send('status', { text: `Reading: ${block.input.url}`, url: block.input.url });
+    send('status', { text: `Reading: ${block.input.url}`, kind: 'fetch', url: block.input.url });
     const result = await fetchWebpage(block.input.url);
     if (result.error) return result.error;
     return `Title: ${result.title}\n\nContent:\n${result.content}`;
@@ -621,7 +626,7 @@ async function handleRecipeDisplay(recipeData, send, convId, pool, userId, fixSt
   if (fixState.attempts < MAX_VALIDATION_RETRIES) {
     fixState.attempts += 1;
     fixState.pending = { attempt: fixState.attempts, startedAt: Date.now() };
-    send('status', { text: 'Fixing recipe format...' });
+    send('status', { text: 'Fixing recipe format...', kind: 'fixup' });
     log.warn('recipe', 'Requesting fix-up from model', {
       attempt: fixState.attempts,
       max_attempts: MAX_VALIDATION_RETRIES,

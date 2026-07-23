@@ -79,7 +79,7 @@ const CookingMode = {
       const isActive = Recipe?.activeSteps?.has(String(i));
       stepsHtml += `
         <div class="cm-step step-card rounded-2xl p-6 md:p-8 my-4 cursor-pointer bg-zinc-100/70 dark:bg-zinc-900/50${isActive ? ' step-active' : ''}" data-step="${i}">
-          <div class="text-sm font-medium text-blue-500 dark:text-blue-400 mb-3">Step ${i + 1} of ${recipe.steps.length}</div>
+          <div class="text-sm font-medium text-blue-500 dark:text-blue-400 mb-3">${t('cook.stepOf', { n: i + 1, total: recipe.steps.length })}</div>
           <p class="text-2xl md:text-3xl leading-relaxed font-light">${this.escapeHtml(step.description)}</p>
           ${temp ? `<div class="text-xl text-orange-500 dark:text-orange-400 mt-3">${temp}</div>` : ''}
           ${ingsHtml}
@@ -105,8 +105,8 @@ const CookingMode = {
           ${stepsHtml}
           <div class="py-16 text-center">
             <p class="text-3xl mb-4">🎉</p>
-            <p class="text-xl text-zinc-500 dark:text-zinc-400">You're done! Enjoy your meal.</p>
-            <button id="cm-made-it" class="mt-6 px-6 py-3 text-base rounded-xl bg-green-600 hover:bg-green-500 text-white font-medium transition-colors">☑ Made it</button>
+            <p class="text-xl text-zinc-500 dark:text-zinc-400">${t('cook.done')}</p>
+            <button id="cm-made-it" class="mt-6 px-6 py-3 text-base rounded-xl bg-green-600 hover:bg-green-500 text-white font-medium transition-colors">${t('recipe.madeIt')}</button>
           </div>
         </div>
       </div>
@@ -139,7 +139,7 @@ const CookingMode = {
           inline.classList.remove('hidden');
           inline.classList.add('flex');
           if (existing.remaining <= 0) {
-            inline.textContent = '⏱ Done!';
+            inline.textContent = t('cook.timerDone');
             inline.classList.add('animate-pulse', 'text-green-500');
           } else {
             inline.textContent = `⏱ ${this.formatTime(existing.remaining)} / ${this.formatTime(existing.total)}`;
@@ -158,7 +158,7 @@ const CookingMode = {
       const inlineEl = el.querySelector(`#${btn.dataset.timerId}-inline`);
       if (inlineEl) {
         inlineEl.style.cursor = 'pointer';
-        inlineEl.title = 'Click to reset, or dismiss if done';
+        inlineEl.title = t('cook.timerResetTitle');
         inlineEl.addEventListener('click', () => {
           const timer = this.timers.find(t => t.id === btn.dataset.timerId);
           if (!timer) return;
@@ -253,7 +253,7 @@ const CookingMode = {
     const badge = this._timerBadge(t.stepNum);
     const cls = 'flex items-center gap-1.5 px-3 py-1 rounded-full text-sm cursor-pointer';
     if (t.remaining <= 0) {
-      return `<div class="${cls} bg-green-600/20 text-green-400 animate-pulse" data-pill-timer="${t.id}">${badge} ⏱ Done!</div>`;
+      return `<div class="${cls} bg-green-600/20 text-green-400 animate-pulse" data-pill-timer="${t.id}">${badge} ${window.t('cook.timerDone')}</div>`;
     }
     return `<div class="${cls} bg-zinc-200 dark:bg-zinc-800 tabular-nums" data-pill-timer="${t.id}">${badge} ⏱ ${this.formatTime(t.remaining)} / ${this.formatTime(t.total)}</div>`;
   },
@@ -282,7 +282,7 @@ const CookingMode = {
         const inline = this.overlay.querySelector(`#${t.id}-inline`);
         if (!inline) return;
         if (t.remaining <= 0) {
-          inline.textContent = '⏱ Done!';
+          inline.textContent = window.t('cook.timerDone');
           inline.classList.add('animate-pulse', 'text-green-500');
         } else {
           inline.textContent = `⏱ ${this.formatTime(t.remaining)} / ${this.formatTime(t.total)}`;
@@ -297,7 +297,7 @@ const CookingMode = {
       const el = document.querySelector(`.step-timer-inline[data-timer-id="${t.id}"]`);
       if (!el) return;
       if (t.remaining <= 0) {
-        el.textContent = '⏱ Done!';
+        el.textContent = window.t('cook.timerDone');
         el.classList.add('animate-pulse');
       } else {
         el.textContent = `⏱ ${this.formatTime(t.remaining)} / ${this.formatTime(t.total)}`;
@@ -480,7 +480,7 @@ const CookingMode = {
 
     return `
       <div class="py-8 border-b border-zinc-200 dark:border-zinc-800">
-        <div class="text-sm font-medium text-blue-500 dark:text-blue-400 mb-3">All Ingredients</div>
+        <div class="text-sm font-medium text-blue-500 dark:text-blue-400 mb-3">${t('cook.allIngredients')}</div>
         <div class="bg-zinc-100 dark:bg-zinc-900 rounded-xl p-5 w-full max-w-lg">
           ${rows}
         </div>

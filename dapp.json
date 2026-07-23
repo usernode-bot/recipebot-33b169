@@ -111,6 +111,16 @@
       "expectSelector": "#icon-system"
     },
     {
+      "name": "Language toggle renders",
+      "path": "/",
+      "expectSelector": "#language-toggle"
+    },
+    {
+      "name": "Settings language options exist",
+      "path": "/",
+      "expectSelector": "#language-options"
+    },
+    {
       "name": "Update-note dialog exists",
       "path": "/",
       "expectSelector": "#share-note-modal"

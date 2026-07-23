@@ -96,7 +96,7 @@ const Store = {
 
     if (typeof Chat !== 'undefined') {
       Chat.clear();
-      Chat.appendMessage('assistant', `Ready to modify "${recipeData.title}". What changes would you like?`);
+      Chat.appendMessage('assistant', t('chat.readyToModify', { title: recipeData.title }));
     }
 
     HashParams.clear();
@@ -104,7 +104,7 @@ const Store = {
   },
 
   async deleteConversation(id) {
-    if (!confirm('Delete this conversation?')) return;
+    if (!confirm(t('confirm.deleteConversation'))) return;
     await fetch(`/api/conversations/${id}`, { method: 'DELETE' }).catch(() => {});
     if (App.currentConversationId === id) {
       App.currentConversationId = null;

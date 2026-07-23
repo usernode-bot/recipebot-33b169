@@ -175,6 +175,16 @@
         ((!t || t === 'system') && window.matchMedia('(prefers-color-scheme: dark)').matches);
       document.documentElement.classList.toggle('dark', dark);
     })();
+    // Anti-flash: set <html lang> from the saved language before first paint.
+    // Full dictionary application happens once i18n.js + locales load.
+    (function () {
+      try {
+        var l = localStorage.language;
+        if (l && ['en', 'es', 'fr', 'de', 'id'].indexOf(l) !== -1) {
+          document.documentElement.lang = l;
+        }
+      } catch (e) { /* private mode */ }
+    })();
   </script>
   <link rel="stylesheet" href="/css/app.css">
   <link rel="stylesheet" href="/css/print.css" media="print">
@@ -193,7 +203,7 @@
   <header class="flex items-center justify-between px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
     <div class="flex items-center gap-3">
       <!-- Back to the homepage recipe list; hidden on the homepage itself (see App.showView) -->
-      <button id="home-btn" class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" title="Back to recipes" aria-label="Back to recipes" style="display:none">
+      <button id="home-btn" class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" title="Back to recipes" aria-label="Back to recipes" data-i18n-title="header.backToRecipes" data-i18n-aria-label="header.backToRecipes" style="display:none">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
         </svg>
@@ -203,10 +213,10 @@
     <div class="flex items-center gap-2">
       <!-- Mobile tab switcher -->
       <div id="mobile-tabs" class="flex rounded-lg bg-zinc-100 dark:bg-zinc-900 p-0.5 lg:hidden">
-        <button data-tab="recipe" class="tab-btn px-3 py-1 text-sm rounded-md transition-colors bg-zinc-300 dark:bg-zinc-700 text-zinc-900 dark:text-white">Recipe</button>
-        <button data-tab="chat" class="tab-btn px-3 py-1 text-sm rounded-md transition-colors text-zinc-500 dark:text-zinc-400">Chat</button>
+        <button data-tab="recipe" class="tab-btn px-3 py-1 text-sm rounded-md transition-colors bg-zinc-300 dark:bg-zinc-700 text-zinc-900 dark:text-white" data-i18n="header.recipeTab">Recipe</button>
+        <button data-tab="chat" class="tab-btn px-3 py-1 text-sm rounded-md transition-colors text-zinc-500 dark:text-zinc-400" data-i18n="header.chatTab">Chat</button>
       </div>
-      <button id="chat-toggle" class="hidden lg:block p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" title="Toggle chat panel">
+      <button id="chat-toggle" class="hidden lg:block p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" title="Toggle chat panel" data-i18n-title="header.toggleChat">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
         </svg>
@@ -223,12 +233,21 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v9a2 2 0 002 2z"/>
         </svg>
       </button>
-      <button id="shortcuts-help-btn" class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-sm font-mono font-bold" title="Keyboard shortcuts">?</button>
+      <!-- Language picker: globe button + dropdown (populated by app.js from I18N.LANGS) -->
+      <div class="relative">
+        <button id="language-toggle" class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" title="Language" aria-haspopup="true" aria-expanded="false" data-i18n-title="header.language" data-i18n-aria-label="header.language">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12h18M12 3a15.3 15.3 0 014 9 15.3 15.3 0 01-4 9 15.3 15.3 0 01-4-9 15.3 15.3 0 014-9zm0 0a9 9 0 100 18 9 9 0 000-18z"/>
+          </svg>
+        </button>
+        <div id="language-menu" class="hidden absolute right-0 top-full mt-1 z-40 w-48 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg py-1"></div>
+      </div>
+      <button id="shortcuts-help-btn" class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-sm font-mono font-bold" title="Keyboard shortcuts" data-i18n-title="header.shortcuts">?</button>
       <span id="rate-limit-display" class="text-xs text-zinc-500 hidden sm:inline"></span>
       <!-- Anonymous mode: shown by app.js when there is no signed-in user -->
-      <a id="sign-in-btn" class="hidden px-3 py-1.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors" href="https://social-vibecoding.usernodelabs.org/#app/recipebot-33b169/full">Sign in</a>
+      <a id="sign-in-btn" class="hidden px-3 py-1.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors" href="https://social-vibecoding.usernodelabs.org/#app/recipebot-33b169/full" data-i18n="header.signIn">Sign in</a>
       <div class="relative">
-        <button id="user-menu-btn" class="hidden items-center gap-1.5 p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" title="Account menu" aria-haspopup="true" aria-expanded="false">
+        <button id="user-menu-btn" class="hidden items-center gap-1.5 p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" title="Account menu" aria-haspopup="true" aria-expanded="false" data-i18n-title="header.accountMenu">
           <svg class="w-5 h-5 sm:hidden text-zinc-400 dark:text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A10.97 10.97 0 0112 15c2.5 0 4.847.826 6.879 2.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
@@ -240,14 +259,14 @@
         <div id="user-menu" class="hidden absolute right-0 top-full mt-1 z-40 w-56 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg py-1">
           <!-- "AI usage today" meter — populated by settings.js on each menu open -->
           <div id="usage-section" class="px-3 py-2 border-b border-zinc-200 dark:border-zinc-800">
-            <p class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">AI usage today</p>
+            <p class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400" data-i18n="header.aiUsageToday">AI usage today</p>
             <p id="usage-amount" class="text-sm text-zinc-700 dark:text-zinc-200 mt-1 truncate">&hellip;</p>
             <div id="usage-bar" class="hidden mt-1.5 h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
               <div id="usage-bar-fill" class="h-full rounded-full bg-blue-500 transition-all" style="width:0%"></div>
             </div>
             <p id="usage-footnote" class="hidden text-[11px] text-zinc-400 dark:text-zinc-500 mt-1">Estimate &middot; resets at midnight UTC</p>
           </div>
-          <button id="open-settings" class="w-full text-left px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">App settings</button>
+          <button id="open-settings" class="w-full text-left px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" data-i18n="header.appSettings">App settings</button>
         </div>
       </div>
     </div>
@@ -257,25 +276,25 @@
   <div id="shortcuts-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50">
     <div class="bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-700 p-5 max-w-sm w-full mx-4">
       <div class="flex items-center justify-between mb-4">
-        <h2 class="text-base font-semibold">Keyboard Shortcuts</h2>
+        <h2 class="text-base font-semibold" data-i18n="shortcuts.title">Keyboard Shortcuts</h2>
         <button id="shortcuts-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>
       </div>
       <div class="space-y-2 text-sm">
-        <div class="flex justify-between"><span class="text-zinc-500 dark:text-zinc-400">Send message</span><kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-mono">Ctrl+Enter</kbd></div>
-        <div class="flex justify-between"><span class="text-zinc-500 dark:text-zinc-400">New conversation</span><kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-mono">Ctrl+N</kbd></div>
-        <div class="flex justify-between"><span class="text-zinc-500 dark:text-zinc-400">Print recipe</span><kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-mono">Ctrl+P</kbd></div>
-        <div class="flex justify-between"><span class="text-zinc-500 dark:text-zinc-400">Close / exit</span><kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-mono">Escape</kbd></div>
-        <div class="flex justify-between"><span class="text-zinc-500 dark:text-zinc-400">This help</span><kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-mono">?</kbd></div>
+        <div class="flex justify-between"><span class="text-zinc-500 dark:text-zinc-400" data-i18n="shortcuts.send">Send message</span><kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-mono">Ctrl+Enter</kbd></div>
+        <div class="flex justify-between"><span class="text-zinc-500 dark:text-zinc-400" data-i18n="shortcuts.newConversation">New conversation</span><kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-mono">Ctrl+N</kbd></div>
+        <div class="flex justify-between"><span class="text-zinc-500 dark:text-zinc-400" data-i18n="shortcuts.print">Print recipe</span><kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-mono">Ctrl+P</kbd></div>
+        <div class="flex justify-between"><span class="text-zinc-500 dark:text-zinc-400" data-i18n="shortcuts.close">Close / exit</span><kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-mono">Escape</kbd></div>
+        <div class="flex justify-between"><span class="text-zinc-500 dark:text-zinc-400" data-i18n="shortcuts.help">This help</span><kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-mono">?</kbd></div>
       </div>
-      <p class="text-xs text-zinc-400 mt-3">On Mac, use Cmd instead of Ctrl</p>
+      <p class="text-xs text-zinc-400 mt-3" data-i18n="shortcuts.macNote">On Mac, use Cmd instead of Ctrl</p>
     </div>
   </div>
 
   <!-- Persistent timer bar (visible when cook mode timers are running outside overlay) -->
   <div id="timer-bar" class="hidden items-center gap-2 px-4 py-1.5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/50 shrink-0 flex-wrap">
-    <span class="text-xs text-zinc-400 dark:text-zinc-500">Timers</span>
+    <span class="text-xs text-zinc-400 dark:text-zinc-500" data-i18n="timers.label">Timers</span>
     <div id="timer-bar-items" class="flex flex-wrap gap-2"></div>
-    <button id="timer-bar-resume" class="text-xs text-blue-500 hover:text-blue-400 ml-auto">Resume cooking</button>
+    <button id="timer-bar-resume" class="text-xs text-blue-500 hover:text-blue-400 ml-auto" data-i18n="timers.resume">Resume cooking</button>
   </div>
 
   <!-- Main layout -->
@@ -286,9 +305,9 @@
       <div class="max-w-5xl mx-auto p-4 sm:p-6 space-y-8">
         <!-- Toolbar: recipe search + new recipe (moved here from the old sidebar) -->
         <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
-          <input id="home-search" type="search" placeholder="Search recipes..." autocomplete="off"
+          <input id="home-search" type="search" placeholder="Search recipes..." autocomplete="off" data-i18n-placeholder="home.searchPlaceholder"
             class="flex-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          <button id="new-conversation-btn" class="shrink-0 rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-sm font-medium text-white transition-colors">
+          <button id="new-conversation-btn" class="shrink-0 rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-sm font-medium text-white transition-colors" data-i18n="home.newRecipe">
             + New recipe
           </button>
         </div>
@@ -299,42 +318,42 @@
           <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
             <h2 class="text-base font-semibold flex items-center gap-2">
               <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
-              Collections
+              <span data-i18n="home.collections">Collections</span>
             </h2>
             <div class="flex gap-2">
-              <button id="new-collection-btn" class="px-3 py-1.5 text-xs rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors">+ Collection</button>
-              <button id="new-cookbook-btn" class="px-3 py-1.5 text-xs rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors">+ Group cookbook</button>
+              <button id="new-collection-btn" class="px-3 py-1.5 text-xs rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors" data-i18n="home.newCollection">+ Collection</button>
+              <button id="new-cookbook-btn" class="px-3 py-1.5 text-xs rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors" data-i18n="home.newCookbook">+ Group cookbook</button>
             </div>
           </div>
           <div id="home-collections-list" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
-          <p id="home-collections-empty" class="hidden text-sm text-zinc-400 dark:text-zinc-600">No collections yet — create one, or start a group cookbook and invite your people.</p>
+          <p id="home-collections-empty" class="hidden text-sm text-zinc-400 dark:text-zinc-600" data-i18n="home.collectionsEmpty">No collections yet — create one, or start a group cookbook and invite your people.</p>
         </section>
 
         <section id="home-favorites" class="hidden">
           <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
             <svg class="w-4 h-4 text-pink-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
-            Your favorites
+            <span data-i18n="home.favorites">Your favorites</span>
           </h2>
           <div id="home-favorites-list" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
         </section>
         <section id="home-mine" class="hidden">
           <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
             <span class="text-orange-400">🍳</span>
-            Your recipes
+            <span data-i18n="home.yourRecipes">Your recipes</span>
           </h2>
           <div id="home-mine-list" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
         </section>
         <section id="home-convs" class="hidden">
           <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
             <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-            Your conversations
+            <span data-i18n="home.yourConversations">Your conversations</span>
           </h2>
           <div id="home-convs-list" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
         </section>
         <section id="home-community" class="hidden">
           <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
             <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6-4a3 3 0 11-3-3m-9 3a3 3 0 10-3-3"/></svg>
-            Community recipes
+            <span data-i18n="home.communityRecipes">Community recipes</span>
           </h2>
           <!-- Tag filter chips (built from tag frequencies by home.js) -->
           <div id="home-tag-filters" class="hidden flex flex-wrap gap-1.5 mb-3"></div>
@@ -343,7 +362,7 @@
         <section id="home-public-collections" class="hidden">
           <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
             <svg class="w-4 h-4 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-            Community collections
+            <span data-i18n="home.communityCollections">Community collections</span>
           </h2>
           <div id="home-public-collections-list" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
         </section>
@@ -351,11 +370,11 @@
           <svg class="w-12 h-12 mx-auto mb-3 text-zinc-300 dark:text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/>
           </svg>
-          <p class="text-lg mb-1">No recipes yet</p>
-          <p class="text-sm text-zinc-400 dark:text-zinc-600">Start a conversation to create a recipe, then share it to the community feed.</p>
+          <p class="text-lg mb-1" data-i18n="home.emptyTitle">No recipes yet</p>
+          <p class="text-sm text-zinc-400 dark:text-zinc-600" data-i18n="home.emptySubtitle">Start a conversation to create a recipe, then share it to the community feed.</p>
         </div>
         <div id="home-no-match" class="hidden text-center text-zinc-500 py-16">
-          <p class="text-sm">No recipes match your search</p>
+          <p class="text-sm" data-i18n="home.noMatch">No recipes match your search</p>
         </div>
       </div>
     </div>
@@ -368,8 +387,8 @@
             <svg class="w-12 h-12 mx-auto mb-3 text-zinc-300 dark:text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/>
             </svg>
-            <p>No recipe yet</p>
-            <p class="text-sm text-zinc-400 dark:text-zinc-600 mt-1">Start chatting to generate one</p>
+            <p data-i18n="recipe.noRecipe">No recipe yet</p>
+            <p class="text-sm text-zinc-400 dark:text-zinc-600 mt-1" data-i18n="recipe.startChatting">Start chatting to generate one</p>
           </div>
         </div>
         <div id="recipe-display" class="hidden">
@@ -389,30 +408,30 @@
       <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
         <!-- Welcome / preferences block, hidden once a conversation starts -->
         <div id="chat-welcome" class="flex flex-col items-center justify-center h-full text-center">
-          <p class="text-zinc-500 dark:text-zinc-400 mb-5 text-sm">Set your preferences, then start chatting.</p>
+          <p class="text-zinc-500 dark:text-zinc-400 mb-5 text-sm" data-i18n="chat.welcome">Set your preferences, then start chatting.</p>
           <div id="preferences" class="space-y-2.5 text-left hidden">
             <div class="flex items-center gap-2">
-              <span class="text-xs text-zinc-500 w-16 shrink-0">Diet</span>
+              <span class="text-xs text-zinc-500 w-16 shrink-0" data-i18n="chat.diet">Diet</span>
               <div class="flex gap-1.5">
-                <button data-pref="diet" data-value="vegetarian" class="pref-btn px-2.5 py-1 text-xs rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors">Vegetarian</button>
-                <button data-pref="diet" data-value="vegan" class="pref-btn px-2.5 py-1 text-xs rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors">Vegan</button>
+                <button data-pref="diet" data-value="vegetarian" class="pref-btn px-2.5 py-1 text-xs rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors" data-i18n="pref.vegetarian">Vegetarian</button>
+                <button data-pref="diet" data-value="vegan" class="pref-btn px-2.5 py-1 text-xs rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors" data-i18n="pref.vegan">Vegan</button>
               </div>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-xs text-zinc-500 w-16 shrink-0">Style</span>
+              <span class="text-xs text-zinc-500 w-16 shrink-0" data-i18n="chat.style">Style</span>
               <div class="flex gap-1.5">
-                <button data-pref="complexity" data-value="quick" class="pref-btn px-2.5 py-1 text-xs rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors">&le;10 min</button>
-                <button data-pref="complexity" data-value="normal" class="pref-btn px-2.5 py-1 text-xs rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors">Normal</button>
-                <button data-pref="complexity" data-value="serious" class="pref-btn px-2.5 py-1 text-xs rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors">Advanced</button>
-                <button data-pref="complexity" data-value="foodscience" class="pref-btn px-2.5 py-1 text-xs rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors">Food Science</button>
+                <button data-pref="complexity" data-value="quick" class="pref-btn px-2.5 py-1 text-xs rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors" data-i18n="pref.quick">&le;10 min</button>
+                <button data-pref="complexity" data-value="normal" class="pref-btn px-2.5 py-1 text-xs rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors" data-i18n="pref.normal">Normal</button>
+                <button data-pref="complexity" data-value="serious" class="pref-btn px-2.5 py-1 text-xs rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors" data-i18n="pref.advanced">Advanced</button>
+                <button data-pref="complexity" data-value="foodscience" class="pref-btn px-2.5 py-1 text-xs rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors" data-i18n="pref.foodScience">Food Science</button>
               </div>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-xs text-zinc-500 w-16 shrink-0">Serving size</span>
+              <span class="text-xs text-zinc-500 w-16 shrink-0" data-i18n="chat.servingSize">Serving size</span>
               <div class="flex gap-1.5">
-                <button data-pref="serving" data-value="snack" class="pref-btn px-2.5 py-1 text-xs rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors">Snack</button>
-                <button data-pref="serving" data-value="normal" class="pref-btn px-2.5 py-1 text-xs rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors">Normal</button>
-                <button data-pref="serving" data-value="large" class="pref-btn px-2.5 py-1 text-xs rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors">Large</button>
+                <button data-pref="serving" data-value="snack" class="pref-btn px-2.5 py-1 text-xs rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors" data-i18n="pref.snack">Snack</button>
+                <button data-pref="serving" data-value="normal" class="pref-btn px-2.5 py-1 text-xs rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors" data-i18n="pref.normal">Normal</button>
+                <button data-pref="serving" data-value="large" class="pref-btn px-2.5 py-1 text-xs rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors" data-i18n="pref.large">Large</button>
               </div>
             </div>
           </div>
@@ -426,10 +445,11 @@
             id="chat-input"
             rows="1"
             placeholder="What do you want to cook?"
+            data-i18n-placeholder="chat.inputPlaceholder"
             class="flex-1 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           ></textarea>
           <button type="submit" id="send-btn" class="rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 font-medium text-white transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
-            <span class="send-label">Send</span>
+            <span class="send-label" data-i18n="chat.send">Send</span>
             <svg class="send-spinner hidden w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
               <circle cx="12" cy="12" r="10" stroke-dasharray="50" stroke-dashoffset="15" stroke-linecap="round"/>
             </svg>
@@ -471,17 +491,17 @@
         <h3 id="share-note-title" class="text-base font-semibold">Share to the community feed</h3>
         <button id="share-note-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>
       </div>
-      <label class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">Tags — confirm or edit what the AI proposed</label>
+      <label class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5" data-i18n="shareModal.tagsLabel">Tags — confirm or edit what the AI proposed</label>
       <div id="share-tags-list" class="flex flex-wrap gap-1.5 mb-2"></div>
-      <input id="share-tag-input" type="text" maxlength="32" placeholder="add a tag and press Enter"
+      <input id="share-tag-input" type="text" maxlength="32" placeholder="add a tag and press Enter" data-i18n-placeholder="shareModal.tagPlaceholder"
         class="w-full rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3">
       <div id="share-note-field">
-        <label for="share-note-input" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">What changed? (optional)</label>
-        <textarea id="share-note-input" rows="3" maxlength="500" placeholder="e.g. Reduced the salt, added ginger"
+        <label for="share-note-input" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5" data-i18n="shareModal.noteLabel">What changed? (optional)</label>
+        <textarea id="share-note-input" rows="3" maxlength="500" placeholder="e.g. Reduced the salt, added ginger" data-i18n-placeholder="shareModal.notePlaceholder"
           class="w-full rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
       </div>
       <div class="flex justify-end gap-2 mt-4">
-        <button id="share-note-cancel" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">Cancel</button>
+        <button id="share-note-cancel" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors" data-i18n="common.cancel">Cancel</button>
         <button id="share-note-confirm" class="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors">Share</button>
       </div>
     </div>
@@ -493,9 +513,9 @@
     <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-sm p-5 m-0 sm:m-4 shadow-xl text-center">
       <p class="kicker mb-2">RecipeBot</p>
       <h3 id="sign-in-reason" class="text-lg font-semibold mb-2">Sign in to do this</h3>
-      <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-4">Your box, cookbooks, and the AI cook live in your Usernode account. It takes a moment — this recipe will still be here.</p>
-      <a id="sign-in-go" class="block w-full px-4 py-2.5 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors" href="https://social-vibecoding.usernodelabs.org/#app/recipebot-33b169/full">Open RecipeBot in Usernode →</a>
-      <button id="sign-in-cancel" class="mt-2 w-full px-4 py-2.5 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">Keep browsing</button>
+      <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-4" data-i18n="signin.body">Your box, cookbooks, and the AI cook live in your Usernode account. It takes a moment — this recipe will still be here.</p>
+      <a id="sign-in-go" class="block w-full px-4 py-2.5 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors" href="https://social-vibecoding.usernodelabs.org/#app/recipebot-33b169/full" data-i18n="signin.cta">Open RecipeBot in Usernode →</a>
+      <button id="sign-in-cancel" class="mt-2 w-full px-4 py-2.5 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors" data-i18n="signin.keepBrowsing">Keep browsing</button>
     </div>
   </div>
 
@@ -504,15 +524,15 @@
     <div class="absolute inset-0 bg-black/50" id="made-it-backdrop"></div>
     <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="text-base font-semibold">You made it! 🎉</h3>
+        <h3 class="text-base font-semibold" data-i18n="madeIt.title">You made it! 🎉</h3>
         <button id="made-it-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>
       </div>
-      <label for="made-it-note" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">How did it go? (optional)</label>
-      <textarea id="made-it-note" rows="3" maxlength="500" placeholder="e.g. Doubled the garlic — no regrets"
+      <label for="made-it-note" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5" data-i18n="madeIt.noteLabel">How did it go? (optional)</label>
+      <textarea id="made-it-note" rows="3" maxlength="500" placeholder="e.g. Doubled the garlic — no regrets" data-i18n-placeholder="madeIt.notePlaceholder"
         class="w-full rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
       <div class="flex justify-end gap-2 mt-4">
-        <button id="made-it-cancel" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">Cancel</button>
-        <button id="made-it-confirm" class="px-4 py-2 text-sm rounded-xl bg-green-600 hover:bg-green-500 text-white font-medium transition-colors">Mark made it</button>
+        <button id="made-it-cancel" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors" data-i18n="common.cancel">Cancel</button>
+        <button id="made-it-confirm" class="px-4 py-2 text-sm rounded-xl bg-green-600 hover:bg-green-500 text-white font-medium transition-colors" data-i18n="madeIt.confirm">Mark made it</button>
       </div>
     </div>
   </div>
@@ -522,14 +542,14 @@
     <div class="absolute inset-0 bg-black/50" id="collection-pick-backdrop"></div>
     <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl max-h-[80vh] flex flex-col">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="text-base font-semibold">Add to collection</h3>
+        <h3 class="text-base font-semibold" data-i18n="collPick.title">Add to collection</h3>
         <button id="collection-pick-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>
       </div>
       <div id="collection-pick-list" class="space-y-2 overflow-y-auto"></div>
       <div class="flex gap-2 mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
-        <input id="collection-pick-new-name" type="text" maxlength="120" placeholder="New collection name"
+        <input id="collection-pick-new-name" type="text" maxlength="120" placeholder="New collection name" data-i18n-placeholder="collPick.newPlaceholder"
           class="flex-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <button id="collection-pick-create" class="px-3 py-1.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors shrink-0">Create &amp; add</button>
+        <button id="collection-pick-create" class="px-3 py-1.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors shrink-0" data-i18n="collPick.createAdd">Create &amp; add</button>
       </div>
     </div>
   </div>
@@ -542,13 +562,13 @@
         <h3 id="new-collection-title" class="text-base font-semibold">New collection</h3>
         <button id="new-collection-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>
       </div>
-      <label for="new-collection-name" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">Name</label>
+      <label for="new-collection-name" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5" data-i18n="common.name">Name</label>
       <input id="new-collection-name" type="text" maxlength="120" placeholder="e.g. Weeknight dinners"
         class="w-full rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3">
-      <p id="new-collection-hint" class="hidden text-xs text-zinc-500 dark:text-zinc-400 mb-3">A group cookbook is a shared collection — you'll get an invite link to send to family and friends.</p>
+      <p id="new-collection-hint" class="hidden text-xs text-zinc-500 dark:text-zinc-400 mb-3" data-i18n="newColl.hint">A group cookbook is a shared collection — you'll get an invite link to send to family and friends.</p>
       <div class="flex justify-end gap-2">
-        <button id="new-collection-cancel" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">Cancel</button>
-        <button id="new-collection-confirm" class="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors">Create</button>
+        <button id="new-collection-cancel" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors" data-i18n="common.cancel">Cancel</button>
+        <button id="new-collection-confirm" class="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors" data-i18n="common.create">Create</button>
       </div>
     </div>
   </div>
@@ -558,7 +578,7 @@
     <div class="absolute inset-0 bg-black/50" id="version-history-backdrop"></div>
     <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl max-h-[80vh] flex flex-col">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="text-base font-semibold">Version history</h3>
+        <h3 class="text-base font-semibold" data-i18n="version.title">Version history</h3>
         <button id="version-history-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>
       </div>
       <div id="version-history-list" class="space-y-2 overflow-y-auto"></div>
@@ -570,10 +590,14 @@
     <div class="absolute inset-0 bg-black/50" id="settings-backdrop"></div>
     <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-base font-semibold">App Settings</h3>
+        <h3 class="text-base font-semibold" data-i18n="settings.title">App Settings</h3>
         <button id="settings-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>
       </div>
-      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-2">AI model</p>
+      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-2" data-i18n="settings.language">Language</p>
+      <div id="language-options" class="flex flex-wrap gap-2 mb-4">
+        <!-- Populated by settings.js from I18N.LANGS -->
+      </div>
+      <p class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-2" data-i18n="settings.aiModel">AI model</p>
       <div id="model-options" class="space-y-2">
         <!-- Populated by settings.js from /api/auth/me -->
       </div>
@@ -581,6 +605,12 @@
     </div>
   </div>
 
+  <script src="/js/i18n.js"></script>
+  <script src="/js/locales/en.js"></script>
+  <script src="/js/locales/es.js"></script>
+  <script src="/js/locales/fr.js"></script>
+  <script src="/js/locales/de.js"></script>
+  <script src="/js/locales/id.js"></script>
   <script src="/js/app.js"></script>
   <script src="/js/settings.js"></script>
   <script src="/js/store.js"></script>
