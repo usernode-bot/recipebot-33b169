@@ -111,6 +111,11 @@
       "expectSelector": "#icon-system"
     },
     {
+      "name": "i18n-annotated markup renders",
+      "path": "/",
+      "expectSelector": "[data-i18n]"
+    },
+    {
       "name": "Update-note dialog exists",
       "path": "/",
       "expectSelector": "#share-note-modal"

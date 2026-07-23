@@ -109,7 +109,7 @@ const Home = {
     // as cards in "Your recipes" / "Your favorites").
     const recipeConvIds = new Set(this.mine.map((r) => r.conversation_id));
     const bareConvs = this.conversations.filter(
-      (c) => !recipeConvIds.has(c.id) && matches(c.title || 'New conversation'));
+      (c) => !recipeConvIds.has(c.id) && matches(c.title || t('card.newConversation')));
 
     // Collections section (the box's organizer) — hidden entirely for
     // anonymous visitors: an empty personal box is noise, not a prompt.
@@ -209,7 +209,7 @@ const Home = {
   _heartBtn(filled) {
     const btn = document.createElement('button');
     btn.className = `p-1 rounded transition-colors ${filled ? 'text-pink-500 hover:text-pink-400' : 'text-zinc-400 hover:text-pink-500'}`;
-    btn.title = filled ? 'Unfavorite' : 'Favorite';
+    btn.title = filled ? t('card.unfavorite') : t('card.favorite');
     btn.innerHTML = filled
       ? '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>'
       : '<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 20 20"><path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"/></svg>';
@@ -218,8 +218,8 @@ const Home = {
 
   _metaLine(recipe) {
     const bits = [];
-    if (recipe.prep_time) bits.push(`Prep: ${this.esc(recipe.prep_time)}`);
-    if (recipe.cook_time) bits.push(`Cook: ${this.esc(recipe.cook_time)}`);
+    if (recipe.prep_time) bits.push(t('card.prep', { t: this.esc(recipe.prep_time) }));
+    if (recipe.cook_time) bits.push(t('card.cook', { t: this.esc(recipe.cook_time) }));
     return bits.join(' · ');
   },
 
@@ -248,8 +248,8 @@ const Home = {
   _deleteBtn(conversationId) {
     const btn = document.createElement('button');
     btn.className = 'px-3 py-1.5 text-xs rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-red-100 dark:hover:bg-red-900/40 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors ml-auto';
-    btn.textContent = 'Delete';
-    btn.title = 'Delete this conversation';
+    btn.textContent = t('common.delete');
+    btn.title = t('tip.deleteConversation');
     btn.addEventListener('click', async () => {
       if (typeof Store !== 'undefined') await Store.deleteConversation(conversationId);
       this.refresh();
@@ -261,17 +261,17 @@ const Home = {
   ownCard(r) {
     const recipe = r.data || {};
     const el = this._cardShell();
-    el.appendChild(this._kicker('Your recipe'));
+    el.appendChild(this._kicker(t('card.yourRecipe')));
 
-    const madeBit = r.made_count > 0 ? ` · made ${r.made_count}×` : '';
+    const madeBit = r.made_count > 0 ? ` · ${t('card.made', { n: r.made_count })}` : '';
     const remixBit = r.forked_from_username
-      ? ` · <span title="Forked from ${this.esc(r.forked_from_username)}">⑂ from ${this.esc(r.forked_from_username)}</span>` : '';
+      ? ` · <span title="${this.esc(t('card.forkedFromTitle', { name: r.forked_from_username }))}">${t('card.forkedFrom', { name: this.esc(r.forked_from_username) })}</span>` : '';
     const head = document.createElement('div');
     head.className = 'flex items-start justify-between gap-2';
     head.innerHTML = `
       <div class="min-w-0">
-        <h3 class="font-semibold text-sm truncate">${this.esc(recipe.title || r.conversation_title || 'Untitled')}</h3>
-        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">by you${r.is_shared ? ' · <span class="text-blue-400">shared</span>' : ''}${madeBit}${remixBit}</p>
+        <h3 class="font-semibold text-sm truncate">${this.esc(recipe.title || r.conversation_title || t('common.untitled'))}</h3>
+        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${t('card.byYou')}${r.is_shared ? ` · <span class="text-blue-400">${t('card.shared')}</span>` : ''}${madeBit}${remixBit}</p>
       </div>`;
     const heart = this._heartBtn(r.is_favorited);
     heart.addEventListener('click', () =>
@@ -296,24 +296,24 @@ const Home = {
 
     const actions = document.createElement('div');
     actions.className = 'flex flex-wrap gap-2 mt-auto pt-1';
-    const openBtn = this._actionBtn('Open', true);
+    const openBtn = this._actionBtn(t('common.open'), true);
     openBtn.addEventListener('click', () => {
       if (typeof Store !== 'undefined') Store.selectConversation(r.conversation_id);
     });
-    const forkBtn = this._actionBtn('Fork');
+    const forkBtn = this._actionBtn(t('common.fork'));
     forkBtn.addEventListener('click', () => {
       if (typeof Store !== 'undefined') Store.forkRecipe(recipe);
     });
     actions.appendChild(openBtn);
     actions.appendChild(forkBtn);
     if (!r.is_shared) {
-      const shareBtn = this._actionBtn('Share');
-      shareBtn.title = 'Share recipe to the community feed';
+      const shareBtn = this._actionBtn(t('common.share'));
+      shareBtn.title = t('tip.shareToFeed');
       shareBtn.addEventListener('click', () => this.share(r.conversation_id));
       actions.appendChild(shareBtn);
     }
-    const collectBtn = this._actionBtn('+ Collection');
-    collectBtn.title = 'Add to a collection';
+    const collectBtn = this._actionBtn(t('recipe.addCollection'));
+    collectBtn.title = t('tip.addToCollection');
     collectBtn.addEventListener('click', () =>
       this.openCollectionPicker({ conversationId: r.conversation_id }));
     actions.appendChild(collectBtn);
@@ -325,14 +325,14 @@ const Home = {
   // Card for one of the requester's conversations that has no recipe yet.
   conversationCard(c) {
     const el = this._cardShell();
-    el.appendChild(this._kicker('Conversation'));
+    el.appendChild(this._kicker(t('card.conversation')));
 
     const head = document.createElement('div');
     head.className = 'flex items-start justify-between gap-2';
     head.innerHTML = `
       <div class="min-w-0">
-        <h3 class="font-semibold text-sm truncate">${this.esc(c.title || 'New conversation')}</h3>
-        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">no recipe yet</p>
+        <h3 class="font-semibold text-sm truncate">${this.esc(c.title || t('card.newConversation'))}</h3>
+        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${t('card.noRecipeYet')}</p>
       </div>`;
     const heart = this._heartBtn(c.is_favorited);
     heart.addEventListener('click', () =>
@@ -342,7 +342,7 @@ const Home = {
 
     const actions = document.createElement('div');
     actions.className = 'flex flex-wrap gap-2 mt-auto pt-1';
-    const openBtn = this._actionBtn('Open', true);
+    const openBtn = this._actionBtn(t('common.open'), true);
     openBtn.addEventListener('click', () => {
       if (typeof Store !== 'undefined') Store.selectConversation(c.id);
     });
@@ -356,16 +356,17 @@ const Home = {
   sharedCard(s, opts) {
     const recipe = s.data || {};
     const el = this._cardShell();
-    el.appendChild(this._kicker(s.forked_from_username ? 'Remix' : 'Community recipe'));
+    el.appendChild(this._kicker(s.forked_from_username ? t('card.remix') : t('card.communityRecipe')));
 
     const remixBit = s.forked_from_username
-      ? ` · ⑂ remixed from ${this.esc(s.forked_from_username)}` : '';
+      ? ` · ${t('card.remixedFrom', { name: this.esc(s.forked_from_username) })}` : '';
+    const byline = s.is_mine ? t('card.byYou') : t('card.by', { name: this.esc(s.username) });
     const head = document.createElement('div');
     head.className = 'flex items-start justify-between gap-2';
     head.innerHTML = `
       <div class="min-w-0">
-        <h3 class="font-semibold text-sm truncate">${this.esc(recipe.title || 'Untitled')}</h3>
-        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">by ${s.is_mine ? 'you' : this.esc(s.username)}${s.current_version > 1 ? ` · v${s.current_version}` : ''}${remixBit}</p>
+        <h3 class="font-semibold text-sm truncate">${this.esc(recipe.title || t('common.untitled'))}</h3>
+        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${byline}${s.current_version > 1 ? ` · v${s.current_version}` : ''}${remixBit}</p>
       </div>`;
     if (!App.isAnonymous) {
       const heart = this._heartBtn(s.is_favorited);
@@ -383,9 +384,9 @@ const Home = {
 
     const meta = this._metaLine(recipe);
     const socialBits = [];
-    if (s.made_count > 0) socialBits.push(`cooked ${s.made_count}×`);
-    if (s.comment_count > 0) socialBits.push(`${s.comment_count} comment${s.comment_count === 1 ? '' : 's'}`);
-    if (s.remix_count > 0) socialBits.push(`${s.remix_count} remix${s.remix_count === 1 ? '' : 'es'}`);
+    if (s.made_count > 0) socialBits.push(t('card.cooked', { n: s.made_count }));
+    if (s.comment_count > 0) socialBits.push(tn('card.comments', s.comment_count));
+    if (s.remix_count > 0) socialBits.push(tn('card.remixes', s.remix_count));
     const line = [meta, socialBits.join(' · ')].filter(Boolean).join(' · ');
     if (line) {
       const metaEl = document.createElement('p');
@@ -401,11 +402,11 @@ const Home = {
 
     const actions = document.createElement('div');
     actions.className = 'flex flex-wrap gap-2 mt-auto pt-1';
-    const viewBtn = this._actionBtn('View', true);
+    const viewBtn = this._actionBtn(t('common.view'), true);
     viewBtn.addEventListener('click', () => this.viewShared(s));
-    const forkBtn = this._actionBtn('Fork');
+    const forkBtn = this._actionBtn(t('common.fork'));
     forkBtn.addEventListener('click', () => {
-      if (App.isAnonymous) return App.promptSignIn('Sign in to fork and remix recipes');
+      if (App.isAnonymous) return App.promptSignIn(t('signin.fork'));
       if (typeof Store !== 'undefined') {
         Store.forkRecipe(recipe, s.is_mine ? null : {
           username: s.username, id: s.id, current_version: s.current_version,
@@ -414,16 +415,16 @@ const Home = {
     });
     actions.appendChild(viewBtn);
     actions.appendChild(forkBtn);
-    const collectBtn = this._actionBtn('Save');
-    collectBtn.title = 'Save to a collection (keeps your own copy)';
+    const collectBtn = this._actionBtn(t('common.save'));
+    collectBtn.title = t('tip.saveToCollection');
     collectBtn.addEventListener('click', () => {
-      if (App.isAnonymous) return App.promptSignIn('Sign in to save recipes to your box');
+      if (App.isAnonymous) return App.promptSignIn(t('signin.saveBox'));
       this.openCollectionPicker({ sharedRecipeId: s.id });
     });
     actions.appendChild(collectBtn);
     if (s.share_slug) {
-      const linkBtn = this._actionBtn('Link');
-      linkBtn.title = 'Copy the public share link (no login needed to view or cook)';
+      const linkBtn = this._actionBtn(t('common.link'));
+      linkBtn.title = t('tip.copyShareLink');
       linkBtn.addEventListener('click', () => this.copyShareLink(s.share_slug, linkBtn));
       actions.appendChild(linkBtn);
     }
@@ -436,10 +437,10 @@ const Home = {
     navigator.clipboard?.writeText(url).then(() => {
       if (btn) {
         const orig = btn.textContent;
-        btn.textContent = 'Copied!';
+        btn.textContent = t('common.copied');
         setTimeout(() => { btn.textContent = orig; }, 1500);
       }
-    }).catch(() => window.prompt('Copy this link:', url));
+    }).catch(() => window.prompt(t('prompt.copyLink'), url));
   },
 
   _ratingRow(s) {
@@ -449,8 +450,8 @@ const Home = {
     const summary = document.createElement('span');
     summary.className = 'text-xs text-zinc-500 dark:text-zinc-400 tabular-nums';
     summary.textContent = s.rating_count
-      ? `★ ${Number(s.avg_rating).toFixed(1)} · ${s.rating_count} rating${s.rating_count === 1 ? '' : 's'}`
-      : 'No ratings yet';
+      ? tn('card.ratings', s.rating_count, { avg: Number(s.avg_rating).toFixed(1) })
+      : t('card.noRatings');
     row.appendChild(summary);
 
     // Anonymous visitors see the average summary only — rating is an
@@ -458,14 +459,14 @@ const Home = {
     if (!s.is_mine && !App.isAnonymous) {
       const stars = document.createElement('span');
       stars.className = 'inline-flex items-center';
-      stars.title = s.my_rating ? `Your rating: ${s.my_rating}` : 'Rate this recipe';
+      stars.title = s.my_rating ? t('card.yourRating', { n: s.my_rating }) : t('card.rateThis');
       for (let i = 1; i <= 5; i++) {
         const star = document.createElement('button');
         star.className = `text-base leading-none px-0.5 transition-colors ${
           s.my_rating && i <= s.my_rating ? 'text-yellow-400' : 'text-zinc-300 dark:text-zinc-600 hover:text-yellow-400'
         }`;
         star.textContent = s.my_rating && i <= s.my_rating ? '★' : '☆';
-        star.title = `Rate ${i} star${i === 1 ? '' : 's'}`;
+        star.title = tn('card.rateStars', i);
         star.addEventListener('click', () => this.rate(s.id, i));
         stars.appendChild(star);
       }
@@ -478,19 +479,19 @@ const Home = {
 
   collectionCard(c) {
     const el = this._cardShell();
-    const kind = c.visibility === 'group' ? '👥 Group cookbook'
-      : c.visibility === 'public' ? 'Public collection' : 'Collection';
+    const kind = c.visibility === 'group' ? t('card.groupCookbook')
+      : c.visibility === 'public' ? t('card.publicCollection') : t('card.collection');
     el.appendChild(this._kicker(kind));
     const meta = document.createElement('div');
     meta.className = 'min-w-0';
     meta.innerHTML = `
         <h3 class="font-semibold text-sm truncate">${this.esc(c.name)}</h3>
-        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${c.item_count} recipe${c.item_count === 1 ? '' : 's'}${c.visibility === 'group' ? ` · ${c.member_count} member${c.member_count === 1 ? '' : 's'}` : ''}${c.is_owner ? '' : ` · by ${this.esc(c.username)}`}</p>
+        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${tn('card.recipes', c.item_count)}${c.visibility === 'group' ? ` · ${tn('card.members', c.member_count)}` : ''}${c.is_owner ? '' : ` · ${t('card.by', { name: this.esc(c.username) })}`}</p>
         ${c.description ? `<p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">${this.esc(c.description)}</p>` : ''}`;
     el.appendChild(meta);
     const actions = document.createElement('div');
     actions.className = 'flex flex-wrap gap-2 mt-auto pt-1';
-    const openBtn = this._actionBtn('Open', true);
+    const openBtn = this._actionBtn(t('common.open'), true);
     openBtn.addEventListener('click', () => this.openCollection(c.id));
     actions.appendChild(openBtn);
     el.appendChild(actions);
@@ -499,16 +500,17 @@ const Home = {
 
   publicCollectionCard(c) {
     const el = this._cardShell();
-    el.appendChild(this._kicker('Community collection'));
+    el.appendChild(this._kicker(t('card.communityCollection')));
+    const byline = c.is_mine ? t('card.byYou') : t('card.by', { name: this.esc(c.username) });
     el.innerHTML += `
       <div class="min-w-0">
         <h3 class="font-semibold text-sm truncate">${this.esc(c.name)}</h3>
-        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">by ${c.is_mine ? 'you' : this.esc(c.username)} · ${c.item_count} recipe${c.item_count === 1 ? '' : 's'}</p>
+        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${byline} · ${tn('card.recipes', c.item_count)}</p>
         ${c.description ? `<p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">${this.esc(c.description)}</p>` : ''}
       </div>`;
     const actions = document.createElement('div');
     actions.className = 'flex flex-wrap gap-2 mt-auto pt-1';
-    const openBtn = this._actionBtn('Browse', true);
+    const openBtn = this._actionBtn(t('common.browse'), true);
     openBtn.addEventListener('click', () => this.openCollection(c.id));
     actions.appendChild(openBtn);
     el.appendChild(actions);
@@ -551,13 +553,13 @@ const Home = {
 
     const head = document.createElement('div');
     head.className = 'space-y-2 mb-5';
-    const kind = c.visibility === 'group' ? 'Group cookbook' : c.visibility === 'public' ? 'Public collection' : 'Private collection';
+    const kind = c.visibility === 'group' ? t('card.groupCookbookPlain') : c.visibility === 'public' ? t('card.publicCollection') : t('card.privateCollection');
     head.innerHTML = `
-      <button id="collection-back" class="text-sm text-blue-500 hover:text-blue-400 transition-colors">← Back to your box</button>
+      <button id="collection-back" class="text-sm text-blue-500 hover:text-blue-400 transition-colors">${t('coll.back')}</button>
       <div class="flex items-start justify-between gap-3 flex-wrap">
         <div class="min-w-0">
           <h2 class="text-xl font-bold">${this.esc(c.name)}</h2>
-          <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-1">${kind} · by ${this.esc(c.username)} · ${c.items.length} recipe${c.items.length === 1 ? '' : 's'}</p>
+          <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-1">${kind} · ${t('card.by', { name: this.esc(c.username) })} · ${tn('card.recipes', c.items.length)}</p>
           ${c.description ? `<p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">${this.esc(c.description)}</p>` : ''}
         </div>
         <div class="flex gap-2 flex-wrap" id="collection-detail-actions"></div>
@@ -567,20 +569,20 @@ const Home = {
 
     const actions = head.querySelector('#collection-detail-actions');
     if (c.visibility === 'group' && c.invite_token && c.is_member) {
-      const inviteBtn = this._actionBtn('Copy invite link');
-      inviteBtn.title = 'Anyone with this link can join the cookbook';
+      const inviteBtn = this._actionBtn(t('coll.copyInvite'));
+      inviteBtn.title = t('tip.inviteLink');
       inviteBtn.addEventListener('click', () => {
         const url = `${location.origin}/?join=${c.invite_token}`;
         navigator.clipboard?.writeText(url).then(() => {
-          inviteBtn.textContent = 'Copied!';
-          setTimeout(() => { inviteBtn.textContent = 'Copy invite link'; }, 1500);
-        }).catch(() => window.prompt('Share this invite link:', url));
+          inviteBtn.textContent = t('common.copied');
+          setTimeout(() => { inviteBtn.textContent = t('coll.copyInvite'); }, 1500);
+        }).catch(() => window.prompt(t('prompt.shareInvite'), url));
       });
       actions.appendChild(inviteBtn);
     }
     if (c.is_owner) {
       if (c.visibility !== 'group') {
-        const pubBtn = this._actionBtn(c.visibility === 'public' ? 'Make private' : 'Publish to feed');
+        const pubBtn = this._actionBtn(c.visibility === 'public' ? t('coll.makePrivate') : t('coll.publishFeed'));
         pubBtn.addEventListener('click', async () => {
           await fetch(`/api/collections/${c.id}`, {
             method: 'PATCH',
@@ -591,9 +593,9 @@ const Home = {
         });
         actions.appendChild(pubBtn);
       }
-      const renameBtn = this._actionBtn('Rename');
+      const renameBtn = this._actionBtn(t('common.rename'));
       renameBtn.addEventListener('click', async () => {
-        const name = window.prompt('Collection name:', c.name);
+        const name = window.prompt(t('prompt.collectionName'), c.name);
         if (!name || !name.trim()) return;
         await fetch(`/api/collections/${c.id}`, {
           method: 'PATCH',
@@ -603,19 +605,19 @@ const Home = {
         this.refresh();
       });
       actions.appendChild(renameBtn);
-      const delBtn = this._actionBtn('Delete');
+      const delBtn = this._actionBtn(t('common.delete'));
       delBtn.classList.add('hover:text-red-500');
       delBtn.addEventListener('click', async () => {
-        if (!confirm(`Delete "${c.name}"? Recipes themselves are not deleted.`)) return;
+        if (!confirm(t('coll.deleteConfirm', { name: c.name }))) return;
         await fetch(`/api/collections/${c.id}`, { method: 'DELETE' }).catch(() => {});
         this.closeCollection();
         this.refresh();
       });
       actions.appendChild(delBtn);
     } else if (c.visibility === 'group' && c.is_member && App.currentUser) {
-      const leaveBtn = this._actionBtn('Leave cookbook');
+      const leaveBtn = this._actionBtn(t('coll.leave'));
       leaveBtn.addEventListener('click', async () => {
-        if (!confirm(`Leave "${c.name}"?`)) return;
+        if (!confirm(t('coll.leaveConfirm', { name: c.name }))) return;
         await fetch(`/api/collections/${c.id}/members/${App.currentUser.id}`, { method: 'DELETE' }).catch(() => {});
         this.closeCollection();
         this.refresh();
@@ -626,7 +628,9 @@ const Home = {
     if (c.visibility === 'group' && c.members?.length) {
       const membersEl = document.createElement('p');
       membersEl.className = 'text-xs text-zinc-400 dark:text-zinc-500 mb-4';
-      membersEl.textContent = `Members: ${c.members.map((m) => m.username + (m.role === 'owner' ? ' (owner)' : '')).join(', ')}`;
+      membersEl.textContent = t('coll.members', {
+        list: c.members.map((m) => m.username + (m.role === 'owner' ? t('coll.ownerSuffix') : '')).join(', '),
+      });
       container.appendChild(membersEl);
     }
 
@@ -636,7 +640,7 @@ const Home = {
     if (!c.items.length) {
       const empty = document.createElement('p');
       empty.className = 'text-sm text-zinc-400 dark:text-zinc-600';
-      empty.textContent = 'Nothing in here yet — use "Save" / "+ Collection" on any recipe card to add one.';
+      empty.textContent = t('coll.empty');
       container.appendChild(empty);
       return;
     }
@@ -646,20 +650,20 @@ const Home = {
   collectionItemCard(c, item) {
     const recipe = item.data || {};
     const el = this._cardShell();
-    el.appendChild(this._kicker(item.snapshot_only ? 'Saved copy' : 'Recipe'));
+    el.appendChild(this._kicker(item.snapshot_only ? t('card.savedCopy') : t('card.recipe')));
     const srcBit = item.snapshot_only
-      ? '<span class="text-amber-500" title="The original shared recipe was deleted — this is your saved copy">saved copy</span>'
-      : item.conversation_id ? 'your recipe' : `by ${this.esc(item.username)}`;
+      ? `<span class="text-amber-500" title="${this.esc(t('card.savedCopyTitle'))}">${t('coll.savedCopyBadge')}</span>`
+      : item.conversation_id ? t('coll.yourRecipe') : t('card.by', { name: this.esc(item.username) });
     el.innerHTML += `
       <div class="min-w-0">
-        <h3 class="font-semibold text-sm truncate">${this.esc(recipe.title || item.snapshot_title || 'Untitled')}</h3>
-        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${srcBit} · added by ${this.esc(item.added_by_username)}</p>
+        <h3 class="font-semibold text-sm truncate">${this.esc(recipe.title || item.snapshot_title || t('common.untitled'))}</h3>
+        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${srcBit} · ${t('card.addedBy', { name: this.esc(item.added_by_username) })}</p>
         ${recipe.description ? `<p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">${this.esc(recipe.description)}</p>` : ''}
       </div>`;
 
     const actions = document.createElement('div');
     actions.className = 'flex flex-wrap gap-2 mt-auto pt-1';
-    const viewBtn = this._actionBtn('View', true);
+    const viewBtn = this._actionBtn(t('common.view'), true);
     viewBtn.addEventListener('click', () => {
       if (item.conversation_id && typeof Store !== 'undefined') {
         Store.selectConversation(item.conversation_id);
@@ -674,7 +678,7 @@ const Home = {
     });
     actions.appendChild(viewBtn);
     if (!App.isAnonymous) {
-      const removeBtn = this._actionBtn('Remove');
+      const removeBtn = this._actionBtn(t('common.remove'));
       removeBtn.addEventListener('click', async () => {
         await fetch(`/api/collections/${c.id}/items/${item.id}`, { method: 'DELETE' }).catch(() => {});
         this.refresh();
@@ -724,13 +728,16 @@ const Home = {
 
     list.innerHTML = '';
     if (!this.collections.length) {
-      list.innerHTML = '<p class="text-sm text-zinc-400 dark:text-zinc-500">No collections yet — create one below.</p>';
+      const p = document.createElement('p');
+      p.className = 'text-sm text-zinc-400 dark:text-zinc-500';
+      p.textContent = t('collPick.empty');
+      list.appendChild(p);
     }
     this.collections.forEach((c) => {
       const row = document.createElement('button');
       row.className = 'w-full text-left px-3 py-2.5 text-sm rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 hover:border-blue-400 dark:hover:border-blue-600 transition-colors flex justify-between items-center gap-2';
       row.innerHTML = `<span class="truncate">${this.esc(c.name)}${c.visibility === 'group' ? ' 👥' : ''}</span>
-        <span class="text-xs text-zinc-400 shrink-0">${c.item_count} recipe${c.item_count === 1 ? '' : 's'}</span>`;
+        <span class="text-xs text-zinc-400 shrink-0">${tn('card.recipes', c.item_count)}</span>`;
       row.addEventListener('click', () => addTo(c.id));
       list.appendChild(row);
     });
@@ -758,11 +765,11 @@ const Home = {
     const modal = document.getElementById('new-collection-modal');
     if (!modal) return;
     document.getElementById('new-collection-title').textContent =
-      isGroup ? 'New group cookbook' : 'New collection';
+      isGroup ? t('newColl.cookbookTitle') : t('newColl.title');
     document.getElementById('new-collection-hint').classList.toggle('hidden', !isGroup);
     const input = document.getElementById('new-collection-name');
     input.value = '';
-    input.placeholder = isGroup ? 'e.g. Family Cookbook' : 'e.g. Weeknight dinners';
+    input.placeholder = isGroup ? t('newColl.cookbookPlaceholder') : t('newColl.placeholder');
     modal.classList.remove('hidden');
     input.focus();
 
@@ -801,7 +808,11 @@ const Home = {
       if (!res.ok) return;
       const info = await res.json();
       if (!info.already_member) {
-        const ok = confirm(`Join "${info.name}"? ${info.member_count} member${info.member_count === 1 ? '' : 's'} · ${info.item_count} recipe${info.item_count === 1 ? '' : 's'}.`);
+        const ok = confirm(t('coll.joinConfirm', {
+          name: info.name,
+          members: tn('card.members', info.member_count),
+          recipes: tn('card.recipes', info.item_count),
+        }));
         if (!ok) return;
         await fetch(`/api/collections/join/${encodeURIComponent(token)}`, { method: 'POST' });
       }

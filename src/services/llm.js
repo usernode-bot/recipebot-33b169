@@ -57,6 +57,27 @@ function isValidModel(id) {
   return typeof id === 'string' && MODELS.some((m) => m.id === id);
 }
 
+// Supported UI languages (code → English name for the prompt directive).
+// Mirrors the client-side list in public/js/i18n.js — keep the two in sync
+// when adding a language.
+const SUPPORTED_LANGUAGES = {
+  en: 'English',
+  es: 'Spanish',
+  fr: 'French',
+  de: 'German',
+  id: 'Indonesian',
+};
+
+// Map the platform's BCP-47 locale tag (the JWT `locale` claim — "id",
+// "pt-BR", or null when unset) onto a shipped language code by
+// language-subtag prefix. Returns null when nothing matches or no
+// preference is set.
+function resolveLocale(tag) {
+  if (typeof tag !== 'string' || !tag) return null;
+  const sub = tag.split('-')[0].toLowerCase();
+  return Object.prototype.hasOwnProperty.call(SUPPORTED_LANGUAGES, sub) ? sub : null;
+}
+
 // Haiku 4.5 (and older dated snapshots) still take the pre-4.6 thinking shape
 // `{type: 'enabled', budget_tokens}`. Sonnet 5 / Opus 4.8 reject budget_tokens
 // and non-default sampling params with a 400 — they use adaptive thinking.
@@ -92,6 +113,7 @@ async function createMessage(config, params, userToken, { timeoutMs = LLM_TIMEOU
 
   if (mode === 'disabled') {
     const err = new Error('LLM disabled');
+    err.code = 'llm_unavailable';
     err.userMessage = 'AI features are unavailable in this environment.';
     throw err;
   }
@@ -138,8 +160,10 @@ async function createMessage(config, params, userToken, { timeoutMs = LLM_TIMEOU
     const code = body?.code || body?.error?.type || '';
     log.error('llm', 'Messages API error', { status: resp.status, code, mode });
 
+    // Always carry a machine-readable code so the client can render the
+    // error in the user's language; 'llm_failed' is the generic fallback.
     const err = new Error(`LLM request failed (${resp.status})`);
-    err.code = code;
+    err.code = code || 'llm_failed';
     if (code === 'grant_required') {
       err.userMessage = 'RecipeBot needs your permission to use AI. Approve access when prompted, then send your message again.';
     } else if (code === 'app_cap_exceeded') {
@@ -333,6 +357,17 @@ function buildSystemPrompt(preferences, currentRecipe) {
   const tempUnit = preferences.tempUnit === 'F' ? 'Fahrenheit' : 'Celsius';
   parts.push(`- Temperature: Write temperatures in ${tempUnit} in step descriptions (the temperature_f field is always Fahrenheit regardless)`);
 
+  // Language directive: `preferences.language` is resolved server-side from
+  // the platform's JWT locale claim (see chat.js) — only a resolvable
+  // non-English locale appends anything. For 'en'/unset nothing is appended,
+  // preserving default behavior — including the model naturally mirroring a
+  // user who writes in another language. Tags stay canonical English:
+  // they're shared filter tokens.
+  const lang = preferences.language;
+  if (lang && lang !== 'en' && SUPPORTED_LANGUAGES[lang]) {
+    parts.push(`- Language: Write your conversational replies and ALL human-readable recipe text (title, description, notes, prep_time, cook_time, step titles, step descriptions, ingredient names, serving_item name) in ${SUPPORTED_LANGUAGES[lang]}, unless the user explicitly asks for another language. EXCEPTION: the "tags" array must remain in the lowercase English tag vocabulary described above — tags are shared filter tokens across the community and must never be translated.`);
+  }
+
   if (parts.length > 0) {
     prompt += `\n\nThe user's current preferences:\n${parts.join('\n')}\nAlways respect these constraints when suggesting or generating recipes.`;
   }
@@ -380,6 +415,8 @@ module.exports = {
   MODELS,
   DEFAULT_MODEL,
   isValidModel,
+  SUPPORTED_LANGUAGES,
+  resolveLocale,
   estimateMicrocents,
   buildSystemPrompt,
   buildMessages,

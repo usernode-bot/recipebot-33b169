@@ -73,6 +73,8 @@ function authRoutes(config) {
   });
 
   router.patch('/api/auth/preferences', async (req, res) => {
+    // Language is NOT an app preference — it follows the platform-level
+    // user setting (the JWT locale claim); any client-sent value is ignored.
     const { diet, complexity, serving, tempUnit, model } = req.body;
 
     if (model != null && !isValidModel(model)) {

@@ -54,13 +54,16 @@
 
     amountEl.className = 'text-sm text-zinc-700 dark:text-zinc-200 mt-1 truncate';
     footnoteEl.textContent = authoritative
-      ? 'Resets at midnight UTC'
-      : 'Estimate · resets at midnight UTC';
+      ? t('settings.resets')
+      : t('settings.estimateResets');
     footnoteEl.classList.remove('hidden');
 
     const prefix = authoritative ? '' : '≈ ';
     if (capCents != null && capCents > 0) {
-      amountEl.textContent = `${prefix}${fmtCents(cents)} of ${fmtCents(capCents)} used today`;
+      amountEl.textContent = t('settings.usedOfToday', {
+        amount: prefix + fmtCents(cents),
+        cap: fmtCents(capCents),
+      });
       const pct = Math.min(100, (cents / capCents) * 100);
       fillEl.style.width = pct + '%';
       fillEl.className =
@@ -68,7 +71,7 @@
         (pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-blue-500');
       barEl.classList.remove('hidden');
     } else {
-      amountEl.textContent = `${prefix}${fmtCents(cents)} used today`;
+      amountEl.textContent = t('settings.usedToday', { amount: prefix + fmtCents(cents) });
       barEl.classList.add('hidden');
     }
   }
@@ -115,7 +118,7 @@
     // instead of a $0.00 meter. With data (e.g. the staging demo row) the
     // spend still renders so testers can see the meter.
     if (usage.llm && !usage.llm.enabled && cents === 0) {
-      amountEl.textContent = 'AI is unavailable in this environment';
+      amountEl.textContent = t('settings.aiUnavailable');
       return;
     }
 
@@ -161,7 +164,8 @@
     optionsEl.innerHTML = '';
 
     if (!models.length) {
-      optionsEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400">Model options unavailable — try reloading.</p>';
+      optionsEl.innerHTML = '<p class="text-sm text-zinc-500 dark:text-zinc-400"></p>';
+      optionsEl.querySelector('p').textContent = t('settings.modelsUnavailable');
       return;
     }
 
@@ -182,7 +186,7 @@
           : '') +
         '</div>' +
         '<p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5"></p>';
-      btn.querySelector('span').textContent = m.label + (m.default ? ' (default)' : '');
+      btn.querySelector('span').textContent = m.label + (m.default ? t('settings.default') : '');
       btn.querySelector('p').textContent = m.description || '';
       btn.addEventListener('click', () => selectModel(m.id));
       optionsEl.appendChild(btn);
@@ -202,12 +206,12 @@
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        showStatus(data.error || 'Failed to save', true);
+        showStatus(data.error || t('settings.saveFailed'), true);
         return;
       }
-      showStatus('Saved — applies to your next message', false);
+      showStatus(t('settings.saved'), false);
     } catch {
-      showStatus('Network error — not saved', true);
+      showStatus(t('settings.networkError'), true);
     }
   }
 

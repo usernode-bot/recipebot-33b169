@@ -51,6 +51,27 @@ const Chat = {
     }
   },
 
+  // Server status/log entries carry a structured `kind` (+ params) alongside
+  // the legacy English `text`; render via the dictionary when the kind is
+  // known, fall back to the persisted text for old rows.
+  _statusText(data) {
+    if (data.kind === 'search') return t('chat.searching', { query: data.query });
+    if (data.kind === 'fetch') return t('chat.reading', { url: data.url });
+    if (data.kind === 'fixup') return t('chat.fixingFormat');
+    return data.text;
+  },
+
+  // Server errors carry a machine `code`; map it to a localized message and
+  // fall back to the server's English string for unknown codes.
+  _errorText(data) {
+    if (data.code) {
+      const key = 'errors.' + data.code;
+      const translated = t(key);
+      if (translated !== key) return translated;
+    }
+    return data.error || t('errors.somethingWrong');
+  },
+
   _appendStatusLine(target, text, active = true) {
     this._finalizeActiveStatus();
     this._activeStatusDetail = null;
@@ -254,7 +275,7 @@ const Chat = {
           if (status === 'error' || status === 'not_found') {
             const errEl = document.createElement('div');
             errEl.className = 'msg-assistant px-4 py-2.5';
-            errEl.textContent = 'Response was interrupted. Please try again.';
+            errEl.textContent = t('errors.interrupted');
             if (wrapper) wrapper.appendChild(errEl);
           }
           this._cleanupStream();
@@ -283,7 +304,7 @@ const Chat = {
         icon.innerHTML = this._statusIconSpinner;
         const label = document.createElement('span');
         label.className = 'status-toggle';
-        label.textContent = 'Thinking...';
+        label.textContent = t('chat.thinking');
         line.appendChild(icon);
         line.appendChild(label);
         thinkingEl = document.createElement('div');
@@ -332,11 +353,11 @@ const Chat = {
         link.target = '_blank';
         link.rel = 'noopener';
         link.className = 'status-link';
-        link.textContent = data.text;
+        link.textContent = this._statusText(data);
         line.appendChild(link);
         wrapper.appendChild(line);
         this._activeStatusLine = line;
-      } else if (data.text?.startsWith('Searching:')) {
+      } else if (data.kind === 'search' || data.text?.startsWith('Searching:')) {
         this._finalizeActiveStatus();
         this._activeStatusDetail = null;
         const line = document.createElement('div');
@@ -344,7 +365,7 @@ const Chat = {
         line.innerHTML = this._statusIconSpinner;
         const label = document.createElement('span');
         label.className = 'status-toggle';
-        label.textContent = data.text;
+        label.textContent = this._statusText(data);
         line.appendChild(label);
         wrapper.appendChild(line);
         const detail = document.createElement('div');
@@ -354,7 +375,7 @@ const Chat = {
         this._activeStatusLine = line;
         this._activeStatusDetail = detail;
       } else {
-        this._appendStatusLine(wrapper, data.text, true);
+        this._appendStatusLine(wrapper, this._statusText(data), true);
       }
     });
 
@@ -373,7 +394,7 @@ const Chat = {
       if (dedup(data)) return;
       console.log('[chat] ← recipe');
       currentTextEl = null;
-      this._appendStatusLine(wrapper, `Created recipe: ${data.title}`, false);
+      this._appendStatusLine(wrapper, t('chat.createdRecipe', { title: data.title }), false);
       if (typeof Recipe !== 'undefined') {
         // A modification renders the Accept/Reject diff — record which reply
         // it belongs to so the decision can be persisted server-side.
@@ -402,7 +423,7 @@ const Chat = {
       if (dedup(data)) return;
       const el = document.getElementById('rate-limit-display');
       if (data.used >= 30) {
-        el.textContent = `${data.used}/${data.limit} today`;
+        el.textContent = t('chat.rateLimitBadge', { used: data.used, limit: data.limit });
         el.classList.remove('hidden');
       } else {
         el.classList.add('hidden');
@@ -430,7 +451,7 @@ const Chat = {
         this._failActiveStatus();
         const errEl = document.createElement('div');
         errEl.className = 'msg-assistant px-4 py-2.5';
-        errEl.textContent = data.error || 'Something went wrong.';
+        errEl.textContent = this._errorText(data);
         wrapper.appendChild(errEl);
         this._cleanupStream();
         if (data.code === 'grant_required' && typeof usernode !== 'undefined' && usernode.requestLlmAccess) {
@@ -519,19 +540,19 @@ const Chat = {
     if (!preferences) return '';
 
     const dietOptions = [
-      { value: 'vegetarian', label: 'Vegetarian' },
-      { value: 'vegan', label: 'Vegan' },
+      { value: 'vegetarian', label: t('pref.vegetarian') },
+      { value: 'vegan', label: t('pref.vegan') },
     ];
     const complexityOptions = [
-      { value: 'quick', label: '≤10 min' },
-      { value: 'normal', label: 'Normal' },
-      { value: 'serious', label: 'Advanced' },
-      { value: 'foodscience', label: 'Food Science' },
+      { value: 'quick', label: t('pref.quick') },
+      { value: 'normal', label: t('pref.normal') },
+      { value: 'serious', label: t('pref.advanced') },
+      { value: 'foodscience', label: t('pref.foodScience') },
     ];
     const servingOptions = [
-      { value: 'snack', label: 'Snack' },
-      { value: 'normal', label: 'Normal' },
-      { value: 'large', label: 'Large' },
+      { value: 'snack', label: t('pref.snack') },
+      { value: 'normal', label: t('pref.normal') },
+      { value: 'large', label: t('pref.large') },
     ];
 
     const renderRow = (label, options, selected) => {
@@ -550,9 +571,9 @@ const Chat = {
     };
 
     return `<div class="space-y-2.5 text-left py-2 px-1">
-      ${renderRow('Diet', dietOptions, preferences.diet)}
-      ${renderRow('Style', complexityOptions, preferences.complexity || 'normal')}
-      ${renderRow('Serving size', servingOptions, preferences.serving || 'normal')}
+      ${renderRow(t('chat.diet'), dietOptions, preferences.diet)}
+      ${renderRow(t('chat.style'), complexityOptions, preferences.complexity || 'normal')}
+      ${renderRow(t('chat.servingSize'), servingOptions, preferences.serving || 'normal')}
     </div>`;
   },
 
@@ -574,10 +595,18 @@ const Chat = {
       icon.innerHTML = this._statusIconCheck;
       line.appendChild(icon);
 
+      // Localized label: kind-mapped when the entry carries structured
+      // fields (kind/title/query/url), the stored English text otherwise.
+      const entryText = entry.kind === 'thinking' || entry.type === 'thinking'
+        ? t('chat.thinking')
+        : entry.kind === 'recipe' || (entry.type === 'recipe' && entry.title)
+          ? t('chat.createdRecipe', { title: entry.title })
+          : this._statusText(entry);
+
       if (entry.type === 'thinking' && entry.detail) {
         const label = document.createElement('span');
         label.className = 'status-toggle';
-        label.textContent = entry.text;
+        label.textContent = entryText;
         line.appendChild(label);
         wrap.appendChild(line);
         const detail = document.createElement('div');
@@ -588,7 +617,7 @@ const Chat = {
       } else if (entry.type === 'status' && entry.results?.length) {
         const label = document.createElement('span');
         label.className = 'status-toggle';
-        label.textContent = entry.text;
+        label.textContent = entryText;
         line.appendChild(label);
         wrap.appendChild(line);
         const detail = document.createElement('div');
@@ -604,12 +633,12 @@ const Chat = {
         link.target = '_blank';
         link.rel = 'noopener';
         link.className = 'status-link';
-        link.textContent = entry.text;
+        link.textContent = entryText;
         line.appendChild(link);
         wrap.appendChild(line);
       } else {
         const label = document.createElement('span');
-        label.textContent = entry.text;
+        label.textContent = entryText;
         line.appendChild(label);
         wrap.appendChild(line);
       }
@@ -703,17 +732,17 @@ const Chat = {
     if (this.streaming || !message.trim()) return;
 
     if (App.isAnonymous) {
-      App.promptSignIn('Sign in to cook with the AI');
+      App.promptSignIn(t('signin.cookWithAI'));
       return;
     }
 
     if (App.llm && !App.llm.enabled) {
-      this.appendMessage('assistant', 'AI is unavailable in this environment, so chat is disabled here.');
+      this.appendMessage('assistant', t('chat.aiDisabled'));
       return;
     }
 
     if (!(await this._ensureLlmGrant())) {
-      this.appendMessage('assistant', 'RecipeBot needs AI access to generate recipes. Approve access when prompted, then try again.');
+      this.appendMessage('assistant', t('chat.needsAccess'));
       return;
     }
 
@@ -772,18 +801,18 @@ const Chat = {
         const data = await res.json();
         const errEl = document.createElement('div');
         errEl.className = 'msg-assistant px-4 py-2.5';
-        errEl.textContent = `Daily limit reached (${data.count}/${data.limit}). Resets at midnight UTC.`;
+        errEl.textContent = t('errors.dailyLimit', { count: data.count, limit: data.limit });
         this._streamWrapper.appendChild(errEl);
         this._cleanupStream();
         return;
       }
 
       if (!res.ok) {
-        let errText = 'Something went wrong. Please try again.';
+        let errText = t('errors.tryAgain');
         if (res.status === 503) {
           try {
             const data = await res.json();
-            errText = data.error || 'AI features are unavailable in this environment.';
+            errText = this._errorText(data);
           } catch {}
         }
         const errEl = document.createElement('div');
@@ -808,7 +837,7 @@ const Chat = {
     } catch {
       const errEl = document.createElement('div');
       errEl.className = 'msg-assistant px-4 py-2.5';
-      errEl.textContent = 'Connection error. Please try again.';
+      errEl.textContent = t('errors.connection');
       this._streamWrapper.appendChild(errEl);
       this._cleanupStream();
     }

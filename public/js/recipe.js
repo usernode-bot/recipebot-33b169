@@ -45,8 +45,8 @@ const Recipe = {
     };
 
     const timeInfo = [
-      recipe.prep_time ? `Prep: ${recipe.prep_time}` : '',
-      recipe.cook_time ? `Cook: ${recipe.cook_time}` : '',
+      recipe.prep_time ? t('card.prep', { t: recipe.prep_time }) : '',
+      recipe.cook_time ? t('card.cook', { t: recipe.cook_time }) : '',
     ].filter(Boolean).join('  ·  ');
 
     const scaleLabel = ss === 1.0 ? '1×' : `${ss}×`;
@@ -61,13 +61,14 @@ const Recipe = {
         : '';
       const displayedVersion = App.viewingVersion ? App.viewingVersion.version : vs.current_version;
       const versionBit = displayedVersion ? ` · v${displayedVersion}` : '';
-      const madeBit = vs.made_count ? ` · cooked ${vs.made_count}×` : '';
+      const madeBit = vs.made_count ? ` · ${t('recipe.cookedTimes', { n: vs.made_count })}` : '';
       const historyBit = vs.id && vs.current_version > 1 && !App.isAnonymous
-        ? ` · <button id="history-btn" class="underline hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">History</button>`
+        ? ` · <button id="history-btn" class="underline hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">${t('version.history')}</button>`
         : '';
-      bylineHtml = `<p class="text-sm text-zinc-400 dark:text-zinc-500 mt-1">by ${this.escapeHtml(vs.is_mine ? 'you' : vs.username)}${ratingBit}${versionBit}${madeBit}${historyBit}</p>`;
+      const byline = vs.is_mine ? t('card.byYou') : t('card.by', { name: this.escapeHtml(vs.username) });
+      bylineHtml = `<p class="text-sm text-zinc-400 dark:text-zinc-500 mt-1">${byline}${ratingBit}${versionBit}${madeBit}${historyBit}</p>`;
       if (vs.forked_from_username) {
-        bylineHtml += `<p class="text-sm text-zinc-400 dark:text-zinc-500 mt-0.5">⑂ remixed from ${this.escapeHtml(vs.forked_from_username)}'s recipe</p>`;
+        bylineHtml += `<p class="text-sm text-zinc-400 dark:text-zinc-500 mt-0.5">${t('card.remixedFrom', { name: this.escapeHtml(vs.forked_from_username) })}</p>`;
       }
     }
 
@@ -84,8 +85,8 @@ const Recipe = {
         App.viewingVersion.version !== App.viewingShared.current_version) {
       versionBannerHtml = `
         <div class="flex items-center justify-between gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-          <span class="text-sm font-medium text-blue-800 dark:text-blue-200">Viewing v${App.viewingVersion.version} — current version is v${App.viewingShared.current_version}</span>
-          <button id="version-back-current" class="shrink-0 px-3 py-1 text-sm rounded-lg bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors">Back to current</button>
+          <span class="text-sm font-medium text-blue-800 dark:text-blue-200">${t('version.viewing', { v: App.viewingVersion.version, cur: App.viewingShared.current_version })}</span>
+          <button id="version-back-current" class="shrink-0 px-3 py-1 text-sm rounded-lg bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors">${t('version.backToCurrent')}</button>
         </div>`;
     }
 
@@ -101,7 +102,7 @@ const Recipe = {
 
         <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
           <div class="flex items-center gap-2">
-            <span class="text-zinc-400 dark:text-zinc-500">Servings</span>
+            <span class="text-zinc-400 dark:text-zinc-500">${t('recipe.servings')}</span>
             <div class="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 rounded-lg px-1 py-0.5">
               <button class="servings-btn w-6 h-6 rounded flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors text-zinc-500" data-delta="-1">&minus;</button>
               <span id="servings-count" class="font-semibold w-5 text-center text-sm">${servings}</span>
@@ -109,7 +110,7 @@ const Recipe = {
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-zinc-400 dark:text-zinc-500">Scale</span>
+            <span class="text-zinc-400 dark:text-zinc-500">${t('recipe.scale')}</span>
             <div class="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 rounded-lg px-1 py-0.5">
               <button class="scale-btn w-6 h-6 rounded flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors text-zinc-500" data-delta="-0.25">&minus;</button>
               <span id="scale-count" class="font-semibold w-8 text-center text-sm">${scaleLabel}</span>
@@ -121,36 +122,36 @@ const Recipe = {
             <span class="px-2.5 py-1 rounded-full transition-all ${this.useCelsius ? 'bg-blue-200 dark:bg-blue-700/40 text-blue-800 dark:text-blue-100 font-medium shadow-sm' : 'text-zinc-400 dark:text-zinc-500'}">°C</span>
             <span class="px-2.5 py-1 rounded-full transition-all ${!this.useCelsius ? 'bg-blue-200 dark:bg-blue-700/40 text-blue-800 dark:text-blue-100 font-medium shadow-sm' : 'text-zinc-400 dark:text-zinc-500'}">°F</span>
           </div>
-          <button id="reset-progress" class="text-xs px-2 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors" title="Reset step highlights and ingredient checks">
-            Reset progress
+          <button id="reset-progress" class="text-xs px-2 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors" title="${this.escapeHtml(t('recipe.resetProgressTitle'))}">
+            ${t('recipe.resetProgress')}
           </button>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-          <span class="text-xs text-zinc-400 dark:text-zinc-500">per serving${ss !== 1.0 ? ` (${scaleLabel})` : ''}</span>
-          <span class="macro-pill bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400">${Math.round(perServingMacros.calories)} cal</span>
-          <span class="macro-pill bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">${Math.round(perServingMacros.protein_g)}g protein</span>
-          <span class="macro-pill bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400">${Math.round(perServingMacros.carbs_g)}g carbs</span>
-          <span class="macro-pill bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400">${Math.round(perServingMacros.fat_g)}g fat</span>
-          <span class="macro-pill bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400">${Math.round(perServingMacros.fiber_g)}g fiber</span>
+          <span class="text-xs text-zinc-400 dark:text-zinc-500">${t('recipe.perServing')}${ss !== 1.0 ? ` (${scaleLabel})` : ''}</span>
+          <span class="macro-pill bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400">${t('recipe.macroCal', { n: Math.round(perServingMacros.calories) })}</span>
+          <span class="macro-pill bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">${t('recipe.macroProtein', { n: Math.round(perServingMacros.protein_g) })}</span>
+          <span class="macro-pill bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400">${t('recipe.macroCarbs', { n: Math.round(perServingMacros.carbs_g) })}</span>
+          <span class="macro-pill bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400">${t('recipe.macroFat', { n: Math.round(perServingMacros.fat_g) })}</span>
+          <span class="macro-pill bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400">${t('recipe.macroFiber', { n: Math.round(perServingMacros.fiber_g) })}</span>
           ${recipe.serving_item ? `<span class="macro-pill bg-zinc-100 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-300">${Math.round(recipe.serving_item.count * ss)} ${this.escapeHtml(recipe.serving_item.name)}</span>` : ''}
         </div>
 
         <div class="flex flex-wrap gap-2 pt-1">
-          <button id="cook-btn" class="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors">🍳 Cook Mode</button>
+          <button id="cook-btn" class="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors">${t('recipe.cookMode')}</button>
           ${this.renderMadeItControl()}
           ${this.renderForkControl()}
           ${this.renderShareControls()}
           ${this.renderCollectionControl()}
           ${this.renderShareLinkControl()}
           <div class="relative">
-            <button id="export-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">Export ▾</button>
+            <button id="export-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.export')}</button>
             <div id="export-menu" class="hidden absolute top-full mt-1 left-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg overflow-hidden z-10 min-w-[160px]">
-              <button id="export-md" class="block w-full px-4 py-2.5 text-sm text-left hover:bg-zinc-100 dark:hover:bg-zinc-800">Download Markdown</button>
-              <button id="export-copy-md" class="block w-full px-4 py-2.5 text-sm text-left hover:bg-zinc-100 dark:hover:bg-zinc-800">Copy Markdown</button>
-              <button id="export-json" class="block w-full px-4 py-2.5 text-sm text-left hover:bg-zinc-100 dark:hover:bg-zinc-800">Download JSON</button>
+              <button id="export-md" class="block w-full px-4 py-2.5 text-sm text-left hover:bg-zinc-100 dark:hover:bg-zinc-800">${t('recipe.downloadMd')}</button>
+              <button id="export-copy-md" class="block w-full px-4 py-2.5 text-sm text-left hover:bg-zinc-100 dark:hover:bg-zinc-800">${t('recipe.copyMd')}</button>
+              <button id="export-json" class="block w-full px-4 py-2.5 text-sm text-left hover:bg-zinc-100 dark:hover:bg-zinc-800">${t('recipe.downloadJson')}</button>
               <div class="border-t border-zinc-200 dark:border-zinc-700"></div>
-              <label id="import-json-label" class="block w-full px-4 py-2.5 text-sm text-left hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer">Import JSON
+              <label id="import-json-label" class="block w-full px-4 py-2.5 text-sm text-left hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer">${t('recipe.importJson')}
                 <input type="file" id="import-json-input" accept=".json,application/json" class="hidden">
               </label>
             </div>
@@ -163,7 +164,7 @@ const Recipe = {
           ${recipe.steps.map((step, i) => this.renderStep(step, i, ingredientScale)).join('')}
         </div>
 
-        ${recipe.notes ? `<div class="mt-3 p-4 bg-zinc-100/70 dark:bg-zinc-900/50 rounded-xl text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed"><strong class="text-zinc-700 dark:text-zinc-300">Notes:</strong> ${this.renderInline(recipe.notes)}</div>` : ''}
+        ${recipe.notes ? `<div class="mt-3 p-4 bg-zinc-100/70 dark:bg-zinc-900/50 rounded-xl text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed"><strong class="text-zinc-700 dark:text-zinc-300">${t('recipe.notesLabel')}</strong> ${this.renderInline(recipe.notes)}</div>` : ''}
 
         <div id="social-section"></div>
       </div>
@@ -268,12 +269,12 @@ const Recipe = {
     if (conv?.is_shared) {
       if (conv.shared_up_to_date) {
         return `
-        <button id="share-btn" disabled title="Shared copy is up to date" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 opacity-60 cursor-default">Shared ✓</button>`;
+        <button id="share-btn" disabled title="${this.escapeHtml(t('recipe.sharedUpToDate'))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 opacity-60 cursor-default">${t('recipe.sharedCheck')}</button>`;
       }
       return `
-        <button id="share-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">Update shared copy</button>`;
+        <button id="share-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.updateShared')}</button>`;
     }
-    return `<button id="share-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">Share</button>`;
+    return `<button id="share-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.share')}</button>`;
   },
 
   // Fork button for the recipe view. Hidden in the unsaved-fork state
@@ -281,19 +282,19 @@ const Recipe = {
   // untouched fork would do nothing useful.
   renderForkControl() {
     if (!App.currentConversationId && !App.viewingShared) return '';
-    return `<button id="fork-btn" title="Fork this recipe into a new conversation" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">Fork</button>`;
+    return `<button id="fork-btn" title="${this.escapeHtml(t('recipe.forkTitle'))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.fork')}</button>`;
   },
 
   // "Made it" for an owned conversation or a published recipe.
   renderMadeItControl() {
     if (!App.currentConversationId && !App.viewingShared?.id) return '';
-    return `<button id="made-it-btn" title="Mark that you cooked this (optional note)" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">☑ Made it</button>`;
+    return `<button id="made-it-btn" title="${this.escapeHtml(t('recipe.madeItTitle'))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.madeIt')}</button>`;
   },
 
   // Add to a collection (own conversation or a published recipe).
   renderCollectionControl() {
     if (!App.currentConversationId && !App.viewingShared?.id) return '';
-    return `<button id="add-collection-btn" title="Add this recipe to a collection" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">+ Collection</button>`;
+    return `<button id="add-collection-btn" title="${this.escapeHtml(t('recipe.addCollectionTitle'))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.addCollection')}</button>`;
   },
 
   // Copy the public share link (published recipes only).
@@ -308,7 +309,7 @@ const Recipe = {
 
   renderShareLinkControl() {
     if (!this._currentShareSlug()) return '';
-    return `<button id="copy-link-btn" title="Copy the public share link — anyone can view and cook it, no login" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">🔗 Link</button>`;
+    return `<button id="copy-link-btn" title="${this.escapeHtml(t('recipe.copyLinkTitle'))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.copyLink')}</button>`;
   },
 
   // ── "Made it" ────────────────────────────────────────────────
@@ -345,7 +346,7 @@ const Recipe = {
   },
 
   async markMadeIt(btn) {
-    if (App.isAnonymous) return App.promptSignIn('Sign in to mark recipes you cooked');
+    if (App.isAnonymous) return App.promptSignIn(t('signin.madeIt'));
     const note = await this.promptMadeItNote();
     if (note === null) return; // cancelled
     const target = App.currentConversationId
@@ -360,13 +361,13 @@ const Recipe = {
       });
       if (!res.ok) throw new Error();
       const data = await res.json();
-      if (btn) btn.textContent = `☑ Made it ✓ (${data.made_count}×)`;
+      if (btn) btn.textContent = t('recipe.madeItDone', { n: data.made_count });
       if (App.viewingShared) {
         App.viewingShared.made_count = data.made_count;
         if (App.viewingShared.id) this.loadSocialSection(App.viewingShared.id);
       }
     } catch {
-      if (btn) btn.textContent = 'Failed — try again';
+      if (btn) btn.textContent = t('recipe.madeItFailed');
     }
   },
 
@@ -394,21 +395,24 @@ const Recipe = {
       const renderTags = () => {
         tagsList.innerHTML = '';
         if (!tags.length) {
-          tagsList.innerHTML = '<span class="text-xs text-zinc-400 dark:text-zinc-500">No tags yet — add some below (e.g. cuisine, diet, course, method)</span>';
+          const hint = document.createElement('span');
+          hint.className = 'text-xs text-zinc-400 dark:text-zinc-500';
+          hint.textContent = t('shareModal.noTags');
+          tagsList.appendChild(hint);
         }
-        tags.forEach((t, idx) => {
+        tags.forEach((tag, idx) => {
           const chip = document.createElement('button');
           chip.type = 'button';
           chip.className = 'px-2.5 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-600 transition-colors';
-          chip.textContent = `${t} ✕`;
-          chip.title = 'Remove tag';
+          chip.textContent = `${tag} ✕`;
+          chip.title = t('shareModal.removeTag');
           chip.addEventListener('click', () => { tags.splice(idx, 1); renderTags(); });
           tagsList.appendChild(chip);
         });
       };
 
-      titleEl.textContent = isUpdate ? 'Update shared copy' : 'Share to the community feed';
-      confirmBtn.textContent = isUpdate ? 'Update' : 'Share';
+      titleEl.textContent = isUpdate ? t('shareModal.titleUpdate') : t('shareModal.title');
+      confirmBtn.textContent = isUpdate ? t('shareModal.update') : t('shareModal.share');
       noteField.style.display = isUpdate ? '' : 'none';
       input.value = '';
       tagInput.value = '';
@@ -489,10 +493,10 @@ const Recipe = {
 
     if (remixes.length) {
       html += `<div>
-        <h3 class="text-sm font-semibold mb-2">⑂ ${remixes.length} remix${remixes.length === 1 ? '' : 'es'}</h3>
+        <h3 class="text-sm font-semibold mb-2">${tn('social.remixes', remixes.length)}</h3>
         <div class="space-y-1">`;
       remixes.slice(0, 10).forEach((r) => {
-        html += `<p class="text-sm text-zinc-500 dark:text-zinc-400">${this.escapeHtml(r.title || 'Untitled')} <span class="text-zinc-400 dark:text-zinc-500">by ${this.escapeHtml(r.username)}</span>${r.share_slug ? ` · <a class="text-blue-500 hover:text-blue-400" href="/r/${this.escapeHtml(r.share_slug)}" target="_blank" rel="noopener">view</a>` : ''}</p>`;
+        html += `<p class="text-sm text-zinc-500 dark:text-zinc-400">${this.escapeHtml(r.title || t('common.untitled'))} <span class="text-zinc-400 dark:text-zinc-500">${t('card.by', { name: this.escapeHtml(r.username) })}</span>${r.share_slug ? ` · <a class="text-blue-500 hover:text-blue-400" href="/r/${this.escapeHtml(r.share_slug)}" target="_blank" rel="noopener">${t('social.viewLink')}</a>` : ''}</p>`;
       });
       html += '</div></div>';
     }
@@ -500,7 +504,7 @@ const Recipe = {
     const notes = madeIt.filter((m) => m.note);
     if (madeCount) {
       html += `<div>
-        <h3 class="text-sm font-semibold mb-2">☑ Made it (${madeCount})</h3>`;
+        <h3 class="text-sm font-semibold mb-2">${t('social.madeIt', { n: madeCount })}</h3>`;
       if (notes.length) {
         html += '<div class="space-y-2">';
         notes.slice(0, 10).forEach((m) => {
@@ -511,20 +515,20 @@ const Recipe = {
         });
         html += '</div>';
       } else if (madeIt.length) {
-        html += `<p class="text-xs text-zinc-400 dark:text-zinc-500">${madeIt.map((m) => this.escapeHtml(m.username)).slice(0, 8).join(', ')} cooked this.</p>`;
+        html += `<p class="text-xs text-zinc-400 dark:text-zinc-500">${t('social.cookedThis', { names: madeIt.map((m) => this.escapeHtml(m.username)).slice(0, 8).join(', ') })}</p>`;
       }
       html += '</div>';
     }
 
     const commentEntry = App.isAnonymous
-      ? `<button id="comment-signin" class="w-full px-4 py-2 text-sm rounded-lg bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 text-left transition-colors mt-2">Sign in to comment…</button>`
+      ? `<button id="comment-signin" class="w-full px-4 py-2 text-sm rounded-lg bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 text-left transition-colors mt-2">${t('social.signInToComment')}</button>`
       : `<form id="comment-form" class="flex gap-2 mt-2">
-        <input id="comment-input" type="text" maxlength="1000" placeholder="Add a comment…"
+        <input id="comment-input" type="text" maxlength="1000" placeholder="${this.escapeHtml(t('social.addComment'))}"
           class="flex-1 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <button type="submit" class="px-4 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors shrink-0">Post</button>
+        <button type="submit" class="px-4 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors shrink-0">${t('common.post')}</button>
       </form>`;
     html += `<div>
-      <h3 class="text-sm font-semibold mb-2">Comments (${comments.filter((c) => !c.deleted).length})</h3>
+      <h3 class="text-sm font-semibold mb-2">${t('social.comments', { n: comments.filter((c) => !c.deleted).length })}</h3>
       <div id="comments-list" class="space-y-2"></div>
       ${commentEntry}
     </div>`;
@@ -535,13 +539,16 @@ const Recipe = {
     const list = container.querySelector('#comments-list');
     const isRecipeOwner = App.viewingShared?.is_mine;
     if (!comments.length) {
-      list.innerHTML = '<p class="text-xs text-zinc-400 dark:text-zinc-500">No comments yet.</p>';
+      const p = document.createElement('p');
+      p.className = 'text-xs text-zinc-400 dark:text-zinc-500';
+      p.textContent = t('social.noComments');
+      list.appendChild(p);
     }
     comments.forEach((c) => {
       const row = document.createElement('div');
       row.className = 'p-3 rounded-lg bg-zinc-100/70 dark:bg-zinc-900/50 text-sm flex items-start justify-between gap-2';
       if (c.deleted) {
-        row.innerHTML = '<p class="text-xs italic text-zinc-400 dark:text-zinc-600">comment deleted</p>';
+        row.innerHTML = `<p class="text-xs italic text-zinc-400 dark:text-zinc-600">${t('social.commentDeleted')}</p>`;
       } else {
         row.innerHTML = `<div class="min-w-0">
           <span class="font-medium">${this.escapeHtml(c.username)}</span>
@@ -550,7 +557,7 @@ const Recipe = {
         if (c.is_mine || isRecipeOwner) {
           const del = document.createElement('button');
           del.className = 'text-xs text-zinc-400 hover:text-red-500 transition-colors shrink-0';
-          del.textContent = 'Delete';
+          del.textContent = t('common.delete');
           del.addEventListener('click', async () => {
             await fetch(`/api/comments/${c.id}`, { method: 'DELETE' }).catch(() => {});
             this.loadSocialSection(sharedId);
@@ -576,7 +583,7 @@ const Recipe = {
     });
 
     container.querySelector('#comment-signin')?.addEventListener('click', () => {
-      App.promptSignIn('Sign in to comment on recipes');
+      App.promptSignIn(t('signin.comment'));
     });
   },
 
@@ -588,7 +595,7 @@ const Recipe = {
     const modal = document.getElementById('version-history-modal');
     const list = document.getElementById('version-history-list');
     if (!modal || !list) return;
-    list.innerHTML = '<p class="text-sm text-zinc-400 dark:text-zinc-500">Loading…</p>';
+    list.innerHTML = `<p class="text-sm text-zinc-400 dark:text-zinc-500">${t('common.loading')}</p>`;
     modal.classList.remove('hidden');
 
     try {
@@ -602,19 +609,19 @@ const Recipe = {
         const isCurrent = v.version === vs.current_version;
         const row = document.createElement('div');
         row.className = 'flex items-start justify-between gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50';
-        const date = v.created_at ? new Date(v.created_at).toLocaleDateString() : '';
+        const date = v.created_at ? new Date(v.created_at).toLocaleDateString(I18N.lang) : '';
         row.innerHTML = `
           <div class="min-w-0">
-            <p class="text-sm font-medium">v${v.version}${isCurrent ? ' <span class="text-xs font-normal text-blue-500">current</span>' : ''}</p>
-            <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">by ${this.escapeHtml(v.username)}${date ? ` · ${date}` : ''}</p>
+            <p class="text-sm font-medium">v${v.version}${isCurrent ? ` <span class="text-xs font-normal text-blue-500">${t('version.current')}</span>` : ''}</p>
+            <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${t('card.by', { name: this.escapeHtml(v.username) })}${date ? ` · ${date}` : ''}</p>
             ${v.note ? `<p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">${this.escapeHtml(v.note)}</p>` : ''}
           </div>
-          <button class="version-view-btn shrink-0 px-3 py-1.5 text-xs rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors">View</button>`;
+          <button class="version-view-btn shrink-0 px-3 py-1.5 text-xs rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors">${t('version.view')}</button>`;
         row.querySelector('.version-view-btn').addEventListener('click', () => this.viewVersion(v));
         list.appendChild(row);
       });
     } catch {
-      list.innerHTML = '<p class="text-sm text-red-500">Could not load version history</p>';
+      list.innerHTML = `<p class="text-sm text-red-500">${t('version.loadFailed')}</p>`;
     }
   },
 
@@ -664,12 +671,12 @@ const Recipe = {
           }),
         });
         if (!res.ok) throw new Error('share failed');
-        if (btn) btn.textContent = 'Shared!';
+        if (btn) btn.textContent = t('recipe.sharedBang');
         if (App.currentRecipe) App.currentRecipe.tags = result.tags;
         if (typeof Store !== 'undefined') await Store.refresh();
         setTimeout(() => this.display(App.currentRecipe), 800);
       } catch {
-        if (btn) btn.textContent = 'Share failed';
+        if (btn) btn.textContent = t('recipe.shareFailed');
       }
     });
 
@@ -678,7 +685,7 @@ const Recipe = {
     });
 
     display.querySelector('#add-collection-btn')?.addEventListener('click', () => {
-      if (App.isAnonymous) return App.promptSignIn('Sign in to save recipes to your box');
+      if (App.isAnonymous) return App.promptSignIn(t('signin.saveBox'));
       if (typeof Home === 'undefined') return;
       const target = App.currentConversationId
         ? { conversationId: App.currentConversationId }
@@ -692,7 +699,7 @@ const Recipe = {
     });
 
     display.querySelector('#fork-btn')?.addEventListener('click', () => {
-      if (App.isAnonymous) return App.promptSignIn('Sign in to fork and remix recipes');
+      if (App.isAnonymous) return App.promptSignIn(t('signin.fork'));
       if (typeof Store === 'undefined') return;
       const vs = App.viewingShared;
       Store.forkRecipe(App.currentRecipe, vs && !vs.is_mine ? {
@@ -815,14 +822,14 @@ const Recipe = {
     display.querySelectorAll('.ing-remove').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
-        this.appendToChatInput(`Remove ${btn.dataset.name} from the recipe`);
+        this.appendToChatInput(t('chat.removeIngredient', { name: btn.dataset.name }));
       });
     });
 
     display.querySelectorAll('.ing-swap').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
-        this.appendToChatInput(`Find a substitute for ${btn.dataset.name}`);
+        this.appendToChatInput(t('chat.substituteIngredient', { name: btn.dataset.name }));
       });
     });
   },
@@ -849,10 +856,10 @@ const Recipe = {
     let html = `
       <div class="space-y-4">
         <div class="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-          <span class="text-sm font-medium text-yellow-800 dark:text-yellow-200">Recipe modified</span>
+          <span class="text-sm font-medium text-yellow-800 dark:text-yellow-200">${t('diff.modified')}</span>
           <div class="flex gap-2">
-            <button id="diff-accept" class="px-3 py-1 text-sm rounded-lg bg-green-600 hover:bg-green-500 text-white transition-colors">Accept</button>
-            <button id="diff-reject" class="px-3 py-1 text-sm rounded-lg bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors">Reject</button>
+            <button id="diff-accept" class="px-3 py-1 text-sm rounded-lg bg-green-600 hover:bg-green-500 text-white transition-colors">${t('diff.accept')}</button>
+            <button id="diff-reject" class="px-3 py-1 text-sm rounded-lg bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors">${t('diff.reject')}</button>
           </div>
         </div>
     `;
@@ -883,21 +890,21 @@ const Recipe = {
       if (!oldStep) {
         const newTitle = newStep.title ? `: ${this.escapeHtml(newStep.title)}` : '';
         html += `<div class="border-l-2 border-green-500 pl-4 diff-added">
-          <div class="text-xs text-zinc-500 mb-1">+ Step ${i + 1}${newTitle}</div>
+          <div class="text-xs text-zinc-500 mb-1">${t('diff.addedStep', { n: i + 1 })}${newTitle}</div>
           <p class="text-sm">${this.escapeHtml(newStep.description)}</p>
           ${this.renderStepIngredients(newStep, 1, 'diff-added')}
         </div>`;
       } else if (!newStep) {
         const oldTitle = oldStep.title ? `: ${this.escapeHtml(oldStep.title)}` : '';
         html += `<div class="border-l-2 border-red-500 pl-4 diff-removed">
-          <div class="text-xs text-zinc-500 mb-1">- Step ${i + 1}${oldTitle}</div>
+          <div class="text-xs text-zinc-500 mb-1">${t('diff.removedStep', { n: i + 1 })}${oldTitle}</div>
           <p class="text-sm">${this.escapeHtml(oldStep.description)}</p>
         </div>`;
       } else {
         const stepTitle = newStep.title ? `: ${this.escapeHtml(newStep.title)}` : '';
         const changed = oldStep.description !== newStep.description || JSON.stringify(oldStep.ingredients) !== JSON.stringify(newStep.ingredients);
         html += `<div class="border-l-2 ${changed ? 'border-yellow-500' : 'border-zinc-300 dark:border-zinc-700'} pl-4">
-          <div class="text-xs text-zinc-500 mb-1">Step ${i + 1}${stepTitle}</div>`;
+          <div class="text-xs text-zinc-500 mb-1">${t('recipe.step', { n: i + 1 })}${stepTitle}</div>`;
 
         if (oldStep.description !== newStep.description) {
           html += `<p class="text-sm"><span class="diff-removed">${this.escapeHtml(oldStep.description)}</span></p>
@@ -993,18 +1000,24 @@ const Recipe = {
       carbs_g: (baseMacros.carbs_g / servings) * this.servingScale,
       fat_g: (baseMacros.fat_g / servings) * this.servingScale,
     };
+    const md = this._buildMarkdown(recipe, servings, scale, macros);
+    this.downloadFile(`${recipe.title}.md`, md, 'text/markdown');
+  },
+
+  // Shared markdown builder for download + copy (localized section labels).
+  _buildMarkdown(recipe, servings, scale, macros) {
     let md = `# ${recipe.title}\n\n`;
     if (recipe.description) md += `${recipe.description}\n\n`;
-    md += `**Servings:** ${servings}`;
-    if (recipe.prep_time) md += ` | **Prep:** ${recipe.prep_time}`;
-    if (recipe.cook_time) md += ` | **Cook:** ${recipe.cook_time}`;
+    md += `**${t('export.servings')}:** ${servings}`;
+    if (recipe.prep_time) md += ` | **${t('export.prep')}:** ${recipe.prep_time}`;
+    if (recipe.cook_time) md += ` | **${t('export.cook')}:** ${recipe.cook_time}`;
     md += `\n\n`;
-    md += `**Macros per serving:** ${Math.round(macros.calories)} cal | ${Math.round(macros.protein_g)}g protein | ${Math.round(macros.carbs_g)}g carbs | ${Math.round(macros.fat_g)}g fat\n\n`;
+    md += `**${t('export.macros')}:** ${Math.round(macros.calories)} cal | ${Math.round(macros.protein_g)}g ${t('export.protein')} | ${Math.round(macros.carbs_g)}g ${t('export.carbs')} | ${Math.round(macros.fat_g)}g ${t('export.fat')}\n\n`;
 
-    md += `## Ingredients\n\n`;
+    md += `## ${t('export.ingredients')}\n\n`;
     recipe.steps.forEach((step, i) => {
       if (!step.ingredients?.length) return;
-      md += `**Step ${i + 1}:**\n`;
+      md += `**${t('export.step', { n: i + 1 })}:**\n`;
       step.ingredients.forEach((ing) => {
         const g = Math.round(ing.grams * scale);
         const vol = this.formatVolume(ing.volume, scale);
@@ -1013,14 +1026,13 @@ const Recipe = {
       md += '\n';
     });
 
-    md += `## Steps\n\n`;
+    md += `## ${t('export.steps')}\n\n`;
     recipe.steps.forEach((step, i) => {
       md += `${i + 1}. ${step.description}\n`;
     });
 
-    if (recipe.notes) md += `\n## Notes\n\n${recipe.notes}\n`;
-
-    this.downloadFile(`${recipe.title}.md`, md, 'text/markdown');
+    if (recipe.notes) md += `\n## ${t('export.notes')}\n\n${recipe.notes}\n`;
+    return md;
   },
 
   exportJSON(recipe) {
@@ -1048,38 +1060,13 @@ const Recipe = {
       carbs_g: (baseMacros.carbs_g / servings) * this.servingScale,
       fat_g: (baseMacros.fat_g / servings) * this.servingScale,
     };
-    let md = `# ${recipe.title}\n\n`;
-    if (recipe.description) md += `${recipe.description}\n\n`;
-    md += `**Servings:** ${servings}`;
-    if (recipe.prep_time) md += ` | **Prep:** ${recipe.prep_time}`;
-    if (recipe.cook_time) md += ` | **Cook:** ${recipe.cook_time}`;
-    md += `\n\n`;
-    md += `**Macros per serving:** ${Math.round(macros.calories)} cal | ${Math.round(macros.protein_g)}g protein | ${Math.round(macros.carbs_g)}g carbs | ${Math.round(macros.fat_g)}g fat\n\n`;
-
-    md += `## Ingredients\n\n`;
-    recipe.steps.forEach((step, i) => {
-      if (!step.ingredients?.length) return;
-      md += `**Step ${i + 1}:**\n`;
-      step.ingredients.forEach((ing) => {
-        const g = Math.round(ing.grams * scale);
-        const vol = this.formatVolume(ing.volume, scale);
-        md += `- ${ing.name} — ${g}g (${vol})\n`;
-      });
-      md += '\n';
-    });
-
-    md += `## Steps\n\n`;
-    recipe.steps.forEach((step, i) => {
-      md += `${i + 1}. ${step.description}\n`;
-    });
-
-    if (recipe.notes) md += `\n## Notes\n\n${recipe.notes}\n`;
+    const md = this._buildMarkdown(recipe, servings, scale, macros);
 
     navigator.clipboard.writeText(md).then(() => {
       const btn = document.getElementById('export-copy-md');
       if (btn) {
-        btn.textContent = 'Copied!';
-        setTimeout(() => { btn.textContent = 'Copy Markdown'; }, 1500);
+        btn.textContent = t('common.copied');
+        setTimeout(() => { btn.textContent = t('recipe.copyMd'); }, 1500);
       }
     });
   },
@@ -1094,7 +1081,7 @@ const Recipe = {
         const recipe = JSON.parse(e.target.result);
 
         if (!recipe.title || !recipe.steps || !Array.isArray(recipe.steps)) {
-          alert('Invalid recipe file. Must have "title" and "steps".');
+          alert(t('alert.invalidRecipe'));
           return;
         }
 
@@ -1108,9 +1095,9 @@ const Recipe = {
         this._ingredientChecks = {};
         this.display(recipe);
 
-        Chat.appendMessage('assistant', `Imported recipe: **${recipe.title}**`);
+        Chat.appendMessage('assistant', t('chat.importedRecipe', { title: recipe.title }));
       } catch (err) {
-        alert('Could not parse JSON file: ' + err.message);
+        alert(t('alert.parseError', { msg: err.message }));
       }
 
       event.target.value = '';
@@ -1131,10 +1118,10 @@ const Recipe = {
     let html = `
       <details class="rounded-xl bg-zinc-100/70 dark:bg-zinc-900/50">
         <summary class="px-4 py-2.5 cursor-pointer text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors flex items-center justify-between gap-2">
-          <span class="flex items-center gap-1.5"><span class="summary-chevron text-[0.6rem]">▶</span>All Ingredients (${totalIngredients})</span>
+          <span class="flex items-center gap-1.5"><span class="summary-chevron text-[0.6rem]">▶</span>${t('recipe.allIngredients', { n: totalIngredients })}</span>
           <label class="ing-macros-summary-toggle flex items-center gap-1.5 cursor-pointer text-xs text-zinc-400 dark:text-zinc-500 select-none">
             <input type="checkbox" id="ing-macros-toggle" class="ingredient-check" ${showMacros ? 'checked' : ''}>
-            Macros per serving
+            ${t('recipe.macrosPerServing')}
           </label>
         </summary>
         <div class="summary-grid px-4 pb-4 pt-2 ${showMacros ? 'show-macros' : ''}">
@@ -1164,7 +1151,9 @@ const Recipe = {
 
     recipe.steps.forEach((step, i) => {
       if (!step.ingredients?.length) return;
-      const stepLabel = step.title ? `Step ${i + 1}: ${this.escapeHtml(step.title)}` : `Step ${i + 1}`;
+      const stepLabel = step.title
+        ? t('recipe.stepTitled', { n: i + 1, title: this.escapeHtml(step.title) })
+        : t('recipe.step', { n: i + 1 });
       html += `<div class="text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider summary-grid-header">${stepLabel}</div>`;
       step.ingredients.forEach((ing) => {
         const g = Math.round(ing.grams * scale);
@@ -1188,14 +1177,14 @@ const Recipe = {
           <div class="summary-grid-row contents">
             <label class="ingredient-label flex items-center gap-2 py-0.5 cursor-pointer">
               <input type="checkbox" class="ingredient-check" data-key="${this.escapeHtml(key)}">
-              <span class="ing-name text-sm">${escapedName}${fromStep ? ' <span class="text-zinc-400 dark:text-zinc-600 text-xs italic">(prev step)</span>' : ''}</span>
+              <span class="ing-name text-sm">${escapedName}${fromStep ? ` <span class="text-zinc-400 dark:text-zinc-600 text-xs italic">${t('recipe.prevStep')}</span>` : ''}</span>
             </label>
             <span class="ing-amt text-zinc-400 dark:text-zinc-500 tabular-nums text-xs py-0.5">${g}g${vol ? ` · ${vol}` : ''}</span>
             <span class="ing-actions flex items-center gap-0.5 py-0.5">
-              <button class="ing-remove p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-zinc-300 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 transition-colors" data-name="${escapedName}" title="Remove ingredient">
+              <button class="ing-remove p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-zinc-300 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 transition-colors" data-name="${escapedName}" title="${this.escapeHtml(t('recipe.removeIngredient'))}">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="-2 -2 28 28"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
-              <button class="ing-swap p-1 rounded hover:bg-yellow-100 dark:hover:bg-yellow-900/30 text-zinc-300 dark:text-zinc-600 hover:text-yellow-500 dark:hover:text-yellow-400 transition-colors" data-name="${escapedName}" title="Substitute ingredient">
+              <button class="ing-swap p-1 rounded hover:bg-yellow-100 dark:hover:bg-yellow-900/30 text-zinc-300 dark:text-zinc-600 hover:text-yellow-500 dark:hover:text-yellow-400 transition-colors" data-name="${escapedName}" title="${this.escapeHtml(t('recipe.substituteIngredient'))}">
                 <svg class="w-3.5 h-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="-1 -1 26 26"><path d="M21.5 2v6h-6M2.5 22v-6h6M21.5 8A10 10 0 0 0 3.2 5.3L2.5 6M2.5 16a10 10 0 0 0 18.3 2.7l.7-.7"/></svg>
               </button>
             </span>

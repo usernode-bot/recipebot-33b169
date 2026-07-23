@@ -25,6 +25,44 @@ window.App = {
   },
 };
 
+// Activate the best-guess language before anything renders (i18n.js and the
+// locale dictionaries load before this file — see index.html). The platform
+// locale is resolved asynchronously right after (applyPlatformLocale).
+if (typeof I18N !== 'undefined') {
+  I18N.init();
+}
+
+// The UI language follows the platform-level user preference (Settings →
+// Language on the Usernode shell) — there is no in-app picker. Resolution
+// order: platform locale → browser language → English.
+async function applyPlatformLocale() {
+  let locale = null;
+  if (typeof usernode !== 'undefined' && usernode.getUserLocale) {
+    try {
+      ({ locale } = await usernode.getUserLocale());
+    } catch { /* no platform shell — fall through to navigator */ }
+  }
+  const code = I18N.resolve(locale) || I18N.resolve(navigator.language) || 'en';
+  if (code !== I18N.lang) I18N.set(code);
+}
+
+// Live updates when the user changes the platform setting mid-session.
+window.addEventListener('usernode:locale-changed', (e) => {
+  const code = I18N.resolve(e.detail && e.detail.locale) ||
+    I18N.resolve(navigator.language) || 'en';
+  if (code !== I18N.lang) I18N.set(code);
+});
+
+// Re-render dynamic views when the language changes. Static markup is
+// re-applied by I18N.set itself; this covers JS-built content.
+document.addEventListener('i18n:change', () => {
+  if (App.currentView === 'home' && typeof Home !== 'undefined') Home.render();
+  if (typeof Recipe !== 'undefined' && App.currentRecipe && !Recipe.diffMode &&
+      App.currentView !== 'home' && !App.pendingRecipe) {
+    Recipe.display(App.currentRecipe);
+  }
+});
+
 // Toggle between the homepage feed and the chat + recipe layout.
 App.showView = function (view) {
   App.currentView = view;
@@ -54,7 +92,7 @@ App.promptSignIn = function (reason) {
   const modal = document.getElementById('sign-in-modal');
   if (!modal) return;
   const reasonEl = document.getElementById('sign-in-reason');
-  if (reasonEl) reasonEl.textContent = reason || 'Sign in to do this';
+  if (reasonEl) reasonEl.textContent = reason || t('signin.title');
   modal.classList.remove('hidden');
   const close = () => {
     modal.classList.add('hidden');
@@ -146,7 +184,8 @@ window.HashParams = {
         const sendBtn = document.getElementById('send-btn');
         if (input) {
           input.disabled = true;
-          input.placeholder = 'AI is unavailable in this environment (staging previews have no AI access).';
+          input.placeholder = t('chat.aiUnavailablePlaceholder');
+          input.dataset.i18nPlaceholder = 'chat.aiUnavailablePlaceholder';
         }
         if (sendBtn) sendBtn.disabled = true;
       }
@@ -166,10 +205,15 @@ window.HashParams = {
     const sendBtn = document.getElementById('send-btn');
     if (input) {
       input.disabled = true;
-      input.placeholder = 'Sign in to cook with the AI.';
+      input.placeholder = t('chat.signInPlaceholder');
+      input.dataset.i18nPlaceholder = 'chat.signInPlaceholder';
     }
     if (sendBtn) sendBtn.disabled = true;
   }
+
+  // Resolve the platform-level language preference (async; corrects the
+  // boot-time guess). Not awaited — the UI re-applies when it lands.
+  applyPlatformLocale();
 
   setupMobileTabs();
   setupPreferences();
@@ -195,7 +239,7 @@ window.HashParams = {
     App.showView('home');
     if (joinToken) {
       HashParams.set('join', null);
-      App.promptSignIn('Sign in to join this cookbook');
+      App.promptSignIn(t('signin.joinCookbook'));
     }
   } else if (joinToken && typeof Home !== 'undefined') {
     App.showView('home');
@@ -304,7 +348,7 @@ function setupPreferences() {
 
 function setupNewConversation() {
   document.getElementById('new-conversation-btn').addEventListener('click', () => {
-    if (App.isAnonymous) return App.promptSignIn('Sign in to create recipes with the AI');
+    if (App.isAnonymous) return App.promptSignIn(t('signin.createRecipes'));
     App.currentConversationId = null;
     App.currentRecipe = null;
     App.pendingRecipe = null;
@@ -327,7 +371,6 @@ function setupDarkMode() {
   const toggle = document.getElementById('dark-mode-toggle');
   const media = window.matchMedia('(prefers-color-scheme: dark)');
   const ORDER = ['system', 'light', 'dark'];
-  const LABELS = { system: 'System', light: 'Light', dark: 'Dark' };
 
   const getMode = () =>
     ORDER.includes(localStorage.theme) ? localStorage.theme : 'system';
@@ -336,7 +379,7 @@ function setupDarkMode() {
     const mode = getMode();
     const dark = mode === 'dark' || (mode === 'system' && media.matches);
     document.documentElement.classList.toggle('dark', dark);
-    toggle.title = `Theme: ${LABELS[mode]}`;
+    toggle.title = t('theme.label', { mode: t(`theme.${mode}`) });
     for (const m of ORDER) {
       const icon = document.getElementById(m === 'system' ? 'icon-system' : m === 'light' ? 'icon-sun' : 'icon-moon');
       if (icon) icon.classList.toggle('hidden', m !== mode);
@@ -352,6 +395,9 @@ function setupDarkMode() {
   media.addEventListener('change', () => {
     if (getMode() === 'system') apply();
   });
+
+  // Keep the tooltip in the active language.
+  document.addEventListener('i18n:change', apply);
 
   apply();
 }
