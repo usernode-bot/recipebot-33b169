@@ -91,31 +91,78 @@
     })();
   </script>
   <script src="https://social-vibecoding.usernodelabs.org/usernode-bridge/v1/bridge.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = {
     darkMode: 'class',
     theme: {
       extend: {
+        fontFamily: {
+          sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          serif: ['Fraunces', 'Georgia', 'serif'],
+        },
         colors: {
+          // Warm-paper editorial palette. The light half of the scale is
+          // paper (page #FAF6EE, panels #F3EDDF, hairlines #E7DFCC); the
+          // dark half is the same ink the text is set in (#1F2B47), so
+          // dark mode reads as "ink paper at night".
           zinc: {
-            50:  '#f6f6fb',
-            100: '#eeeef6',
-            200: '#d4d4e4',
-            300: '#b0b0c8',
-            400: '#9898b0',
-            500: '#6e6e8a',
-            600: '#4e4e6a',
-            700: '#484870',
-            800: '#2e2e50',
-            900: '#1a1a30',
-            950: '#08080f',
+            50:  '#FAF6EE',
+            100: '#F3EDDF',
+            200: '#E7DFCC',
+            300: '#D8CDB0',
+            400: '#8B90A2',
+            500: '#5A6378',
+            600: '#454D66',
+            700: '#333B54',
+            800: '#28304B',
+            900: '#1F2B47',
+            950: '#141A2B',
           },
+          // Paprika accent for primary actions and links.
           blue: {
-            400: '#00c8ff',
-            500: '#00b8ee',
-            600: '#0090cc',
-            700: '#0070a0',
+            50:  '#FBEFE4',
+            100: '#F7E3D0',
+            200: '#F3DCC6',
+            300: '#F0B48A',
+            400: '#E8935B',
+            500: '#E07A3F',
+            600: '#b85a24',
+            700: '#96461A',
+            800: '#6B3413',
+            900: '#4A2A15',
+            950: '#38200F',
           },
+          // Brass — kickers, badges, stars.
+          brass: { 400: '#D3B33E', 500: '#C9A227', 600: '#A8861D' },
+          amber: { 50: '#FBF4DC', 400: '#D3B33E', 500: '#C9A227', 600: '#A8861D', 950: '#3A300A' },
+          teal:  { 400: '#D3B33E', 500: '#C9A227', 600: '#A8861D' },
+          yellow: {
+            50:  '#FBF4DC',
+            100: '#F5EBC8',
+            200: '#EFE1B3',
+            400: '#C9A227',
+            500: '#C9A227',
+            600: '#A8861D',
+            800: '#6B5A12',
+            900: '#4A3D0E',
+          },
+          // Warm olive success family (made-it, timers, diff-added blocks).
+          green: {
+            50:  '#EFF3E1',
+            400: '#94AD52',
+            500: '#7F9147',
+            600: '#5F7A34',
+            950: '#232B14',
+          },
+          // Temperatures render in the paprika family too.
+          orange: { 50: '#FBEFE4', 400: '#E07A3F', 500: '#b85a24', 600: '#96461A', 950: '#38200F' },
+          // Favorited hearts: warm terracotta.
+          pink: { 400: '#D96A4E', 500: '#C9563B' },
+          // Macro pills (fat) — muted plum that sits on paper.
+          violet: { 50: '#F2EDF4', 400: '#9D86B4', 500: '#8A72A3', 600: '#755E8E', 950: '#2A2138' },
         },
       },
     },
@@ -140,7 +187,7 @@
     })();
   </script>
 </head>
-<body class="bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 h-screen overflow-hidden flex flex-col">
+<body class="bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 h-screen overflow-hidden flex flex-col">
 
   <!-- Header -->
   <header class="flex items-center justify-between px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
@@ -223,7 +270,7 @@
   </div>
 
   <!-- Persistent timer bar (visible when cook mode timers are running outside overlay) -->
-  <div id="timer-bar" class="hidden items-center gap-2 px-4 py-1.5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 shrink-0 flex-wrap">
+  <div id="timer-bar" class="hidden items-center gap-2 px-4 py-1.5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/50 shrink-0 flex-wrap">
     <span class="text-xs text-zinc-400 dark:text-zinc-500">Timers</span>
     <div id="timer-bar-items" class="flex flex-wrap gap-2"></div>
     <button id="timer-bar-resume" class="text-xs text-blue-500 hover:text-blue-400 ml-auto">Resume cooking</button>
@@ -417,7 +464,7 @@
   <!-- Publish / update shared copy: creator tags + optional update note -->
   <div id="share-note-modal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center">
     <div class="absolute inset-0 bg-black/50" id="share-note-backdrop"></div>
-    <div class="relative bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl">
+    <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl">
       <div class="flex items-center justify-between mb-3">
         <h3 id="share-note-title" class="text-base font-semibold">Share to the community feed</h3>
         <button id="share-note-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>
@@ -441,7 +488,7 @@
   <!-- "Made it" dialog: optional note -->
   <div id="made-it-modal" class="hidden fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
     <div class="absolute inset-0 bg-black/50" id="made-it-backdrop"></div>
-    <div class="relative bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl">
+    <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl">
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-base font-semibold">You made it! 🎉</h3>
         <button id="made-it-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>
@@ -459,7 +506,7 @@
   <!-- Add-to-collection picker -->
   <div id="collection-pick-modal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center">
     <div class="absolute inset-0 bg-black/50" id="collection-pick-backdrop"></div>
-    <div class="relative bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl max-h-[80vh] flex flex-col">
+    <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl max-h-[80vh] flex flex-col">
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-base font-semibold">Add to collection</h3>
         <button id="collection-pick-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>
@@ -476,7 +523,7 @@
   <!-- New collection / cookbook dialog -->
   <div id="new-collection-modal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center">
     <div class="absolute inset-0 bg-black/50" id="new-collection-backdrop"></div>
-    <div class="relative bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl">
+    <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl">
       <div class="flex items-center justify-between mb-3">
         <h3 id="new-collection-title" class="text-base font-semibold">New collection</h3>
         <button id="new-collection-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>
@@ -495,7 +542,7 @@
   <!-- Shared recipe version history modal -->
   <div id="version-history-modal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center">
     <div class="absolute inset-0 bg-black/50" id="version-history-backdrop"></div>
-    <div class="relative bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl max-h-[80vh] flex flex-col">
+    <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl max-h-[80vh] flex flex-col">
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-base font-semibold">Version history</h3>
         <button id="version-history-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>
@@ -507,7 +554,7 @@
   <!-- App settings modal (opened from the user menu) -->
   <div id="settings-modal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center">
     <div class="absolute inset-0 bg-black/50" id="settings-backdrop"></div>
-    <div class="relative bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl">
+    <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-base font-semibold">App Settings</h3>
         <button id="settings-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>

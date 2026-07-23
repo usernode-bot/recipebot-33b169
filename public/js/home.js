@@ -168,9 +168,19 @@ const Home = {
     });
   },
 
+  // Editorial "newspaper clipping": white card on the paper page, hairline
+  // border, tight radius, whisper of a shadow. A brass kicker (below) names
+  // what kind of clipping it is.
   _cardShell() {
     const el = document.createElement('div');
-    el.className = 'rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4 flex flex-col gap-2';
+    el.className = 'rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4 flex flex-col gap-2 shadow-[0_1px_3px_rgba(31,43,71,0.06)]';
+    return el;
+  },
+
+  _kicker(text) {
+    const el = document.createElement('p');
+    el.className = 'kicker';
+    el.textContent = text;
     return el;
   },
 
@@ -229,6 +239,7 @@ const Home = {
   ownCard(r) {
     const recipe = r.data || {};
     const el = this._cardShell();
+    el.appendChild(this._kicker('Your recipe'));
 
     const madeBit = r.made_count > 0 ? ` · made ${r.made_count}×` : '';
     const remixBit = r.forked_from_username
@@ -292,6 +303,7 @@ const Home = {
   // Card for one of the requester's conversations that has no recipe yet.
   conversationCard(c) {
     const el = this._cardShell();
+    el.appendChild(this._kicker('Conversation'));
 
     const head = document.createElement('div');
     head.className = 'flex items-start justify-between gap-2';
@@ -322,6 +334,7 @@ const Home = {
   sharedCard(s, opts) {
     const recipe = s.data || {};
     const el = this._cardShell();
+    el.appendChild(this._kicker(s.forked_from_username ? 'Remix' : 'Community recipe'));
 
     const remixBit = s.forked_from_username
       ? ` · ⑂ remixed from ${this.esc(s.forked_from_username)}` : '';
@@ -436,17 +449,16 @@ const Home = {
 
   collectionCard(c) {
     const el = this._cardShell();
-    const kindBadge = c.visibility === 'group'
-      ? '<span class="text-teal-500">👥 cookbook</span>'
-      : c.visibility === 'public'
-        ? '<span class="text-blue-400">public</span>'
-        : 'private';
-    el.innerHTML = `
-      <div class="min-w-0">
+    const kind = c.visibility === 'group' ? '👥 Group cookbook'
+      : c.visibility === 'public' ? 'Public collection' : 'Collection';
+    el.appendChild(this._kicker(kind));
+    const meta = document.createElement('div');
+    meta.className = 'min-w-0';
+    meta.innerHTML = `
         <h3 class="font-semibold text-sm truncate">${this.esc(c.name)}</h3>
-        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${kindBadge} · ${c.item_count} recipe${c.item_count === 1 ? '' : 's'}${c.visibility === 'group' ? ` · ${c.member_count} member${c.member_count === 1 ? '' : 's'}` : ''}${c.is_owner ? '' : ` · by ${this.esc(c.username)}`}</p>
-        ${c.description ? `<p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">${this.esc(c.description)}</p>` : ''}
-      </div>`;
+        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${c.item_count} recipe${c.item_count === 1 ? '' : 's'}${c.visibility === 'group' ? ` · ${c.member_count} member${c.member_count === 1 ? '' : 's'}` : ''}${c.is_owner ? '' : ` · by ${this.esc(c.username)}`}</p>
+        ${c.description ? `<p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">${this.esc(c.description)}</p>` : ''}`;
+    el.appendChild(meta);
     const actions = document.createElement('div');
     actions.className = 'flex flex-wrap gap-2 mt-auto pt-1';
     const openBtn = this._actionBtn('Open', true);
@@ -458,7 +470,8 @@ const Home = {
 
   publicCollectionCard(c) {
     const el = this._cardShell();
-    el.innerHTML = `
+    el.appendChild(this._kicker('Community collection'));
+    el.innerHTML += `
       <div class="min-w-0">
         <h3 class="font-semibold text-sm truncate">${this.esc(c.name)}</h3>
         <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">by ${c.is_mine ? 'you' : this.esc(c.username)} · ${c.item_count} recipe${c.item_count === 1 ? '' : 's'}</p>
@@ -598,10 +611,11 @@ const Home = {
   collectionItemCard(c, item) {
     const recipe = item.data || {};
     const el = this._cardShell();
+    el.appendChild(this._kicker(item.snapshot_only ? 'Saved copy' : 'Recipe'));
     const srcBit = item.snapshot_only
       ? '<span class="text-amber-500" title="The original shared recipe was deleted — this is your saved copy">saved copy</span>'
       : item.conversation_id ? 'your recipe' : `by ${this.esc(item.username)}`;
-    el.innerHTML = `
+    el.innerHTML += `
       <div class="min-w-0">
         <h3 class="font-semibold text-sm truncate">${this.esc(recipe.title || item.snapshot_title || 'Untitled')}</h3>
         <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${srcBit} · added by ${this.esc(item.added_by_username)}</p>

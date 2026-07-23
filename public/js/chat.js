@@ -539,7 +539,7 @@ const Chat = {
         const isActive = o.value === selected;
         return `<span class="pref-btn-locked px-2.5 py-1 text-xs rounded-full border ${
           isActive
-            ? 'border-[#00c8ff] bg-[rgba(0,200,255,0.1)] text-[#00c8ff]'
+            ? 'border-[#E07A3F] bg-[rgba(224,122,63,0.1)] text-[#b85a24] dark:text-[#E8935B]'
             : 'border-zinc-200 dark:border-zinc-800 text-zinc-300 dark:text-zinc-600'
         }">${o.label}</span>`;
       }).join('');

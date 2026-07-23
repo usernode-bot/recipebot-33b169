@@ -163,7 +163,7 @@ const Recipe = {
           ${recipe.steps.map((step, i) => this.renderStep(step, i, ingredientScale)).join('')}
         </div>
 
-        ${recipe.notes ? `<div class="mt-3 p-4 bg-zinc-50 dark:bg-zinc-900/50 rounded-xl text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed"><strong class="text-zinc-700 dark:text-zinc-300">Notes:</strong> ${this.renderInline(recipe.notes)}</div>` : ''}
+        ${recipe.notes ? `<div class="mt-3 p-4 bg-zinc-100/70 dark:bg-zinc-900/50 rounded-xl text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed"><strong class="text-zinc-700 dark:text-zinc-300">Notes:</strong> ${this.renderInline(recipe.notes)}</div>` : ''}
 
         <div id="social-section"></div>
       </div>
@@ -483,7 +483,7 @@ const Recipe = {
       if (notes.length) {
         html += '<div class="space-y-2">';
         notes.slice(0, 10).forEach((m) => {
-          html += `<div class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900/50 text-sm">
+          html += `<div class="p-3 rounded-lg bg-zinc-100/70 dark:bg-zinc-900/50 text-sm">
             <span class="font-medium">${this.escapeHtml(m.username)}</span>
             <p class="text-zinc-500 dark:text-zinc-400 mt-0.5">${this.escapeHtml(m.note)}</p>
           </div>`;
@@ -515,7 +515,7 @@ const Recipe = {
     }
     comments.forEach((c) => {
       const row = document.createElement('div');
-      row.className = 'p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900/50 text-sm flex items-start justify-between gap-2';
+      row.className = 'p-3 rounded-lg bg-zinc-100/70 dark:bg-zinc-900/50 text-sm flex items-start justify-between gap-2';
       if (c.deleted) {
         row.innerHTML = '<p class="text-xs italic text-zinc-400 dark:text-zinc-600">comment deleted</p>';
       } else {
@@ -1097,8 +1097,8 @@ const Recipe = {
     // is only visible while the section is expanded (see app.css). Flex on
     // <summary> drops the native disclosure marker, so a chevron stands in.
     let html = `
-      <details class="rounded-xl bg-zinc-50 dark:bg-zinc-900/50">
-        <summary class="px-4 py-2.5 cursor-pointer text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors flex items-center justify-between gap-2">
+      <details class="rounded-xl bg-zinc-100/70 dark:bg-zinc-900/50">
+        <summary class="px-4 py-2.5 cursor-pointer text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors flex items-center justify-between gap-2">
           <span class="flex items-center gap-1.5"><span class="summary-chevron text-[0.6rem]">▶</span>All Ingredients (${totalIngredients})</span>
           <label class="ing-macros-summary-toggle flex items-center gap-1.5 cursor-pointer text-xs text-zinc-400 dark:text-zinc-500 select-none">
             <input type="checkbox" id="ing-macros-toggle" class="ingredient-check" ${showMacros ? 'checked' : ''}>
@@ -1228,7 +1228,7 @@ const Recipe = {
     const titleHtml = step.title ? `<h4 class="text-sm font-semibold mb-1">${this.escapeHtml(step.title)}</h4>` : '';
 
     return `
-      <div class="step-card flex gap-4 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900/50" data-step="${index}">
+      <div class="step-card flex gap-4 p-4 rounded-xl bg-zinc-100/70 dark:bg-zinc-900/50" data-step="${index}">
         <div class="step-number shrink-0 w-8 h-8 rounded-full bg-blue-600 dark:bg-blue-400 text-white dark:text-zinc-950 flex items-center justify-center text-sm font-bold mt-0.5">${index + 1}</div>
         <div class="flex-1 min-w-0">
           ${titleHtml}

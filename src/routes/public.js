@@ -108,11 +108,15 @@ function notFoundPage() {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Recipe not found — RecipeBot</title>
-<style>body{font-family:system-ui;background:#08080f;color:#e4e4e7;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>body{font-family:Inter,system-ui,sans-serif;background:#FAF6EE;color:#1F2B47;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+@media(prefers-color-scheme:dark){body{background:#141A2B;color:#F3EDDF}}</style>
 </head><body><div style="max-width:24rem;padding:2rem;text-align:center">
-<h1 style="font-size:1.25rem;margin:0 0 .5rem">Recipe not found</h1>
-<p style="color:#9898b0;font-size:.9rem;margin:0 0 1.25rem">This recipe may have been unpublished or deleted by its author.</p>
-<a href="${PLATFORM_APP_URL}" style="display:inline-block;padding:.5rem 1rem;background:#0090cc;color:#fff;border-radius:.5rem;text-decoration:none;font-size:.9rem">Open RecipeBot</a>
+<h1 style="font-family:Fraunces,Georgia,serif;font-size:1.35rem;margin:0 0 .5rem">Recipe not found</h1>
+<p style="color:#5A6378;font-size:.9rem;margin:0 0 1.25rem">This recipe may have been unpublished or deleted by its author.</p>
+<a href="${PLATFORM_APP_URL}" style="display:inline-block;padding:.5rem 1rem;background:#b85a24;color:#fff;border-radius:.6rem;text-decoration:none;font-size:.9rem">Open RecipeBot</a>
 </div></body></html>`;
 }
 
@@ -143,59 +147,74 @@ function recipePage(data, pageUrl) {
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="${esc(title)}">
 <meta name="twitter:description" content="${esc(description)}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root{color-scheme:light dark}
+  /* Warm-paper editorial palette; dark mode is the same ink at night. */
+  :root{color-scheme:light dark;
+    --page:#FAF6EE;--panel:#F3EDDF;--card:#FFFFFF;--ink:#1F2B47;--soft:#5A6378;
+    --hairline:#E7DFCC;--brass:#C9A227;--paprika:#E07A3F;--paprika-deep:#b85a24}
+  @media(prefers-color-scheme:dark){:root{
+    --page:#141A2B;--panel:#1F2B47;--card:#1F2B47;--ink:#F3EDDF;--soft:#A5ABBE;
+    --hairline:#333B54}}
   *{box-sizing:border-box}
-  body{font-family:system-ui,-apple-system,sans-serif;margin:0;background:#fff;color:#1a1a30;line-height:1.55}
-  @media(prefers-color-scheme:dark){body{background:#08080f;color:#eeeef6}}
+  body{font-family:Inter,system-ui,-apple-system,sans-serif;margin:0;background:var(--page);color:var(--ink);line-height:1.55}
   .wrap{max-width:680px;margin:0 auto;padding:24px 20px 80px}
-  a{color:#0090cc;text-decoration:none}
+  a{color:var(--paprika-deep);text-decoration:none}
+  @media(prefers-color-scheme:dark){a{color:var(--paprika)}}
   a:hover{text-decoration:underline}
-  .brand{font-size:13px;color:#6e6e8a;display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
-  h1{font-size:28px;margin:0 0 4px;letter-spacing:-.02em}
-  .byline{font-size:14px;color:#6e6e8a;margin:0 0 4px}
-  .lineage{font-size:13px;color:#6e6e8a;margin:0 0 8px}
-  .desc{color:#4e4e6a;font-size:15px;margin:8px 0}
-  @media(prefers-color-scheme:dark){.desc{color:#b0b0c8}}
+  .brand{font-size:13px;color:var(--soft);display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid var(--ink)}
+  .brand b{font-family:Fraunces,Georgia,serif;color:var(--ink)}
+  .kicker{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--brass);margin:0 0 6px}
+  h1{font-family:Fraunces,Georgia,serif;font-size:32px;font-weight:900;margin:0 0 4px;letter-spacing:-.01em}
+  .byline{font-size:14px;color:var(--soft);margin:0 0 4px}
+  .lineage{font-size:13px;color:var(--soft);margin:0 0 8px}
+  .desc{color:var(--soft);font-size:15px;margin:8px 0}
   .tags{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
-  .tag{font-size:12px;padding:2px 10px;border-radius:99px;background:rgba(0,144,204,.12);color:#0090cc}
-  .metaline{display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:14px;color:#6e6e8a;margin:14px 0}
-  .servings{display:inline-flex;align-items:center;gap:6px;background:rgba(110,110,138,.12);border-radius:10px;padding:2px 6px}
+  .tag{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:3px 10px;border-radius:99px;border:1px solid var(--brass);color:var(--brass)}
+  .metaline{display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:14px;color:var(--soft);margin:14px 0}
+  .servings{display:inline-flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--hairline);border-radius:10px;padding:2px 6px}
   .servings button{width:26px;height:26px;border:none;background:none;color:inherit;font-size:16px;cursor:pointer;border-radius:6px}
-  .servings button:hover{background:rgba(110,110,138,.18)}
+  .servings button:hover{background:var(--hairline)}
   #servings-n{font-weight:600;min-width:20px;text-align:center}
   .cta{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}
-  .btn{display:inline-block;padding:10px 16px;border-radius:12px;font-size:14px;font-weight:500;cursor:pointer;border:none}
-  .btn-primary{background:#0090cc;color:#fff}
-  .btn-secondary{background:rgba(110,110,138,.14);color:inherit}
-  h2{font-size:18px;margin:28px 0 10px}
-  .step{display:flex;gap:14px;padding:14px;border-radius:14px;background:rgba(110,110,138,.08);margin:10px 0}
-  .stepnum{flex:none;width:28px;height:28px;border-radius:50%;background:#0090cc;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
-  .steptitle{font-weight:600;font-size:14px;margin:2px 0 4px}
+  .btn{display:inline-block;padding:10px 16px;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer;border:none}
+  .btn-primary{background:var(--paprika-deep);color:#fff}
+  .btn-primary:hover{background:var(--paprika)}
+  .btn-secondary{background:var(--panel);border:1px solid var(--hairline);color:var(--ink)}
+  h2{font-family:Fraunces,Georgia,serif;font-size:19px;font-weight:700;margin:28px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--hairline)}
+  .step{display:flex;gap:14px;padding:14px;border-radius:8px;background:var(--card);border:1px solid var(--hairline);box-shadow:0 1px 3px rgba(31,43,71,.06);margin:10px 0}
+  .stepnum{flex:none;width:28px;height:28px;border-radius:50%;background:var(--paprika-deep);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+  .steptitle{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:15px;margin:2px 0 4px}
   .stepdesc{font-size:14px;margin:0}
-  .ings{margin:8px 0 0;padding-left:10px;border-left:2px solid rgba(110,110,138,.25);font-size:13px;color:#6e6e8a}
+  .ings{margin:8px 0 0;padding-left:10px;border-left:2px solid var(--hairline);font-size:13px;color:var(--soft)}
   .ings div{display:flex;justify-content:space-between;gap:10px;padding:1px 0}
-  .social{font-size:13px;color:#6e6e8a}
-  .note,.comment{padding:10px 12px;border-radius:10px;background:rgba(110,110,138,.08);margin:8px 0;font-size:14px}
+  .social{font-size:13px;color:var(--soft)}
+  .temp{color:var(--paprika-deep)!important}
+  .note,.comment{padding:10px 12px;border-radius:8px;background:var(--card);border:1px solid var(--hairline);margin:8px 0;font-size:14px}
   .note b,.comment b{font-size:13px}
-  .note p,.comment p{margin:2px 0 0}
-  .foot{margin-top:36px;padding-top:16px;border-top:1px solid rgba(110,110,138,.25);font-size:13px;color:#6e6e8a}
-  /* cook mode overlay */
-  #cook{position:fixed;inset:0;background:#08080f;color:#eeeef6;display:none;flex-direction:column;z-index:50}
+  .note p,.comment p{margin:2px 0 0;color:var(--soft)}
+  .foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--hairline);font-size:13px;color:var(--soft)}
+  /* cook mode overlay — ink at night regardless of scheme */
+  #cook{position:fixed;inset:0;background:#141A2B;color:#F3EDDF;display:none;flex-direction:column;z-index:50}
   #cook.open{display:flex}
-  #cook header{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid #2e2e50}
+  #cook header{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid #333B54}
+  #cook header div{font-family:Fraunces,Georgia,serif}
   #cook-body{flex:1;overflow-y:auto;display:flex;align-items:center;justify-content:center;padding:24px}
   #cook-step{max-width:560px}
   #cook-step .stepdesc{font-size:22px;line-height:1.5;font-weight:300}
-  #cook nav{display:flex;gap:10px;padding:16px 20px;border-top:1px solid #2e2e50}
-  #cook nav button{flex:1;padding:14px;font-size:16px;border-radius:12px;border:none;cursor:pointer;background:#2e2e50;color:#eeeef6}
-  #cook nav button.primary{background:#0090cc;color:#fff}
-  #cook .ings{color:#9898b0}
+  #cook nav{display:flex;gap:10px;padding:16px 20px;border-top:1px solid #333B54}
+  #cook nav button{flex:1;padding:14px;font-size:16px;border-radius:10px;border:none;cursor:pointer;background:#28304B;color:#F3EDDF}
+  #cook nav button.primary{background:var(--paprika-deep);color:#fff}
+  #cook .ings{color:#A5ABBE;border-left-color:#333B54}
+  #cook .btn-secondary{background:#28304B;border:none;color:#F3EDDF}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="brand"><span>🍳 <b>RecipeBot</b></span><a href="${PLATFORM_APP_URL}">Open the app →</a></div>
+  <p class="kicker">Shared recipe</p>
   <h1 id="title"></h1>
   <p class="byline" id="byline"></p>
   <p class="lineage" id="lineage" style="display:none"></p>
@@ -236,7 +255,7 @@ function recipePage(data, pageUrl) {
 <div id="cook">
   <header>
     <div id="cook-title" style="font-weight:600"></div>
-    <button class="btn btn-secondary" id="cook-exit" style="background:#2e2e50;color:#eeeef6">✕ Exit</button>
+    <button class="btn btn-secondary" id="cook-exit">✕ Exit</button>
   </header>
   <div id="cook-body"><div id="cook-step"></div></div>
   <nav>
@@ -367,7 +386,7 @@ var DATA = ${payload};
     }
     document.getElementById('cook-next').style.visibility = '';
     var step = steps[cookIdx];
-    el.innerHTML = '<div style="color:#00b8ee;font-size:14px;margin-bottom:12px">Step ' + (cookIdx + 1) + ' of ' + steps.length +
+    el.innerHTML = '<div style="color:#C9A227;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin-bottom:12px">Step ' + (cookIdx + 1) + ' of ' + steps.length +
       (step.title ? ' — ' + esc(step.title) : '') + '</div>' +
       '<p class="stepdesc">' + esc(step.description) + '</p>' +
       (step.temperature_f ? '<p class="stepdesc" style="color:#e07a3f;margin-top:10px">' + step.temperature_f + '°F / ' + Math.round((step.temperature_f - 32) * 5 / 9) + '°C</p>' : '') +
