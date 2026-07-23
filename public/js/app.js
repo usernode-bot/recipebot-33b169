@@ -22,27 +22,36 @@ window.App = {
     complexity: 'normal',
     serving: 'normal',
     model: null,
-    language: 'en',
   },
 };
 
-// Activate the saved/detected language before anything renders (i18n.js and
-// the locale dictionaries load before this file — see index.html).
+// Activate the best-guess language before anything renders (i18n.js and the
+// locale dictionaries load before this file — see index.html). The platform
+// locale is resolved asynchronously right after (applyPlatformLocale).
 if (typeof I18N !== 'undefined') {
   I18N.init();
-  App.preferences.language = I18N.lang;
 }
 
-// Central language switch: updates the UI immediately, persists to
-// localStorage (via I18N.set) and — when signed in — to the account
-// preferences, same as the diet/units/model chips.
-App.setLanguage = function (code) {
-  if (typeof I18N === 'undefined' || !I18N.isSupported(code)) return;
-  if (code === I18N.lang) return;
-  I18N.set(code);
-  App.preferences.language = code;
-  if (!App.isAnonymous && App.currentUser) savePreferences();
-};
+// The UI language follows the platform-level user preference (Settings →
+// Language on the Usernode shell) — there is no in-app picker. Resolution
+// order: platform locale → browser language → English.
+async function applyPlatformLocale() {
+  let locale = null;
+  if (typeof usernode !== 'undefined' && usernode.getUserLocale) {
+    try {
+      ({ locale } = await usernode.getUserLocale());
+    } catch { /* no platform shell — fall through to navigator */ }
+  }
+  const code = I18N.resolve(locale) || I18N.resolve(navigator.language) || 'en';
+  if (code !== I18N.lang) I18N.set(code);
+}
+
+// Live updates when the user changes the platform setting mid-session.
+window.addEventListener('usernode:locale-changed', (e) => {
+  const code = I18N.resolve(e.detail && e.detail.locale) ||
+    I18N.resolve(navigator.language) || 'en';
+  if (code !== I18N.lang) I18N.set(code);
+});
 
 // Re-render dynamic views when the language changes. Static markup is
 // re-applied by I18N.set itself; this covers JS-built content.
@@ -52,7 +61,6 @@ document.addEventListener('i18n:change', () => {
       App.currentView !== 'home' && !App.pendingRecipe) {
     Recipe.display(App.currentRecipe);
   }
-  renderLanguageMenu();
 });
 
 // Toggle between the homepage feed and the chat + recipe layout.
@@ -158,11 +166,6 @@ window.HashParams = {
 
       if (data.user.preferences) {
         const tempUnit = data.user.preferences.tempUnit === 'F' ? 'F' : 'C';
-        // The account language wins over the device's localStorage choice
-        // for signed-in users; the device value is then mirrored by I18N.set.
-        const savedLang = (typeof I18N !== 'undefined' && I18N.isSupported(data.user.preferences.language))
-          ? data.user.preferences.language
-          : (typeof I18N !== 'undefined' ? I18N.lang : 'en');
         App.preferences = {
           diet: data.user.preferences.diet || null,
           complexity: data.user.preferences.complexity || 'normal',
@@ -170,11 +173,7 @@ window.HashParams = {
           tempUnit,
           // Effective model (saved choice validated server-side, else default)
           model: (data.llm && data.llm.model) || null,
-          language: savedLang,
         };
-        if (typeof I18N !== 'undefined' && savedLang !== I18N.lang) {
-          I18N.set(savedLang);
-        }
         if (typeof Recipe !== 'undefined') {
           Recipe.useCelsius = tempUnit !== 'F';
         }
@@ -212,7 +211,10 @@ window.HashParams = {
     if (sendBtn) sendBtn.disabled = true;
   }
 
-  setupLanguageToggle();
+  // Resolve the platform-level language preference (async; corrects the
+  // boot-time guess). Not awaited — the UI re-applies when it lands.
+  applyPlatformLocale();
+
   setupMobileTabs();
   setupPreferences();
   const prefEl = document.getElementById('preferences');
@@ -251,54 +253,6 @@ window.HashParams = {
     App.showView('home');
   }
 })();
-
-// Header globe dropdown: one row per supported language, shown in its own
-// language, checkmark on the active one. Works signed-in and signed-out.
-function renderLanguageMenu() {
-  const menu = document.getElementById('language-menu');
-  if (!menu || typeof I18N === 'undefined') return;
-  menu.innerHTML = '';
-  I18N.LANGS.forEach((l) => {
-    const active = l.code === I18N.lang;
-    const btn = document.createElement('button');
-    btn.className =
-      'w-full text-left px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center justify-between gap-2 ' +
-      (active ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-zinc-700 dark:text-zinc-200');
-    btn.dataset.lang = l.code;
-    const name = document.createElement('span');
-    name.textContent = l.native;
-    btn.appendChild(name);
-    if (active) {
-      const check = document.createElement('span');
-      check.textContent = '✓';
-      btn.appendChild(check);
-    }
-    btn.addEventListener('click', () => {
-      menu.classList.add('hidden');
-      document.getElementById('language-toggle')?.setAttribute('aria-expanded', 'false');
-      App.setLanguage(l.code);
-    });
-    menu.appendChild(btn);
-  });
-}
-
-function setupLanguageToggle() {
-  const toggle = document.getElementById('language-toggle');
-  const menu = document.getElementById('language-menu');
-  if (!toggle || !menu) return;
-  renderLanguageMenu();
-  toggle.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const nowHidden = menu.classList.toggle('hidden');
-    toggle.setAttribute('aria-expanded', String(!nowHidden));
-  });
-  document.addEventListener('click', (e) => {
-    if (menu.classList.contains('hidden')) return;
-    if (menu.contains(e.target) || toggle.contains(e.target)) return;
-    menu.classList.add('hidden');
-    toggle.setAttribute('aria-expanded', 'false');
-  });
-}
 
 function setupHomeButton() {
   document.getElementById('home-btn')?.addEventListener('click', () => {

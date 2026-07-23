@@ -111,14 +111,9 @@
       "expectSelector": "#icon-system"
     },
     {
-      "name": "Language toggle renders",
+      "name": "i18n-annotated markup renders",
       "path": "/",
-      "expectSelector": "#language-toggle"
-    },
-    {
-      "name": "Settings language options exist",
-      "path": "/",
-      "expectSelector": "#language-options"
+      "expectSelector": "[data-i18n]"
     },
     {
       "name": "Update-note dialog exists",

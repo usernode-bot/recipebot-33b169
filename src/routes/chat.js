@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { EventEmitter } = require('events');
 const { getPool } = require('../db/pool');
-const { createMessage, isEnabled, buildSystemPrompt, getCreateParams, isValidModel, estimateMicrocents } = require('../services/llm');
+const { createMessage, isEnabled, buildSystemPrompt, getCreateParams, isValidModel, resolveLocale, estimateMicrocents } = require('../services/llm');
 const { validate, getSchemaReminder } = require('../services/recipe-validator');
 const { fetchWebpage } = require('../services/web');
 const { webSearch, init: initSearch } = require('../services/search');
@@ -55,6 +55,14 @@ function chatRoutes(config) {
     // authorize and bill the right user during the background stream.
     const userToken = req.headers['x-usernode-token'] || req.query.token || '';
 
+    // AI output language comes from the platform-level user preference (the
+    // JWT locale claim), not from the client body — any client-sent value
+    // is replaced. Unresolvable/unset locale → null → no prompt directive.
+    const effectivePrefs = {
+      ...(preferences || {}),
+      language: resolveLocale(req.user.locale),
+    };
+
     try {
       let convId = conversationId;
       let convCreated = null;
@@ -72,7 +80,7 @@ function chatRoutes(config) {
 
       if (!convId) {
         const title = forkRecipe?.title ? `Fork: ${forkRecipe.title}` : 'New conversation';
-        const convPrefs = preferences || {};
+        const convPrefs = effectivePrefs;
 
         // Remix lineage: when the fork came from a shared recipe, record
         // the source on the conversation. Copied onto the published
@@ -157,7 +165,7 @@ function chatRoutes(config) {
 
       runBackgroundStream(
         userToken, config, pool, convId, replyId, req.user.id, userModel,
-        preferences, send, userMsgId
+        effectivePrefs, send, userMsgId
       );
 
       res.status(202).json({ conversationId: convId, replyId });

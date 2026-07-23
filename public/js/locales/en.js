@@ -10,7 +10,6 @@ I18N.register('en', {
   'header.shortcuts': 'Keyboard shortcuts',
   'header.signIn': 'Sign in',
   'header.accountMenu': 'Account menu',
-  'header.language': 'Language',
   'header.aiUsageToday': 'AI usage today',
   'header.appSettings': 'App settings',
   'theme.label': 'Theme: {mode}',
@@ -237,11 +236,9 @@ I18N.register('en', {
 
   // ── Settings modal ──
   'settings.title': 'App Settings',
-  'settings.language': 'Language',
   'settings.aiModel': 'AI model',
   'settings.default': ' (default)',
   'settings.saved': 'Saved — applies to your next message',
-  'settings.savedLanguage': 'Saved',
   'settings.saveFailed': 'Failed to save',
   'settings.networkError': 'Network error — not saved',
   'settings.modelsUnavailable': 'Model options unavailable — try reloading.',

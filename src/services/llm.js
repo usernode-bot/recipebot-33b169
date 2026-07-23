@@ -68,9 +68,14 @@ const SUPPORTED_LANGUAGES = {
   id: 'Indonesian',
 };
 
-function isValidLanguage(code) {
-  return typeof code === 'string' &&
-    Object.prototype.hasOwnProperty.call(SUPPORTED_LANGUAGES, code);
+// Map the platform's BCP-47 locale tag (the JWT `locale` claim — "id",
+// "pt-BR", or null when unset) onto a shipped language code by
+// language-subtag prefix. Returns null when nothing matches or no
+// preference is set.
+function resolveLocale(tag) {
+  if (typeof tag !== 'string' || !tag) return null;
+  const sub = tag.split('-')[0].toLowerCase();
+  return Object.prototype.hasOwnProperty.call(SUPPORTED_LANGUAGES, sub) ? sub : null;
 }
 
 // Haiku 4.5 (and older dated snapshots) still take the pre-4.6 thinking shape
@@ -352,10 +357,12 @@ function buildSystemPrompt(preferences, currentRecipe) {
   const tempUnit = preferences.tempUnit === 'F' ? 'Fahrenheit' : 'Celsius';
   parts.push(`- Temperature: Write temperatures in ${tempUnit} in step descriptions (the temperature_f field is always Fahrenheit regardless)`);
 
-  // Language directive: only when the user picked a non-English language.
-  // For 'en' (or unset) nothing is appended, preserving today's behavior —
-  // including the model naturally mirroring a user who writes in another
-  // language. Tags stay canonical English: they're shared filter tokens.
+  // Language directive: `preferences.language` is resolved server-side from
+  // the platform's JWT locale claim (see chat.js) — only a resolvable
+  // non-English locale appends anything. For 'en'/unset nothing is appended,
+  // preserving default behavior — including the model naturally mirroring a
+  // user who writes in another language. Tags stay canonical English:
+  // they're shared filter tokens.
   const lang = preferences.language;
   if (lang && lang !== 'en' && SUPPORTED_LANGUAGES[lang]) {
     parts.push(`- Language: Write your conversational replies and ALL human-readable recipe text (title, description, notes, prep_time, cook_time, step titles, step descriptions, ingredient names, serving_item name) in ${SUPPORTED_LANGUAGES[lang]}, unless the user explicitly asks for another language. EXCEPTION: the "tags" array must remain in the lowercase English tag vocabulary described above — tags are shared filter tokens across the community and must never be translated.`);
@@ -409,7 +416,7 @@ module.exports = {
   DEFAULT_MODEL,
   isValidModel,
   SUPPORTED_LANGUAGES,
-  isValidLanguage,
+  resolveLocale,
   estimateMicrocents,
   buildSystemPrompt,
   buildMessages,

@@ -2,10 +2,14 @@
 // Locale dictionaries live in /js/locales/<code>.js and register themselves
 // via I18N.register(). English is the source of truth: a key missing from
 // the active dictionary falls back to the English string.
+//
+// The language is NOT an in-app setting: it follows the platform-level user
+// preference (usernode.getUserLocale() / the JWT locale claim — see app.js),
+// falling back to the browser language, then English. localStorage.language
+// is only a mirror of the last resolution, kept for anti-flash <html lang>.
 (function () {
-  // Single source of truth for the supported set (picker + boot detection).
-  // The server keeps its own copy of the codes (src/services/llm.js) for
-  // preference validation and the AI prompt directive.
+  // The dictionaries this app ships. The server keeps its own copy of the
+  // codes (src/services/llm.js) for the AI prompt directive.
   const LANGS = [
     { code: 'en', native: 'English' },
     { code: 'es', native: 'Español' },
@@ -26,6 +30,15 @@
 
     isSupported(code) {
       return LANGS.some((l) => l.code === code);
+    },
+
+    // Map a BCP-47 tag ("pt-BR", "id", "es-419") onto a shipped dictionary
+    // by language-subtag prefix. Returns null when nothing matches (map,
+    // don't match exactly — per the platform conventions).
+    resolve(tag) {
+      if (typeof tag !== 'string' || !tag) return null;
+      const sub = tag.split('-')[0].toLowerCase();
+      return I18N.isSupported(sub) ? sub : null;
     },
 
     t(key, params) {
@@ -65,9 +78,9 @@
       });
     },
 
-    // Set the active language: persist to localStorage (works signed-out),
-    // update <html lang>, re-apply static markup, and notify views so they
-    // can re-render dynamic content. Account persistence is app.js's job.
+    // Set the active language: mirror to localStorage (anti-flash cache for
+    // the next load), update <html lang>, re-apply static markup, and notify
+    // views so they can re-render dynamic content.
     set(code, opts) {
       if (!I18N.isSupported(code)) code = 'en';
       I18N.lang = code;
@@ -79,16 +92,16 @@
       }
     },
 
-    // First-visit detection: saved choice wins, else the browser language
-    // when supported, else English.
+    // Initial guess before the platform locale arrives (async, via the
+    // bridge): last mirrored resolution, else the browser language, else
+    // English. app.js corrects this to the platform truth once known.
     detect() {
       try {
         if (localStorage.language && I18N.isSupported(localStorage.language)) {
           return localStorage.language;
         }
       } catch { /* private mode */ }
-      const nav = (navigator.language || 'en').slice(0, 2).toLowerCase();
-      return I18N.isSupported(nav) ? nav : 'en';
+      return I18N.resolve(navigator.language) || 'en';
     },
 
     init() {

@@ -148,35 +148,8 @@
     modal.classList.toggle('hidden', !visible);
     if (visible) {
       statusEl.classList.add('hidden');
-      renderLanguageOptions();
       renderOptions();
     }
-  }
-
-  // Language chips in the settings modal — same choice as the header globe.
-  function renderLanguageOptions() {
-    const wrap = document.getElementById('language-options');
-    if (!wrap || typeof I18N === 'undefined') return;
-    wrap.innerHTML = '';
-    I18N.LANGS.forEach((l) => {
-      const active = l.code === I18N.lang;
-      const btn = document.createElement('button');
-      btn.dataset.lang = l.code;
-      btn.className =
-        'px-3 py-1.5 text-sm rounded-lg border transition-colors ' +
-        (active
-          ? 'border-blue-500 ring-1 ring-blue-500 bg-blue-50 dark:bg-blue-500/10 font-medium'
-          : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500');
-      btn.textContent = l.native;
-      btn.addEventListener('click', () => {
-        if (l.code === I18N.lang) return;
-        App.setLanguage(l.code);
-        renderLanguageOptions();
-        renderOptions();
-        if (!App.isAnonymous && App.currentUser) showStatus(t('settings.savedLanguage'), false);
-      });
-      wrap.appendChild(btn);
-    });
   }
 
   function currentModel() {
