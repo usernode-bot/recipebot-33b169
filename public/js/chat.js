@@ -161,17 +161,21 @@ const Chat = {
       .replace(/\n/g, '<br>');
   },
 
+  // Resolves true when the conversation loaded, false when it's gone or the
+  // request failed — Store.selectConversation forwards that to the boot
+  // restore path so a deleted recipe falls back to the homepage instead of
+  // leaving an empty panel behind.
   async loadMessages(conversationId) {
     this.clear();
     this.messages = [];
     App.pendingReplyId = null;
     this._ackOnDone = null;
 
-    if (!conversationId) return;
+    if (!conversationId || Number.isNaN(conversationId)) return false;
 
     try {
       const res = await fetch(`/api/conversations/${conversationId}/messages`);
-      if (!res.ok) return;
+      if (!res.ok) return false;
       const data = await res.json();
       this.messages = data.messages || data;
 
@@ -246,7 +250,10 @@ const Chat = {
       } else if (isProcessing) {
         this._resumeStream(pr.id);
       }
-    } catch { /* retry on next load */ }
+      return true;
+    } catch {
+      return false; /* retry on next load */
+    }
   },
 
   _resumeStream(replyId) {
@@ -427,7 +434,11 @@ const Chat = {
       if (dedup(data)) return;
       console.log('[chat] ← conversation', data);
       App.currentConversationId = data.id;
+      // A fork of a shared recipe becomes an owned conversation — the `s`
+      // route no longer describes what's on screen.
+      HashParams.set('s', null);
       HashParams.set('c', data.id);
+      App.setSignInPath?.(null);
       Store.refresh();
     });
 
@@ -865,7 +876,11 @@ const Chat = {
 
       if (conversationId && !App.currentConversationId) {
         App.currentConversationId = conversationId;
+        // Same as the SSE `conversation` event: an owned conversation
+        // supersedes any read-only `s` route this was forked from.
+        HashParams.set('s', null);
         HashParams.set('c', conversationId);
+        App.setSignInPath?.(null);
         Store.refresh();
       }
 

@@ -103,6 +103,22 @@ App.promptSignIn = function (reason) {
   document.getElementById('sign-in-backdrop').onclick = close;
 };
 
+// Every "open in Usernode" link (header button + sign-in dialog CTA) points
+// at the platform shell. When the visitor is reading a shared recipe we
+// append the platform's ?path= forwarding param so signing in lands them
+// back on that recipe instead of the homepage. Contract: `path` must be the
+// FINAL fragment param and its value the app-relative path+query in wire
+// format — the ?s= query form satisfies that with no encoded '#'.
+App.setSignInPath = function (path) {
+  const href = path
+    ? `${App.PLATFORM_APP_URL}?path=${path}`
+    : App.PLATFORM_APP_URL;
+  for (const id of ['sign-in-btn', 'sign-in-go']) {
+    const el = document.getElementById(id);
+    if (el) el.href = href;
+  }
+};
+
 window.HashParams = {
   get() {
     const raw = location.hash.replace(/^#/, '');
@@ -112,6 +128,18 @@ window.HashParams = {
       if (k) params[k] = decodeURIComponent(v || '');
     }
     return params;
+  },
+
+  // Every URL rewrite in the app goes through here, and it MUST keep
+  // location.search intact: the platform iframe token arrives as ?token=…
+  // and index.html re-reads it from location.search on the next document
+  // load. Rewriting to a bare pathname (the old behaviour) dropped the
+  // token, so any reload after a route change booted anonymously and
+  // bounced to the homepage. Never build a URL here without `search`.
+  _write(hash) {
+    const url = location.pathname + location.search + (hash ? `#${hash}` : '');
+    history.replaceState(null, '', url);
+    if (typeof Router !== 'undefined') Router.save();
   },
 
   set(key, value) {
@@ -124,13 +152,122 @@ window.HashParams = {
     const hash = Object.entries(params)
       .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
       .join('&');
-    history.replaceState(null, '', hash ? `#${hash}` : location.pathname);
+    this._write(hash);
   },
 
   clear() {
-    history.replaceState(null, '', location.pathname);
+    this._write('');
   },
 };
+
+// Route state. The hash is canonical (`#c=…` own recipe, `#s=…` read-only
+// shared recipe, `#cook=1` cooking mode, plus the `ing`/`mac`/`ch` panel
+// sub-state); the query string mirrors it as a fallback for contexts that
+// can't set a fragment — dapp.json test routes, screenshot-state deep
+// links, the platform's ?path= forwarding.
+//
+// Inside the platform shell the app lives in a cross-origin iframe whose
+// hash is invisible to the top-level URL, and bridge v1 has no
+// path/navigation sync API — so a browser reload rebuilds the iframe with
+// a route-less src. sessionStorage (same origin, survives a tab reload)
+// carries the route across that gap.
+window.Router = {
+  KEY: 'recipebot:route',
+  // Only a genuine refresh/re-embed should resurrect a saved route; a
+  // deliberate re-open of the app minutes later starts on home.
+  MAX_AGE_MS: 30_000,
+  ROUTE_KEYS: ['c', 's', 'cook', 'ing', 'mac', 'ch'],
+
+  // Hash params win over query params when both carry the same key.
+  read() {
+    const query = new URLSearchParams(location.search);
+    const hp = HashParams.get();
+    const route = {};
+    for (const k of this.ROUTE_KEYS) {
+      const v = hp[k] != null ? hp[k] : query.get(k);
+      if (v != null && v !== '') route[k] = String(v);
+    }
+    return route;
+  },
+
+  // Serialize the current route back to hash-param wire format.
+  serialize(route) {
+    return Object.entries(route)
+      .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+      .join('&');
+  },
+
+  save() {
+    try {
+      sessionStorage.setItem(this.KEY, JSON.stringify({
+        route: this.serialize(this.read()),
+        savedAt: Date.now(),
+      }));
+    } catch { /* storage can throw in locked-down WebViews */ }
+  },
+
+  // Refreshed on pagehide/visibility-hidden so `savedAt` reflects when the
+  // document went away, not when the user last navigated in-app.
+  touch() {
+    try {
+      const raw = sessionStorage.getItem(this.KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      saved.savedAt = Date.now();
+      sessionStorage.setItem(this.KEY, JSON.stringify(saved));
+    } catch { /* ignore */ }
+  },
+
+  // The saved route, when this document load looks like a refresh of the
+  // previous one. A saved route of '' (home) is stored too — that's what
+  // makes "went home, then refreshed" stay on home.
+  restoreCandidate() {
+    let saved;
+    try {
+      const raw = sessionStorage.getItem(this.KEY);
+      if (!raw) return null;
+      saved = JSON.parse(raw);
+    } catch { return null; }
+    if (!saved || !saved.route) return null;
+
+    const nav = performance.getEntriesByType?.('navigation')?.[0];
+    if (nav && nav.type === 'reload') return saved.route;
+    // In-platform embed: the shell re-creates the iframe from a route-less
+    // src, so navigation type is 'navigate' even on a real refresh.
+    const embedded = window.parent !== window;
+    if (embedded && Date.now() - (saved.savedAt || 0) < this.MAX_AGE_MS) {
+      return saved.route;
+    }
+    return null;
+  },
+
+  // Adopt a saved route into the live URL so the rest of the app (and any
+  // later HashParams.set) sees a consistent address bar.
+  adopt(routeStr) {
+    history.replaceState(null, '', location.pathname + location.search +
+      (routeStr ? `#${routeStr}` : ''));
+    return this.read();
+  },
+
+  // The hash is canonical: mirror the resolved route into it and drop the
+  // query-form duplicates, so a later HashParams.set (which only ever reads
+  // the hash) can't silently wipe a route that arrived as ?c=/?s=/?cook=.
+  // Everything else in the query — crucially the platform's ?token= — stays.
+  normalize(route) {
+    const query = new URLSearchParams(location.search);
+    for (const k of [...this.ROUTE_KEYS, 'join']) query.delete(k);
+    const search = query.toString();
+    const hash = this.serialize(route);
+    history.replaceState(null, '', location.pathname +
+      (search ? `?${search}` : '') + (hash ? `#${hash}` : ''));
+    return this.read();
+  },
+};
+
+window.addEventListener('pagehide', () => Router.touch());
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') Router.touch();
+});
 
 (async function init() {
   // app.js loads first (see the script tags in index.html) — wait for the
@@ -227,36 +364,92 @@ window.HashParams = {
   setupChatToggle();
 
   const hp = HashParams.get();
-  // ?c=<id> is a deep-link fallback for contexts that can't set a hash
-  // (dapp.json test routes); the hash param wins when both are present.
   const query = new URLSearchParams(location.search);
-  const queryC = query.get('c');
   // ?join=<token> / #join=<token> — group-cookbook invite link landing.
   const joinToken = hp.join || query.get('join');
-  if (App.isAnonymous) {
-    // Conversations are owner-scoped and joining needs an account —
-    // anonymous deep links land on the browse homepage.
-    App.showView('home');
-    if (joinToken) {
-      HashParams.set('join', null);
-      App.promptSignIn(t('signin.joinCookbook'));
-    }
-  } else if (joinToken && typeof Home !== 'undefined') {
+
+  let route = Router.read();
+  // No route in the URL? A refresh inside the platform shell arrives with a
+  // route-less iframe src, so fall back to the route the previous document
+  // saved (see Router.restoreCandidate for the eligibility rules).
+  if (!route.c && !route.s && !joinToken) {
+    const candidate = Router.restoreCandidate();
+    if (candidate) route = Router.adopt(candidate);
+  }
+  route = Router.normalize(route);
+
+  if (joinToken) {
     App.showView('home');
     HashParams.set('join', null);
-    Home.handleJoinToken(joinToken);
-  } else if (hp.c && typeof Store !== 'undefined') {
-    Store.selectConversation(parseInt(hp.c), { restore: true });
-  } else if (queryC && typeof Store !== 'undefined') {
-    Store.selectConversation(parseInt(queryC), { restore: true });
+    if (App.isAnonymous) {
+      // Joining a cookbook needs an account.
+      App.promptSignIn(t('signin.joinCookbook'));
+    } else if (typeof Home !== 'undefined') {
+      Home.handleJoinToken(joinToken);
+    }
   } else {
-    App.showView('home');
+    await restoreRoute(route);
   }
 })();
 
+// Boot dispatch for a resolved route. `c` (own conversation) wins over `s`
+// (read-only shared recipe) when both are somehow present.
+async function restoreRoute(route) {
+  if (typeof Store === 'undefined') return App.showView('home');
+
+  if (route.c && route.s) {
+    console.warn('[route] both c and s present — using c', route);
+    HashParams.set('s', null);
+  }
+
+  let ok = false;
+  if (route.c) {
+    // Conversations are owner-scoped: anonymous visitors can't restore one.
+    if (App.isAnonymous) {
+      console.warn('[route] conversation deep link needs an account — showing home');
+      HashParams.set('c', null);
+    } else {
+      ok = await Store.selectConversation(parseInt(route.c), { restore: true });
+      if (!ok) {
+        console.warn('[route] conversation could not be restored', route.c);
+        HashParams.set('c', null);
+      }
+    }
+  } else if (route.s) {
+    // Shared recipes are public — restorable signed in AND anonymously.
+    const item = await Store.loadSharedById(parseInt(route.s));
+    if (item) {
+      Store.openShared(item);
+      ok = true;
+    } else {
+      console.warn('[route] shared recipe could not be restored', route.s);
+      HashParams.set('s', null);
+    }
+  }
+
+  if (!ok) {
+    HashParams.set('cook', null);
+    return App.showView('home');
+  }
+
+  // The recipe panel is the point of the route — on narrow screens
+  // setupMobileTabs has already defaulted to the chat tab.
+  if (window.innerWidth < 1024) App.setMobileTab?.('recipe');
+
+  if (route.cook === '1' && typeof CookingMode !== 'undefined') {
+    if (App.currentRecipe?.steps?.length) CookingMode.enter(App.currentRecipe);
+    else HashParams.set('cook', null);
+  }
+}
+
 function setupHomeButton() {
   document.getElementById('home-btn')?.addEventListener('click', () => {
+    // Clear the whole recipe route — "I went home" is itself the state a
+    // refresh should restore.
     HashParams.set('c', null);
+    HashParams.set('s', null);
+    HashParams.set('cook', null);
+    App.setSignInPath?.(null);
     App.showView('home');
   });
 }
@@ -286,6 +479,10 @@ function setupMobileTabs() {
   tabs.forEach((t) => {
     t.addEventListener('click', () => setTab(t.dataset.tab));
   });
+
+  // Exposed so a restored recipe route can land on the recipe tab instead
+  // of the chat tab this defaults to on phones.
+  App.setMobileTab = setTab;
 
   if (window.innerWidth < 1024) {
     setTab('chat');
@@ -356,6 +553,7 @@ function setupNewConversation() {
     App.viewingVersion = null;
     App.showView('chat');
     HashParams.clear();
+    App.setSignInPath?.(null);
     if (typeof Chat !== 'undefined') Chat.clear();
     document.getElementById('recipe-display')?.classList.add('hidden');
     document.getElementById('recipe-empty')?.classList.remove('hidden');

@@ -26,6 +26,8 @@ const Store = {
     } catch { /* retry on next refresh */ }
   },
 
+  // Resolves true when the conversation actually loaded — the boot restore
+  // path falls back to the homepage when it didn't (deleted recipe, 404).
   async selectConversation(id, opts) {
     App.currentConversationId = id;
     App.currentRecipe = null;
@@ -33,7 +35,9 @@ const Store = {
     App.viewingShared = null;
     App.viewingVersion = null;
     App.showView('chat');
+    HashParams.set('s', null);
     HashParams.set('c', id);
+    App.setSignInPath?.(null);
     if (!opts?.restore) {
       HashParams.set('ing', null);
       if (typeof Recipe !== 'undefined') {
@@ -43,7 +47,27 @@ const Store = {
       }
     }
 
-    if (typeof Chat !== 'undefined') await Chat.loadMessages(id);
+    if (typeof Chat === 'undefined') return false;
+    return await Chat.loadMessages(id);
+  },
+
+  // Look up one shared recipe by id for the `#s=<id>` / `?s=<id>` route.
+  // Both feeds return the shape openShared consumes; the anonymous one just
+  // omits the personalized fields (is_mine / my_rating / is_favorited).
+  async loadSharedById(id) {
+    if (!id || Number.isNaN(id)) return null;
+    if (typeof Home !== 'undefined' && Home.shared?.length) {
+      const cached = Home.shared.find((s) => s.id === id);
+      if (cached) return cached;
+    }
+    try {
+      const res = await fetch(App.isAnonymous ? '/api/public/feed' : '/api/shared-recipes');
+      if (!res.ok) return null;
+      const rows = await res.json();
+      return rows.find((s) => s.id === id) || null;
+    } catch {
+      return null;
+    }
   },
 
   // Read-only view of a shared recipe. Chatting from this state auto-forks
@@ -74,7 +98,15 @@ const Store = {
     Recipe.display(item.data);
 
     if (typeof Chat !== 'undefined') Chat.clear();
-    HashParams.clear();
+
+    // Addressable as `#s=<id>` so a refresh reloads this recipe. Snapshot-only
+    // copies (id === null) have nothing to look up, so they stay routeless.
+    HashParams.set('c', null);
+    HashParams.set('ing', null);
+    HashParams.set('mac', null);
+    HashParams.set('s', item.id || null);
+    // Signing in from here should come back to this recipe.
+    App.setSignInPath?.(item.id ? `/?s=${item.id}` : null);
   },
 
   // meta (when forking someone else's shared recipe) carries the lineage
@@ -99,7 +131,9 @@ const Store = {
       Chat.appendMessage('assistant', t('chat.readyToModify', { title: recipeData.title }));
     }
 
+    // An unsaved fork draft has nothing server-side to reload — no route.
     HashParams.clear();
+    App.setSignInPath?.(null);
     document.getElementById('chat-input')?.focus();
   },
 

@@ -15,9 +15,12 @@ const CookingMode = {
     if (bar) { bar.classList.add('hidden'); bar.classList.remove('flex'); }
     this.createOverlay();
     this.acquireWakeLock();
+    // Part of the route so a refresh comes back into cooking mode.
+    if (typeof HashParams !== 'undefined') HashParams.set('cook', '1');
   },
 
   exit() {
+    if (typeof HashParams !== 'undefined') HashParams.set('cook', null);
     this.releaseWakeLock();
     if (this.overlay) {
       this.overlay.remove();

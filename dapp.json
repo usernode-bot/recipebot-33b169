@@ -191,6 +191,31 @@
       "expectSelector": "#made-it-modal"
     },
     {
+      "name": "Shared recipe deep link renders",
+      "path": "/?s=900001",
+      "expectSelector": "#made-it-btn"
+    },
+    {
+      "name": "Shared recipe deep link shows author byline",
+      "path": "/?s=900001",
+      "expectText": "staging-demo-user"
+    },
+    {
+      "name": "Cooking mode deep link renders",
+      "path": "/?c=900003&cook=1",
+      "expectSelector": "#cooking-overlay"
+    },
+    {
+      "name": "Cooking mode deep link shows exit control",
+      "path": "/?c=900003&cook=1",
+      "expectSelector": "#cm-exit"
+    },
+    {
+      "name": "Recipe deep link opens recipe tab on mobile",
+      "path": "/?c=900003 @mobile",
+      "expectSelector": "#recipe-panel:not(.panel-hidden) #cook-btn"
+    },
+    {
       "name": "Public recipe page renders without login",
       "path": "/r/staging-demo-recipe",
       "expectText": "Staging Demo Chicken Stir Fry"
