@@ -9,8 +9,10 @@ I18N.register('es', {
   'header.accountMenu': 'Menú de la cuenta',
   'header.aiUsageToday': 'Uso de IA hoy',
   'header.appSettings': 'Ajustes de la app',
+  'theme.title': 'Tema',
   'theme.label': 'Tema: {mode}',
   'theme.system': 'Sistema',
+  'theme.systemHint': 'Seguir la configuración del dispositivo',
   'theme.light': 'Claro',
   'theme.dark': 'Oscuro',
 

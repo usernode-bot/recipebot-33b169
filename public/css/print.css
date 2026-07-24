@@ -1,4 +1,10 @@
 @media print {
+  /* app.js pins color-scheme to the effective theme for native widgets;
+     print is always on white paper, so force it back here. */
+  :root {
+    color-scheme: light !important;
+  }
+
   header,
   #chat-panel,
   #mobile-tabs,

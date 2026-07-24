@@ -9,8 +9,10 @@ I18N.register('id', {
   'header.accountMenu': 'Menu akun',
   'header.aiUsageToday': 'Pemakaian AI hari ini',
   'header.appSettings': 'Pengaturan aplikasi',
+  'theme.title': 'Tema',
   'theme.label': 'Tema: {mode}',
   'theme.system': 'Sistem',
+  'theme.systemHint': 'Ikuti pengaturan perangkat',
   'theme.light': 'Terang',
   'theme.dark': 'Gelap',
 

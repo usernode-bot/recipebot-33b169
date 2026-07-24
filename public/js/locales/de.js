@@ -9,8 +9,10 @@ I18N.register('de', {
   'header.accountMenu': 'Kontomenü',
   'header.aiUsageToday': 'KI-Nutzung heute',
   'header.appSettings': 'App-Einstellungen',
+  'theme.title': 'Design',
   'theme.label': 'Design: {mode}',
   'theme.system': 'System',
+  'theme.systemHint': 'Geräteeinstellung folgen',
   'theme.light': 'Hell',
   'theme.dark': 'Dunkel',
 

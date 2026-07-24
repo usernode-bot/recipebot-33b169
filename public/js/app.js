@@ -363,40 +363,109 @@ function setupNewConversation() {
   });
 }
 
-// Three-state theme toggle: System → Light → Dark → System. The mode is
-// stored in localStorage.theme ('light' | 'dark' | 'system'; missing key =
-// system); the button icon reflects the selected mode, not the effective
-// theme. In system mode the app follows the OS preference live.
+// Three-state theme control: System / Light / Dark, picked from a labelled
+// dropdown under the header button. The mode is stored in localStorage.theme
+// ('light' | 'dark' | 'system'; missing or unrecognised = system, so a
+// never-touched install follows the OS and a legacy explicit 'light'/'dark'
+// from the old binary toggle is preserved as-is). The button icon reflects the
+// selected MODE, not the effective theme, so "am I pinned?" is answerable at a
+// glance. In system mode the app follows the OS preference live.
 function setupDarkMode() {
   const toggle = document.getElementById('dark-mode-toggle');
+  const menu = document.getElementById('theme-menu');
   const media = window.matchMedia('(prefers-color-scheme: dark)');
   const ORDER = ['system', 'light', 'dark'];
+  const ICONS = { system: 'icon-system', light: 'icon-sun', dark: 'icon-moon' };
+  if (!toggle || !menu) return;
 
-  const getMode = () =>
-    ORDER.includes(localStorage.theme) ? localStorage.theme : 'system';
+  const options = Array.from(menu.querySelectorAll('.theme-option'));
+
+  function getMode() {
+    let stored;
+    try { stored = localStorage.theme; } catch { /* storage blocked */ }
+    return ORDER.includes(stored) ? stored : 'system';
+  }
 
   function apply() {
     const mode = getMode();
     const dark = mode === 'dark' || (mode === 'system' && media.matches);
     document.documentElement.classList.toggle('dark', dark);
-    toggle.title = t('theme.label', { mode: t(`theme.${mode}`) });
+    // Pin the UA scheme to what's on screen so native widgets (scrollbars,
+    // carets, browser-drawn menus) match an explicit choice too.
+    document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+
+    const label = t('theme.label', { mode: t(`theme.${mode}`) });
+    toggle.title = label;
+    toggle.setAttribute('aria-label', label);
+
     for (const m of ORDER) {
-      const icon = document.getElementById(m === 'system' ? 'icon-system' : m === 'light' ? 'icon-sun' : 'icon-moon');
+      const icon = document.getElementById(ICONS[m]);
       if (icon) icon.classList.toggle('hidden', m !== mode);
+    }
+    for (const opt of options) {
+      const active = opt.dataset.themeMode === mode;
+      opt.setAttribute('aria-checked', String(active));
+      opt.querySelector('.theme-check')?.classList.toggle('invisible', !active);
     }
   }
 
-  toggle.addEventListener('click', () => {
-    const next = ORDER[(ORDER.indexOf(getMode()) + 1) % ORDER.length];
-    localStorage.theme = next;
-    apply();
+  const isOpen = () => !menu.classList.contains('hidden');
+
+  function setOpen(open) {
+    menu.classList.toggle('hidden', !open);
+    toggle.setAttribute('aria-expanded', String(open));
+  }
+
+  toggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = !isOpen();
+    setOpen(open);
+    if (open) options.find((o) => o.getAttribute('aria-checked') === 'true')?.focus();
   });
+
+  for (const opt of options) {
+    opt.addEventListener('click', () => {
+      try { localStorage.theme = opt.dataset.themeMode; } catch { /* storage blocked: session-only */ }
+      apply();
+      setOpen(false);
+      toggle.focus();
+    });
+  }
+
+  // Arrow-key roving between the three rows.
+  menu.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    const i = options.indexOf(document.activeElement);
+    const step = e.key === 'ArrowDown' ? 1 : -1;
+    options[(Math.max(i, 0) + step + options.length) % options.length].focus();
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!isOpen()) return;
+    if (menu.contains(e.target) || toggle.contains(e.target)) return;
+    setOpen(false);
+  });
+
+  // Escape closes the menu and stops there — cooking mode, the shortcuts
+  // modal and the settings modal each bind Escape too.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !isOpen()) return;
+    e.stopPropagation();
+    setOpen(false);
+    toggle.focus();
+  }, true);
 
   media.addEventListener('change', () => {
     if (getMode() === 'system') apply();
   });
 
-  // Keep the tooltip in the active language.
+  // Another tab changed the preference — keep this one in step.
+  window.addEventListener('storage', (e) => {
+    if (e.key === null || e.key === 'theme') apply();
+  });
+
+  // Keep the tooltip / accessible name in the active language.
   document.addEventListener('i18n:change', apply);
 
   apply();

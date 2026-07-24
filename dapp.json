@@ -111,6 +111,21 @@
       "expectSelector": "#icon-system"
     },
     {
+      "name": "Theme menu renders",
+      "path": "/",
+      "expectSelector": "#theme-menu"
+    },
+    {
+      "name": "Theme menu offers the System option",
+      "path": "/",
+      "expectSelector": "#theme-menu [data-theme-mode=\"system\"]"
+    },
+    {
+      "name": "Theme menu explains the System option",
+      "path": "/",
+      "expectText": "Match your device setting"
+    },
+    {
       "name": "i18n-annotated markup renders",
       "path": "/",
       "expectSelector": "[data-i18n]"

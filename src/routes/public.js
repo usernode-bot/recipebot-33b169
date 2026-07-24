@@ -14,6 +14,17 @@ const log = require('../services/logger');
 
 const PLATFORM_APP_URL = 'https://social-vibecoding.usernodelabs.org/#app/recipebot-33b169/full';
 
+// Pre-paint theme boot for these standalone pages: honour an EXPLICIT
+// light/dark choice the visitor made in the app (same origin, so the same
+// localStorage.theme the SPA writes — see the anti-flash block in
+// public/index.html and setupDarkMode() in public/js/app.js). 'system',
+// missing or unrecognised leaves data-theme unset, so the CSS below falls
+// through to prefers-color-scheme — the normal case for someone opening a
+// share link who has never used RecipeBot.
+const THEME_BOOT_SCRIPT = `<script>(function(){try{var t=localStorage.theme;
+if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;}catch(e){}})();</script>`;
+
+// Dark palette applies for an explicit dark pick OR (no pick + dark OS).
 function esc(str) {
   return String(str ?? '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -239,8 +250,13 @@ function notFoundPage() {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<style>body{font-family:Inter,system-ui,sans-serif;background:#FAF6EE;color:#1F2B47;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
-@media(prefers-color-scheme:dark){body{background:#141A2B;color:#F3EDDF}}</style>
+<style>:root{color-scheme:light dark}
+html[data-theme=light]{color-scheme:light}
+html[data-theme=dark]{color-scheme:dark}
+body{font-family:Inter,system-ui,sans-serif;background:#FAF6EE;color:#1F2B47;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+html[data-theme=dark] body{background:#141A2B;color:#F3EDDF}
+@media(prefers-color-scheme:dark){html:not([data-theme]) body{background:#141A2B;color:#F3EDDF}}</style>
+${THEME_BOOT_SCRIPT}
 </head><body><div style="max-width:24rem;padding:2rem;text-align:center">
 <h1 style="font-family:Fraunces,Georgia,serif;font-size:1.35rem;margin:0 0 .5rem">Recipe not found</h1>
 <p style="color:#5A6378;font-size:.9rem;margin:0 0 1.25rem">This recipe may have been unpublished or deleted by its author.</p>
@@ -283,14 +299,20 @@ function recipePage(data, pageUrl) {
   :root{color-scheme:light dark;
     --page:#FAF6EE;--panel:#F3EDDF;--card:#FFFFFF;--ink:#1F2B47;--soft:#5A6378;
     --hairline:#E7DFCC;--brass:#C9A227;--paprika:#E07A3F;--paprika-deep:#b85a24}
-  @media(prefers-color-scheme:dark){:root{
+  /* Explicit pick wins; no pick (data-theme unset) follows the OS. */
+  html[data-theme=light]{color-scheme:light}
+  html[data-theme=dark]{color-scheme:dark;
+    --page:#141A2B;--panel:#1F2B47;--card:#1F2B47;--ink:#F3EDDF;--soft:#A5ABBE;
+    --hairline:#333B54}
+  @media(prefers-color-scheme:dark){html:not([data-theme]){
     --page:#141A2B;--panel:#1F2B47;--card:#1F2B47;--ink:#F3EDDF;--soft:#A5ABBE;
     --hairline:#333B54}}
   *{box-sizing:border-box}
   body{font-family:Inter,system-ui,-apple-system,sans-serif;margin:0;background:var(--page);color:var(--ink);line-height:1.55}
   .wrap{max-width:680px;margin:0 auto;padding:24px 20px 80px}
   a{color:var(--paprika-deep);text-decoration:none}
-  @media(prefers-color-scheme:dark){a{color:var(--paprika)}}
+  html[data-theme=dark] a{color:var(--paprika)}
+  @media(prefers-color-scheme:dark){html:not([data-theme]) a{color:var(--paprika)}}
   a:hover{text-decoration:underline}
   .brand{font-size:13px;color:var(--soft);display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid var(--ink)}
   .brand b{font-family:Fraunces,Georgia,serif;color:var(--ink)}
@@ -338,6 +360,7 @@ function recipePage(data, pageUrl) {
   #cook .ings{color:#A5ABBE;border-left-color:#333B54}
   #cook .btn-secondary{background:#28304B;border:none;color:#F3EDDF}
 </style>
+${THEME_BOOT_SCRIPT}
 </head>
 <body>
 <div class="wrap">
