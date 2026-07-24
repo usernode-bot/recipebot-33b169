@@ -10,6 +10,12 @@ const log = require('../services/logger');
 
 const MAX_VALIDATION_RETRIES = 2;
 
+// Accepted values for pending_replies.edit_decision (see schema.sql).
+// 'superseded' is written server-side when a newer reply retires an older
+// undecided proposal, and client-side when the user answers a diff by
+// sending another message instead of choosing.
+const EDIT_DECISIONS = new Set(['accepted', 'rejected', 'superseded']);
+
 // Tighter timeout for the recipe fix-up call ("Fixing recipe format..."):
 // the user is already waiting on a spinner at that point, so fail fast
 // rather than sitting on the default LLM timeout.
@@ -124,6 +130,17 @@ function chatRoutes(config) {
         [convId, req.user.id]
       );
       const replyId = replyRows[0].id;
+
+      // This reply's recipe supersedes any earlier proposal the user never
+      // answered, so retire those rows now. Without this, an older undecided
+      // reply resurfaces as "the" pending reply once a newer one is decided
+      // and re-shows a diff the user already dealt with (issue #24).
+      await pool.query(
+        `UPDATE pending_replies SET edit_decision = 'superseded', decided_at = NOW(), updated_at = NOW()
+         WHERE conversation_id = $1 AND id <> $2 AND edit_decision IS NULL AND status <> 'processing'`,
+        [convId, replyId]
+      ).catch((err) =>
+        log.warn('chat', 'Failed to supersede older replies', { message: err.message }));
 
       const emitter = getOrCreateEmitter(replyId);
       let eventIndex = 0;
@@ -279,14 +296,27 @@ function chatRoutes(config) {
     }
   });
 
+  // Record the user's decision on a reply that proposed a recipe edit. Writes
+  // `edit_decision` only — `status` stays lifecycle-only, so this can be
+  // called while the reply is still streaming without tripping the client's
+  // stale checker (that constraint is what made issue #16's fix lossy).
+  // Idempotent: repeated calls just rewrite the same decision.
   router.patch('/api/chat/:replyId/acknowledge', async (req, res) => {
     const replyId = parseInt(req.params.replyId);
+    const decision = (req.body && req.body.decision) || 'accepted';
+    if (!EDIT_DECISIONS.has(decision)) {
+      return res.status(400).json({ error: 'Invalid decision' });
+    }
     try {
-      await pool.query(
-        `UPDATE pending_replies SET status = 'acknowledged', updated_at = NOW() WHERE id = $1 AND user_id = $2`,
-        [replyId, req.user.id]
+      const { rowCount } = await pool.query(
+        `UPDATE pending_replies SET edit_decision = $3, decided_at = NOW(), updated_at = NOW()
+         WHERE id = $1 AND ${config.isStaging ? 'user_id IN ($2, 0)' : 'user_id = $2'}`,
+        [replyId, req.user.id, decision]
       );
-      res.json({ ok: true });
+      // 0 rows means the decision was NOT recorded — tell the client so it can
+      // retry instead of assuming success (the old fire-and-forget behaviour).
+      if (!rowCount) return res.status(404).json({ error: 'Reply not found' });
+      res.json({ ok: true, decision });
     } catch (err) {
       log.error('chat', 'Acknowledge error', { message: err.message });
       res.status(500).json({ error: 'Internal server error' });

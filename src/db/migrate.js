@@ -175,14 +175,27 @@ const DEMO_RECIPE_2 = {
 // titles so the dapp.json tests (and testers) can tell the two apart.
 const DEMO_RECIPE_ACCEPTED = { ...DEMO_RECIPE_2, title: 'Staging Demo Accepted Tofu Stir Fry' };
 const DEMO_RECIPE_PENDING = { ...DEMO_RECIPE_2, title: 'Staging Demo Pending Tofu Stir Fry' };
+// Issue #24 regression variants: a conversation where an older proposal was
+// left undecided and a newer one was accepted, and one whose decision is
+// recorded in the pre-#24 representation (status = 'acknowledged').
+const DEMO_RECIPE_SUPERSEDED = { ...DEMO_RECIPE_2, title: 'Staging Demo Superseded Tofu Stir Fry' };
+const DEMO_RECIPE_LEGACY = { ...DEMO_RECIPE_2, title: 'Staging Demo Legacy Tofu Stir Fry' };
 
-// Regression seeds for issue #16 (accept-edit screen reappearing): a
-// conversation whose recipe was edited, with a pending_replies row in a
-// given terminal state. Message/reply timestamps are staggered explicitly
-// because the client compares message created_at against the reply's
-// created_at to decide whether to re-show the Accept/Reject diff (a
+// Regression seeds for issues #16 / #24 (accept-edit screen reappearing): a
+// conversation whose recipe was edited, with pending_replies rows in given
+// terminal states and decisions. Message/reply timestamps are staggered
+// explicitly because the client compares message created_at against the
+// reply's created_at to decide whether to re-show the Accept/Reject diff (a
 // multi-row INSERT would give every row the same NOW()).
-async function seedEditDecisionDemo(pool, convId, title, newRecipe, replyId, replyStatus) {
+//
+// Never seed status = 'processing': migrate() flips every processing row to
+// 'error' on each boot, so such a seed wouldn't survive a restart.
+//
+// `extraReply` optionally seeds an EARLIER reply row (an abandoned proposal),
+// which is the shape that used to resurrect a settled diff.
+async function seedEditDecisionDemo(
+  pool, convId, title, newRecipe, replyId, replyStatus, editDecision = null, extraReply = null
+) {
   await pool.query(
     `INSERT INTO conversations (id, user_id, title, preferences)
      VALUES ($1, $2, $3, $4)
@@ -211,13 +224,25 @@ async function seedEditDecisionDemo(pool, convId, title, newRecipe, replyId, rep
     );
   }
 
+  // An older, never-answered proposal — seeded BEFORE the main reply so it
+  // can only ever be the loser of the "newest reply wins" lookup.
+  if (extraReply) {
+    await pool.query(
+      `INSERT INTO pending_replies (id, conversation_id, user_id, status, edit_decision, events, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, '[]', NOW() - interval '8 min', NOW() - interval '7 min')
+       ON CONFLICT (id) DO NOTHING`,
+      [extraReply.replyId, convId, DEMO_USER_ID, extraReply.status, extraReply.editDecision || null]
+    );
+  }
+
   // Reply created between the old and new recipe messages, so the client
   // treats the newer recipe message as this reply's proposed edit.
   await pool.query(
-    `INSERT INTO pending_replies (id, conversation_id, user_id, status, events, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, '[]', NOW() - interval '5 min', NOW() - interval '4 min')
+    `INSERT INTO pending_replies (id, conversation_id, user_id, status, edit_decision, decided_at, events, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, CASE WHEN $5::varchar IS NULL THEN NULL ELSE NOW() - interval '3 min' END,
+             '[]', NOW() - interval '5 min', NOW() - interval '4 min')
      ON CONFLICT (id) DO NOTHING`,
-    [replyId, convId, DEMO_USER_ID, replyStatus]
+    [replyId, convId, DEMO_USER_ID, replyStatus, editDecision]
   );
 }
 
@@ -253,11 +278,26 @@ async function seedStagingDemo(pool) {
   // normal recipe view) and an undecided edit (must open to the diff).
   await seedEditDecisionDemo(
     pool, 900003, 'Staging demo — Accepted edit stir fry',
-    DEMO_RECIPE_ACCEPTED, 900301, 'acknowledged'
+    DEMO_RECIPE_ACCEPTED, 900301, 'done', 'accepted'
   );
   await seedEditDecisionDemo(
     pool, 900004, 'Staging demo — Pending edit stir fry',
-    DEMO_RECIPE_PENDING, 900302, 'done'
+    DEMO_RECIPE_PENDING, 900302, 'done', null
+  );
+
+  // Issue #24 regression seeds. 900006: a newer accepted edit alongside an
+  // older reply the user never answered — the old lookup skipped the decided
+  // row and re-showed the stale proposal's diff, costing an extra Accept
+  // click. 900007: a decision recorded the pre-#24 way (status =
+  // 'acknowledged', no edit_decision) must still count as decided.
+  await seedEditDecisionDemo(
+    pool, 900006, 'Staging demo — Superseded edit stir fry',
+    DEMO_RECIPE_SUPERSEDED, 900304, 'done', 'accepted',
+    { replyId: 900303, status: 'done', editDecision: null }
+  );
+  await seedEditDecisionDemo(
+    pool, 900007, 'Staging demo — Legacy acknowledged edit',
+    DEMO_RECIPE_LEGACY, 900305, 'acknowledged', null
   );
   log.info('db', 'Seeded staging edit-decision demo conversations');
 

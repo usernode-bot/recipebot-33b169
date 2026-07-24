@@ -106,14 +106,27 @@ function conversationRoutes(config) {
         [convId]
       );
 
+      // The NEWEST reply in the conversation, whatever its status — only it
+      // can ask the user to accept/reject. Filtering by status here (as this
+      // used to) let an older undecided reply become "the" pending reply again
+      // once a newer one was decided, re-showing a settled diff (issue #24).
       const { rows: pendingRows } = await pool.query(
-        `SELECT id, status, created_at FROM pending_replies WHERE conversation_id = $1 AND ${config.isStaging ? 'user_id IN ($2, 0)' : 'user_id = $2'} AND status IN ('processing', 'done') ORDER BY created_at DESC LIMIT 1`,
+        `SELECT id, status, created_at, edit_decision FROM pending_replies
+         WHERE conversation_id = $1 AND ${config.isStaging ? 'user_id IN ($2, 0)' : 'user_id = $2'}
+         ORDER BY created_at DESC LIMIT 1`,
         [convId, req.user.id]
       );
+      // `resolved` is the single boolean the client branches on. Legacy rows
+      // predating edit_decision carry status = 'acknowledged'; an errored
+      // reply never showed a diff before this change and must not start now.
       const pendingReply = pendingRows.length ? {
         id: pendingRows[0].id,
         status: pendingRows[0].status,
         createdAt: pendingRows[0].created_at,
+        editDecision: pendingRows[0].edit_decision,
+        resolved: pendingRows[0].edit_decision !== null
+          || pendingRows[0].status === 'acknowledged'
+          || pendingRows[0].status === 'error',
       } : null;
 
       res.json({

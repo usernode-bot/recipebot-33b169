@@ -8,6 +8,16 @@ const Chat = {
   _streamWrapper: null,
   _activeStatusLine: null,
 
+  // replyId → highest event index whose recipe the user has already decided
+  // on. Survives conversation switches on purpose (clear()/loadMessages must
+  // NOT reset it): re-entering a recipe replays the reply's event log, and
+  // without this the replayed 'recipe' event re-opens a diff the user already
+  // accepted. Infinity = the whole log is settled (server-reported decision).
+  _decidedReplies: new Map(),
+  _maxDecidedReplies: 50,
+  // Decisions whose PATCH failed outright; retried on the next load.
+  _unsentDecisions: [],
+
   _statusIconSpinner: `<svg class="status-icon spinning" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="8" stroke-linecap="round"/></svg>`,
   _statusIconCheck: `<svg class="status-icon" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   _statusIconError: `<svg class="status-icon status-icon-error" viewBox="0 0 16 16" fill="none"><path d="M4.5 4.5L11.5 11.5M11.5 4.5L4.5 11.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
@@ -165,7 +175,7 @@ const Chat = {
     this.clear();
     this.messages = [];
     App.pendingReplyId = null;
-    this._ackOnDone = null;
+    this._retryUnsentDecisions();
 
     if (!conversationId) return;
 
@@ -202,7 +212,21 @@ const Chat = {
         Recipe.activeSteps = new Set((uiState.activeSteps || []).map(String));
         Recipe.checkedIngredients = new Set(uiState.checkedIngredients || []);
 
-        if (pr) {
+        if (pr && pr.resolved) {
+          // Already decided (or errored) — the recipe the reply produced is
+          // simply the current one. Remembering the decision locally keeps the
+          // replayed 'recipe' event from re-opening the diff when the reply is
+          // still streaming.
+          this._markDecided(pr.id, Infinity);
+          App.currentRecipe = lastRecipeMsg.recipe_data;
+          Recipe.currentServings = uiState.servings || lastRecipeMsg.recipe_data.default_servings;
+          Recipe.servingScale = uiState.servingScale || 1.0;
+          Recipe.display(lastRecipeMsg.recipe_data);
+
+          if (isProcessing) {
+            this._resumeStream(pr.id);
+          }
+        } else if (pr) {
           const cutoff = new Date(pr.createdAt).getTime();
           const oldRecipeMsgs = allRecipeMsgs.filter(m => new Date(m.created_at).getTime() < cutoff);
           const oldRecipeMsg = oldRecipeMsgs[oldRecipeMsgs.length - 1];
@@ -221,16 +245,18 @@ const Chat = {
               Recipe.handleRecipeEvent(lastRecipeMsg.recipe_data);
             }
           } else if (newRecipeFromReply && !oldRecipeMsg) {
+            // First recipe of the conversation — nothing to diff against, so
+            // there was never a decision to make. Settle the row.
             if (pr.status === 'done') {
               App.currentRecipe = lastRecipeMsg.recipe_data;
               Recipe.display(lastRecipeMsg.recipe_data);
-              this._acknowledgeReply(pr.id);
+              this._recordDecision(pr.id, 'accepted');
             }
           } else {
             App.currentRecipe = lastRecipeMsg.recipe_data;
             Recipe.display(lastRecipeMsg.recipe_data);
             if (pr.status === 'done') {
-              this._acknowledgeReply(pr.id);
+              this._recordDecision(pr.id, 'accepted');
             }
           }
 
@@ -290,7 +316,6 @@ const Chat = {
             this._finalizeActiveStatus();
           }
           this._removeSpinner();
-          if (status === 'done') this._flushDeferredAck();
           if (status === 'error' || status === 'not_found') {
             const errEl = document.createElement('div');
             errEl.className = 'msg-assistant px-4 py-2.5';
@@ -410,15 +435,30 @@ const Chat = {
 
     es.addEventListener('recipe', (e) => {
       const data = JSON.parse(e.data);
+      const eventIndex = data._idx;
       if (dedup(data)) return;
       console.log('[chat] ← recipe');
       currentTextEl = null;
       this._appendStatusLine(wrapper, t('chat.createdRecipe', { title: data.title }), false);
       if (typeof Recipe !== 'undefined') {
+        // `_idx` is the stream's own bookkeeping — keep it out of the recipe
+        // object so the accepted recipe equals the stored recipe_data.
+        const recipe = { ...data };
+        delete recipe._idx;
+
+        if (this._isDecided(replyId, eventIndex)) {
+          // Replay of a recipe the user already accepted/rejected (re-entering
+          // a recipe re-reads the whole event log). Adopt it silently instead
+          // of asking again.
+          App.currentRecipe = recipe;
+          Recipe.display(recipe);
+          return;
+        }
+
         // A modification renders the Accept/Reject diff — record which reply
         // it belongs to so the decision can be persisted server-side.
         if (App.currentRecipe) App.pendingReplyId = replyId;
-        Recipe.handleRecipeEvent(data);
+        Recipe.handleRecipeEvent(recipe);
       }
     });
 
@@ -454,7 +494,6 @@ const Chat = {
       if (dedup(data)) return;
       this._finalizeActiveStatus();
       this._removeSpinner();
-      this._flushDeferredAck();
       this._cleanupStream();
     });
 
@@ -506,30 +545,71 @@ const Chat = {
     });
   },
 
-  _acknowledgeReply(replyId) {
-    fetch(`/api/chat/${replyId}/acknowledge`, { method: 'PATCH' }).catch(() => {});
+  // Remember locally that this reply's diff is settled, so a replayed
+  // 'recipe' event (stream resume replays the whole log) can't re-open it.
+  _markDecided(replyId, eventIndex) {
+    const prev = this._decidedReplies.get(replyId);
+    if (prev !== undefined && prev >= eventIndex) return;
+    this._decidedReplies.set(replyId, eventIndex);
+    while (this._decidedReplies.size > this._maxDecidedReplies) {
+      this._decidedReplies.delete(this._decidedReplies.keys().next().value);
+    }
   },
 
-  // Persist an Accept/Reject decision for the diff currently on screen.
-  // If the reply is still streaming, defer the PATCH until 'done' — an
-  // early acknowledge would make the stale checker see a non-'processing'
-  // status and kill the live stream.
-  resolveDiffReply() {
+  _isDecided(replyId, eventIndex) {
+    const decidedAt = this._decidedReplies.get(replyId);
+    if (decidedAt === undefined) return false;
+    // A genuinely NEW recipe from the same reply (higher index) still deserves
+    // its own diff; anything at or below the decided index is a replay.
+    return eventIndex === undefined || eventIndex <= decidedAt;
+  },
+
+  // Persist a decision immediately — no deferral. The PATCH only touches
+  // `edit_decision`, never `status`, so writing it mid-stream can't trip the
+  // stale checker (the reason issue #16's fix deferred it, which is exactly
+  // how the decision got lost on re-entry).
+  async _recordDecision(replyId, decision, attempt = 0) {
+    try {
+      const res = await fetch(`/api/chat/${replyId}/acknowledge`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision }),
+      });
+      if (res.ok) return true;
+      if (res.status === 404 || res.status === 400) {
+        console.warn('[chat] decision not recorded:', res.status, replyId);
+        return false;
+      }
+      throw new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      if (attempt < 2) {
+        await new Promise(r => setTimeout(r, attempt === 0 ? 1000 : 3000));
+        return this._recordDecision(replyId, decision, attempt + 1);
+      }
+      console.warn('[chat] failed to record decision, will retry on next load:', err.message);
+      if (!this._unsentDecisions.some(d => d.replyId === replyId)) {
+        this._unsentDecisions.push({ replyId, decision });
+      }
+      return false;
+    }
+  },
+
+  _retryUnsentDecisions() {
+    if (!this._unsentDecisions.length) return;
+    const queued = this._unsentDecisions;
+    this._unsentDecisions = [];
+    for (const d of queued) this._recordDecision(d.replyId, d.decision);
+  },
+
+  // Persist the Accept/Reject decision for the diff currently on screen.
+  resolveDiffReply(decision = 'accepted') {
     const id = App.pendingReplyId;
     App.pendingReplyId = null;
     if (!id) return;
-    if (this.streaming && this._activeReplyId === id) {
-      this._ackOnDone = id;
-    } else {
-      this._acknowledgeReply(id);
-    }
-  },
-
-  _flushDeferredAck() {
-    if (this._ackOnDone) {
-      this._acknowledgeReply(this._ackOnDone);
-      this._ackOnDone = null;
-    }
+    // Record locally FIRST so an immediate re-entry (before the PATCH lands)
+    // doesn't re-show the diff.
+    this._markDecided(id, this._activeReplyId === id ? this._lastEventIndex : Infinity);
+    this._recordDecision(id, decision);
   },
 
   _cleanupStream() {
@@ -740,7 +820,8 @@ const Chat = {
     this._cleanupStream();
     this.messages = [];
     App.pendingReplyId = null;
-    this._ackOnDone = null;
+    // NOTE: _decidedReplies is deliberately NOT cleared here — it's what keeps
+    // a decision made moments ago from being forgotten on re-entry (issue #24).
     const container = document.getElementById('chat-messages');
     const welcome = document.getElementById('chat-welcome');
     container.innerHTML = '';
@@ -784,8 +865,12 @@ const Chat = {
       return;
     }
 
+    // Answering a diff by asking for something else instead of choosing: the
+    // proposal is moot, so settle it server-side. Left undecided (as it was
+    // before), it came back as a stale diff on a later re-entry.
     if (App.pendingRecipe) {
       App.pendingRecipe = null;
+      this.resolveDiffReply('superseded');
       if (typeof Recipe !== 'undefined' && App.currentRecipe) {
         Recipe.display(App.currentRecipe);
       }

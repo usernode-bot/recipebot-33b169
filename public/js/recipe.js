@@ -921,7 +921,20 @@ const Recipe = {
 
     display.innerHTML = html;
 
+    // One decision per diff: a second click (double-tap, or a click landing
+    // before the re-render swaps the markup out) must not re-run the UI-state
+    // remap or fire a second decision PATCH.
+    let decided = false;
+    const claimDecision = () => {
+      if (decided) return false;
+      decided = true;
+      display.querySelector('#diff-accept')?.setAttribute('disabled', 'disabled');
+      display.querySelector('#diff-reject')?.setAttribute('disabled', 'disabled');
+      return true;
+    };
+
     display.querySelector('#diff-accept')?.addEventListener('click', () => {
+      if (!claimDecision()) return;
       try { this._remapUIState(oldRecipe, newRecipe); } catch (e) { console.warn('remapUIState:', e); }
 
       App.currentRecipe = newRecipe;
@@ -934,13 +947,14 @@ const Recipe = {
       Store.refresh().then(() => {
         if (!this.diffMode && !App.pendingRecipe) this.display(App.currentRecipe);
       });
-      Chat.resolveDiffReply();
+      Chat.resolveDiffReply('accepted');
     });
 
     display.querySelector('#diff-reject')?.addEventListener('click', () => {
+      if (!claimDecision()) return;
       App.pendingRecipe = null;
       this.display(App.currentRecipe);
-      Chat.resolveDiffReply();
+      Chat.resolveDiffReply('rejected');
     });
   },
 

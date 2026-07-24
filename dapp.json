@@ -141,6 +141,21 @@
       "expectSelector": "#diff-accept"
     },
     {
+      "name": "Superseded older edit reopens without accept screen",
+      "path": "/?c=900006",
+      "expectSelector": "#cook-btn"
+    },
+    {
+      "name": "Superseded edit shows the accepted recipe",
+      "path": "/?c=900006",
+      "expectText": "Staging Demo Superseded Tofu Stir Fry"
+    },
+    {
+      "name": "Legacy acknowledged edit reopens without accept screen",
+      "path": "/?c=900007",
+      "expectSelector": "#cook-btn"
+    },
+    {
       "name": "Failed fix-up shows error status line",
       "path": "/?c=900005",
       "expectSelector": ".status-line-error"

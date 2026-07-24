@@ -144,6 +144,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS shared_recipes_share_slug
 ALTER TABLE shared_recipes ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT '{}';
 CREATE INDEX IF NOT EXISTS shared_recipes_tags ON shared_recipes USING GIN (tags);
 
+-- The user's Accept/Reject decision on a reply that proposed a recipe edit.
+-- Deliberately NOT folded into `status`: overloading the lifecycle column
+-- (issue #16's 'acknowledged' status) forced the client to defer the write
+-- until the stream ended, and any navigation in that window silently lost
+-- the decision (issue #24). `status` stays lifecycle-only
+-- ('processing'/'done'/'error'); this column is the decision.
+--   NULL         — still awaiting a decision (the diff should re-show)
+--   'accepted'   — user accepted the proposed recipe
+--   'rejected'   — user rejected it
+--   'superseded' — moot: the user moved on (sent another message / a newer
+--                  reply replaced this proposal)
+-- Legacy rows written before this column carry status = 'acknowledged' and
+-- are treated as decided by the read path, so no backfill is needed.
+ALTER TABLE pending_replies ADD COLUMN IF NOT EXISTS edit_decision VARCHAR(16);
+ALTER TABLE pending_replies ADD COLUMN IF NOT EXISTS decided_at TIMESTAMPTZ;
+
 -- Collections: named sets of recipes. visibility 'private' (owner only),
 -- 'group' (a group cookbook — members via collection_members), or 'public'
 -- (published to the community feed). PUBLIC table: scoping is enforced in
