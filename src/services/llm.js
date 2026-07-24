@@ -382,15 +382,25 @@ function buildMessages(history) {
   }));
 }
 
-function getCreateParams(config, messages, systemPrompt, { model } = {}) {
+function getCreateParams(config, messages, systemPrompt, { model, forceRecipeTool } = {}) {
   const resolvedModel = model || config.anthropicModel;
   const params = {
     model: resolvedModel,
-    max_tokens: 8192,
+    // 16384: a full recipe re-emit (per-ingredient grams/volume/macros) plus
+    // thinking can blow past 8192, which silently truncated the tool call.
+    max_tokens: 16384,
     system: systemPrompt,
     tools: TOOLS,
     messages,
   };
+
+  // Fix-up turns must actually re-send the recipe: force display_recipe.
+  // Forced tool_choice is incompatible with thinking, so omit it here —
+  // a format fix doesn't need it.
+  if (forceRecipeTool) {
+    params.tool_choice = { type: 'tool', name: 'display_recipe' };
+    return params;
+  }
 
   if (config.thinkingEnabled) {
     if (usesLegacyThinking(resolvedModel)) {

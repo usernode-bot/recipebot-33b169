@@ -315,6 +315,10 @@ async function runBackgroundStream(
       responseLog.push(entry);
     } else if (event === 'recipe') {
       responseLog.push({ type: 'recipe', kind: 'recipe', title: data.title, text: `Created recipe: ${data.title}` });
+    } else if (event === 'warning') {
+      const entry = { type: 'warning', text: data.text };
+      if (data.kind) entry.kind = data.kind;
+      responseLog.push(entry);
     }
     send(event, data);
   };
@@ -399,12 +403,19 @@ async function streamWithToolHandling(
 
   // Recipe-validation fix-up state, shared across turns: `attempts` counts
   // how many fix-up rounds we've asked the model for (bounded by
-  // MAX_VALIDATION_RETRIES), and `pending` marks that the NEXT createMessage
-  // call is a fix-up call — it gets a tighter timeout and '[recipe]' logging.
-  const fixState = { attempts: 0, pending: null };
+  // MAX_VALIDATION_RETRIES), `pending` marks that the NEXT createMessage
+  // call is a fix-up call — it gets a tighter timeout, forced tool_choice,
+  // and '[recipe]' logging — and `lastErrors` keeps the most recent
+  // validation errors for failure reporting.
+  const fixState = { attempts: 0, pending: null, lastErrors: null };
 
   for (let turn = 0; turn < 5; turn++) {
-    const params = getCreateParams(config, currentMessages, systemPrompt, { model: userModel });
+    const params = getCreateParams(config, currentMessages, systemPrompt, {
+      model: userModel,
+      // Fix-up turns force display_recipe via tool_choice so the model can't
+      // answer with text only and leave the spinner hanging.
+      forceRecipeTool: !!fixState.pending,
+    });
 
     log.debug('chat', `Turn ${turn} request`, {
       model: params.model,
@@ -447,23 +458,19 @@ async function streamWithToolHandling(
       throw err;
     }
 
+    const calledDisplayRecipe = response.content.some(
+      (b) => b.type === 'tool_use' && b.name === 'display_recipe'
+    );
+    const truncated = response.stop_reason === 'max_tokens';
+
     if (fixup) {
       fixState.pending = null;
-      const calledDisplayRecipe = response.content.some(
-        (b) => b.type === 'tool_use' && b.name === 'display_recipe'
-      );
       log.info('recipe', 'Fix-up response received', {
         attempt: fixup.attempt,
         elapsed_ms: Date.now() - fixup.startedAt,
         stop_reason: response.stop_reason,
         called_display_recipe: calledDisplayRecipe,
       });
-      if (!calledDisplayRecipe) {
-        log.warn('recipe', 'Fix-up turn made no display_recipe call', {
-          attempt: fixup.attempt,
-          stop_reason: response.stop_reason,
-        });
-      }
     }
 
     log.debug('chat', `Turn ${turn} response`, {
@@ -518,7 +525,35 @@ async function streamWithToolHandling(
       );
     }
 
-    if (toolResults.length === 0 || response.stop_reason !== 'tool_use') {
+    // A fix-up turn that produced no display_recipe call (possible if an
+    // upstream proxy strips tool_choice), or any turn truncated at
+    // max_tokens with its display_recipe block dropped, must fail loudly —
+    // ending with 'done' here is exactly the silent "Fixing recipe
+    // format..." dead end.
+    if (!calledDisplayRecipe && (fixup || truncated)) {
+      log.error('recipe', 'Recipe reply failed without a display_recipe call', {
+        fixup_attempt: fixup ? fixup.attempt : null,
+        stop_reason: response.stop_reason,
+        truncated,
+      });
+      const reason = truncated
+        ? 'The response was cut off by the output length limit.'
+        : (fixState.lastErrors?.length
+          ? `Validation errors: ${fixState.lastErrors.slice(0, 3).join('; ')}.`
+          : 'The display_recipe tool call never arrived.');
+      await failRecipeReply(pool, convId, responseLog, reason);
+    }
+
+    // Truncation after a completed recipe call: the recipe went through but
+    // trailing text was cut — deliver what we have and say so.
+    if (truncated && !fixState.pending) {
+      log.warn('chat', 'Response truncated at max_tokens', { turn });
+      send('warning', { kind: 'truncated', text: 'Response was cut off' });
+    }
+
+    // Keep looping while a fix-up is owed even if stop_reason isn't
+    // 'tool_use' (e.g. max_tokens hit right after the tool block closed).
+    if (toolResults.length === 0 || (response.stop_reason !== 'tool_use' && !fixState.pending)) {
       return { usage: totalUsage };
     }
 
@@ -553,12 +588,37 @@ async function streamWithToolHandling(
     log.error('recipe', 'Turn limit reached with recipe fix-up still pending', {
       attempt: fixState.pending.attempt,
     });
-    const err = new Error('Recipe fix-up incomplete at turn limit');
-    err.userMessage = "I couldn't format that recipe correctly. Please try asking again.";
-    throw err;
+    const reason = fixState.lastErrors?.length
+      ? `Validation errors: ${fixState.lastErrors.slice(0, 3).join('; ')}.`
+      : 'The turn limit was reached before the fix-up completed.';
+    await failRecipeReply(pool, convId, responseLog, reason);
   }
 
   return { usage: totalUsage };
+}
+
+// Terminal recipe failure: mark the in-flight fix-up log entry as failed
+// (so reloaded history shows an ✕, not a ✓), record a sentinel row in the
+// conversation so the model's next turn knows the edit never applied, then
+// throw a coded error that the background-stream catch surfaces to the user.
+async function failRecipeReply(pool, convId, responseLog, reason) {
+  for (let i = responseLog.length - 1; i >= 0; i--) {
+    if (responseLog[i].kind === 'fixup') {
+      responseLog[i].ok = false;
+      break;
+    }
+  }
+  await pool.query(
+    'INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)',
+    [convId, 'assistant',
+      `[Recipe update FAILED — display_recipe was not called successfully. ${reason} ` +
+      'The current recipe is unchanged; you must call display_recipe with the full corrected recipe on your next turn.]']
+  ).catch((err) => log.warn('chat', 'Failed to persist recipe-failure sentinel', { message: err.message }));
+
+  const err = new Error('Recipe fix-up failed');
+  err.code = 'recipe_fixup_failed';
+  err.userMessage = "I couldn't apply the changes to the recipe — the update didn't come through correctly. Please try asking again.";
+  throw err;
 }
 
 // Fire-and-forget upsert of one API turn's token usage into llm_usage.
@@ -619,6 +679,7 @@ async function handleRecipeDisplay(recipeData, send, convId, pool, userId, fixSt
       });
       fixState.attempts = 0;
     }
+    fixState.lastErrors = null;
     send('recipe', recipe);
     await updateConversationTitle(pool, convId, recipe.title, send);
     await pool.query(
@@ -634,6 +695,7 @@ async function handleRecipeDisplay(recipeData, send, convId, pool, userId, fixSt
   if (fixState.attempts < MAX_VALIDATION_RETRIES) {
     fixState.attempts += 1;
     fixState.pending = { attempt: fixState.attempts, startedAt: Date.now() };
+    fixState.lastErrors = errors;
     send('status', { text: 'Fixing recipe format...', kind: 'fixup' });
     log.warn('recipe', 'Requesting fix-up from model', {
       attempt: fixState.attempts,
@@ -648,7 +710,8 @@ async function handleRecipeDisplay(recipeData, send, convId, pool, userId, fixSt
     errors,
   });
   fixState.attempts = 0;
-  send('warning', { text: 'Recipe may have formatting issues' });
+  fixState.lastErrors = null;
+  send('warning', { text: 'Recipe may have formatting issues', kind: 'formatting' });
   send('recipe', recipe);
   await updateConversationTitle(pool, convId, recipe.title || 'Untitled', send);
   await pool.query(

@@ -147,6 +147,8 @@ I18N.register('de', {
   'chat.searching': 'Suche: {query}',
   'chat.reading': 'Liest: {url}',
   'chat.fixingFormat': 'Rezeptformat wird korrigiert...',
+  'chat.recipeFormatWarning': 'Dieses Rezept kann Formatierungsprobleme haben',
+  'chat.responseTruncated': 'Die Antwort wurde vorzeitig abgeschnitten. Bitte versuche es erneut.',
   'chat.rateLimitBadge': '{used}/{limit} heute',
   'chat.aiUnavailablePlaceholder': 'KI ist in dieser Umgebung nicht verfügbar (Staging-Vorschauen haben keinen KI-Zugriff).',
   'chat.signInPlaceholder': 'Melde dich an, um mit der KI zu kochen.',
@@ -169,6 +171,7 @@ I18N.register('de', {
   'errors.timeout': 'Die KI-Anfrage ist abgelaufen. Bitte versuche es erneut.',
   'errors.network_error': 'Die KI-Anfrage ist fehlgeschlagen. Bitte versuche es erneut.',
   'errors.llm_failed': 'Die KI-Anfrage ist fehlgeschlagen. Bitte versuche es erneut.',
+  'errors.recipe_fixup_failed': 'Ich konnte die Änderungen am Rezept nicht anwenden — die Aktualisierung ist nicht korrekt angekommen. Bitte versuche es erneut.',
 
   'signin.title': 'Melde dich dafür an',
   'signin.body': 'Deine Box, Kochbücher und der KI-Koch leben in deinem Usernode-Konto. Es dauert nur einen Moment — dieses Rezept bleibt hier.',

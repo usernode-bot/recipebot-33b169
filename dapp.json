@@ -141,6 +141,16 @@
       "expectSelector": "#diff-accept"
     },
     {
+      "name": "Failed fix-up shows error status line",
+      "path": "/?c=900005",
+      "expectSelector": ".status-line-error"
+    },
+    {
+      "name": "Failed fix-up shows warning status line",
+      "path": "/?c=900005",
+      "expectSelector": ".status-line-warning"
+    },
+    {
       "name": "Collections section renders",
       "path": "/",
       "expectSelector": "#home-collections"

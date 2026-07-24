@@ -159,6 +159,8 @@ I18N.register('en', {
   'chat.searching': 'Searching: {query}',
   'chat.reading': 'Reading: {url}',
   'chat.fixingFormat': 'Fixing recipe format...',
+  'chat.recipeFormatWarning': 'This recipe may have formatting issues',
+  'chat.responseTruncated': 'The response was cut off before finishing. Please try again.',
   'chat.rateLimitBadge': '{used}/{limit} today',
   'chat.aiUnavailablePlaceholder': 'AI is unavailable in this environment (staging previews have no AI access).',
   'chat.signInPlaceholder': 'Sign in to cook with the AI.',
@@ -182,6 +184,7 @@ I18N.register('en', {
   'errors.timeout': 'The AI request timed out. Please try again.',
   'errors.network_error': 'The AI request failed. Please try again.',
   'errors.llm_failed': 'The AI request failed. Please try again.',
+  'errors.recipe_fixup_failed': "I couldn't apply the changes to the recipe — the update didn't come through correctly. Please try asking again.",
 
   // ── Sign-in prompts ──
   'signin.title': 'Sign in to do this',

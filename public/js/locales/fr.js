@@ -147,6 +147,8 @@ I18N.register('fr', {
   'chat.searching': 'Recherche : {query}',
   'chat.reading': 'Lecture : {url}',
   'chat.fixingFormat': 'Correction du format de la recette...',
+  'chat.recipeFormatWarning': 'Cette recette peut présenter des problèmes de format',
+  'chat.responseTruncated': 'La réponse a été coupée avant la fin. Veuillez réessayer.',
   'chat.rateLimitBadge': "{used}/{limit} aujourd'hui",
   'chat.aiUnavailablePlaceholder': "L'IA n'est pas disponible dans cet environnement (les aperçus staging n'ont pas accès à l'IA).",
   'chat.signInPlaceholder': "Connectez-vous pour cuisiner avec l'IA.",
@@ -169,6 +171,7 @@ I18N.register('fr', {
   'errors.timeout': "La requête IA a expiré. Veuillez réessayer.",
   'errors.network_error': 'La requête IA a échoué. Veuillez réessayer.',
   'errors.llm_failed': 'La requête IA a échoué. Veuillez réessayer.',
+  'errors.recipe_fixup_failed': "Je n'ai pas pu appliquer les modifications à la recette — la mise à jour n'est pas arrivée correctement. Veuillez réessayer.",
 
   'signin.title': 'Connectez-vous pour faire cela',
   'signin.body': "Votre boîte, vos carnets et le cuisinier IA vivent dans votre compte Usernode. Cela ne prend qu'un instant — cette recette sera toujours là.",

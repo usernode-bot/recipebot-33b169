@@ -11,6 +11,7 @@ const Chat = {
   _statusIconSpinner: `<svg class="status-icon spinning" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="8" stroke-linecap="round"/></svg>`,
   _statusIconCheck: `<svg class="status-icon" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   _statusIconError: `<svg class="status-icon status-icon-error" viewBox="0 0 16 16" fill="none"><path d="M4.5 4.5L11.5 11.5M11.5 4.5L4.5 11.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+  _statusIconWarning: `<svg class="status-icon status-icon-warning" viewBox="0 0 16 16" fill="none"><path d="M8 2L14.5 13.5H1.5L8 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6.5V9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11.5" r="0.9" fill="currentColor"/></svg>`,
 
   _createSpinner() {
     const el = document.createElement('div');
@@ -59,6 +60,24 @@ const Chat = {
     if (data.kind === 'fetch') return t('chat.reading', { url: data.url });
     if (data.kind === 'fixup') return t('chat.fixingFormat');
     return data.text;
+  },
+
+  // Warning events/log entries: localized by `kind`, falling back to the
+  // persisted English text for rows written before kinds existed.
+  _warningText(data) {
+    if (data.kind === 'truncated') return t('chat.responseTruncated');
+    if (data.kind === 'formatting') return t('chat.recipeFormatWarning');
+    return data.text || t('chat.recipeFormatWarning');
+  },
+
+  _appendWarningLine(target, text) {
+    const line = document.createElement('div');
+    line.className = 'status-line status-line-warning';
+    line.innerHTML = `${this._statusIconWarning}<span>${text}</span>`;
+    target.appendChild(line);
+    const container = document.getElementById('chat-messages');
+    container.scrollTop = container.scrollHeight;
+    return line;
   },
 
   // Server errors carry a machine `code`; map it to a localized message and
@@ -482,6 +501,8 @@ const Chat = {
       const data = JSON.parse(e.data);
       if (dedup(data)) return;
       console.log('[chat] ← warning', data);
+      currentTextEl = null;
+      this._appendWarningLine(wrapper, this._warningText(data));
     });
   },
 
@@ -592,16 +613,29 @@ const Chat = {
       const line = document.createElement('div');
       line.className = 'status-line';
       const icon = document.createElement('span');
-      icon.innerHTML = this._statusIconCheck;
+      // Failed steps (e.g. a fix-up that never produced a recipe) show an ✕,
+      // warnings a triangle; everything else keeps the checkmark. Entries
+      // persisted before `ok` existed have no field and render as before.
+      if (entry.type === 'warning') {
+        line.classList.add('status-line-warning');
+        icon.innerHTML = this._statusIconWarning;
+      } else if (entry.ok === false) {
+        line.classList.add('status-line-error');
+        icon.innerHTML = this._statusIconError;
+      } else {
+        icon.innerHTML = this._statusIconCheck;
+      }
       line.appendChild(icon);
 
       // Localized label: kind-mapped when the entry carries structured
       // fields (kind/title/query/url), the stored English text otherwise.
-      const entryText = entry.kind === 'thinking' || entry.type === 'thinking'
-        ? t('chat.thinking')
-        : entry.kind === 'recipe' || (entry.type === 'recipe' && entry.title)
-          ? t('chat.createdRecipe', { title: entry.title })
-          : this._statusText(entry);
+      const entryText = entry.type === 'warning'
+        ? this._warningText(entry)
+        : entry.kind === 'thinking' || entry.type === 'thinking'
+          ? t('chat.thinking')
+          : entry.kind === 'recipe' || (entry.type === 'recipe' && entry.title)
+            ? t('chat.createdRecipe', { title: entry.title })
+            : this._statusText(entry);
 
       if (entry.type === 'thinking' && entry.detail) {
         const label = document.createElement('span');
@@ -677,6 +711,10 @@ const Chat = {
         }
       } else if (skipAssistant) {
         // Covered by the response_log — skip
+      } else if (msg.role === 'assistant' && /^\[Recipe[ :]/.test(msg.content || '')) {
+        // Internal sentinel rows ("[Recipe: <title>]", "[Recipe update
+        // FAILED — …]") are prompt-history bookkeeping, not user-facing
+        // prose — never render them even without a covering response_log.
       } else {
         this.appendMessage(msg.role, msg.content);
       }

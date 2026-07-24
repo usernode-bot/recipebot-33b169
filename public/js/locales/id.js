@@ -147,6 +147,8 @@ I18N.register('id', {
   'chat.searching': 'Mencari: {query}',
   'chat.reading': 'Membaca: {url}',
   'chat.fixingFormat': 'Memperbaiki format resep...',
+  'chat.recipeFormatWarning': 'Resep ini mungkin memiliki masalah format',
+  'chat.responseTruncated': 'Respons terpotong sebelum selesai. Silakan coba lagi.',
   'chat.rateLimitBadge': '{used}/{limit} hari ini',
   'chat.aiUnavailablePlaceholder': 'AI tidak tersedia di lingkungan ini (pratinjau staging tidak punya akses AI).',
   'chat.signInPlaceholder': 'Masuk untuk memasak dengan AI.',
@@ -169,6 +171,7 @@ I18N.register('id', {
   'errors.timeout': 'Permintaan AI kehabisan waktu. Silakan coba lagi.',
   'errors.network_error': 'Permintaan AI gagal. Silakan coba lagi.',
   'errors.llm_failed': 'Permintaan AI gagal. Silakan coba lagi.',
+  'errors.recipe_fixup_failed': 'Saya tidak bisa menerapkan perubahan pada resep — pembaruan tidak diterima dengan benar. Silakan coba lagi.',
 
   'signin.title': 'Masuk untuk melakukan ini',
   'signin.body': 'Kotakmu, buku masak, dan koki AI ada di akun Usernode-mu. Hanya sebentar — resep ini akan tetap di sini.',

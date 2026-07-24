@@ -261,6 +261,37 @@ async function seedStagingDemo(pool) {
   );
   log.info('db', 'Seeded staging edit-decision demo conversations');
 
+  // Failed-fix-up demo: a conversation whose last reply ended with a failed
+  // "Fixing recipe format..." step, so reloaded history shows the ✕ and
+  // warning icons (silent-failure fix) instead of misleading checkmarks.
+  await pool.query(
+    `INSERT INTO conversations (id, user_id, title, preferences)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (id) DO NOTHING`,
+    [900005, DEMO_USER_ID, 'Staging demo — Failed recipe fix-up', JSON.stringify({ complexity: 'normal', serving: 'normal' })]
+  );
+  const { rows: fixupDemoRows } = await pool.query(
+    'SELECT 1 FROM messages WHERE conversation_id = $1 LIMIT 1',
+    [900005]
+  );
+  if (fixupDemoRows.length === 0) {
+    const failedReplyLog = [
+      { type: 'thinking', kind: 'thinking', text: 'Thinking...' },
+      { type: 'text', content: 'Doubling the garlic and halving the fennel now.' },
+      { type: 'status', kind: 'fixup', text: 'Fixing recipe format...', ok: false },
+      { type: 'warning', kind: 'truncated', text: 'Response was cut off' },
+    ];
+    await pool.query(
+      `INSERT INTO messages (conversation_id, role, content, recipe_data, response_log, created_at) VALUES
+       ($1, 'user', 'Staging demo: make me a quick chicken stir fry', NULL, NULL, NOW() - interval '12 min'),
+       ($1, 'assistant', '[Recipe: Staging Demo Chicken Stir Fry]', $2, NULL, NOW() - interval '11 min'),
+       ($1, 'user', 'Staging demo: double the garlic', NULL, $3, NOW() - interval '5 min'),
+       ($1, 'assistant', '[Recipe update FAILED — display_recipe was not called successfully. The response was cut off by the output length limit. The current recipe is unchanged; you must call display_recipe with the full corrected recipe on your next turn.]', NULL, NULL, NOW() - interval '4 min')`,
+      [900005, JSON.stringify(DEMO_RECIPE), JSON.stringify(failedReplyLog)]
+    );
+    log.info('db', 'Seeded staging failed-fix-up demo conversation');
+  }
+
   // Social features: seed the community feed with two shared recipes from
   // two distinct fake creators, plus ratings so aggregates visibly render.
   // Fixed high IDs + ON CONFLICT keep this idempotent across reboots.

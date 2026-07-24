@@ -147,6 +147,8 @@ I18N.register('es', {
   'chat.searching': 'Buscando: {query}',
   'chat.reading': 'Leyendo: {url}',
   'chat.fixingFormat': 'Corrigiendo el formato de la receta...',
+  'chat.recipeFormatWarning': 'La receta puede tener problemas de formato',
+  'chat.responseTruncated': 'La respuesta se cortó antes de terminar. Inténtalo de nuevo.',
   'chat.rateLimitBadge': '{used}/{limit} hoy',
   'chat.aiUnavailablePlaceholder': 'La IA no está disponible en este entorno (las vistas previas de staging no tienen acceso a la IA).',
   'chat.signInPlaceholder': 'Inicia sesión para cocinar con la IA.',
@@ -169,6 +171,7 @@ I18N.register('es', {
   'errors.timeout': 'La solicitud a la IA agotó el tiempo de espera. Inténtalo de nuevo.',
   'errors.network_error': 'La solicitud a la IA falló. Inténtalo de nuevo.',
   'errors.llm_failed': 'La solicitud a la IA falló. Inténtalo de nuevo.',
+  'errors.recipe_fixup_failed': 'No pude aplicar los cambios a la receta — la actualización no llegó correctamente. Vuelve a intentarlo.',
 
   'signin.title': 'Inicia sesión para hacer esto',
   'signin.body': 'Tu caja, tus recetarios y el cocinero IA viven en tu cuenta de Usernode. Solo toma un momento — esta receta seguirá aquí.',

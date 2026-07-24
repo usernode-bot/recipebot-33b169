@@ -221,6 +221,21 @@ h1, h2, h3, .font-display {
   color: #ef4444;
 }
 
+.status-line.status-line-error,
+:is(.dark .status-line.status-line-error) {
+  color: #ef4444;
+}
+
+.status-line .status-icon.status-icon-warning,
+:is(.dark .status-line .status-icon.status-icon-warning) {
+  color: #d97706;
+}
+
+.status-line.status-line-warning,
+:is(.dark .status-line.status-line-warning) {
+  color: #d97706;
+}
+
 :is(.dark .status-line) {
   color: #7A82A0;
 }
