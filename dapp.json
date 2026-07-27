@@ -191,7 +191,7 @@
       "expectText": "Staging Demo Weeknight"
     },
     {
-      "name": "Seeded group cookbook appears",
+      "name": "Seeded shared collection appears",
       "path": "/",
       "expectText": "Staging Demo Family Cookbook"
     },
@@ -244,6 +244,56 @@
       "name": "Recipe deep link opens recipe tab on mobile",
       "path": "/?c=900003 @mobile",
       "expectSelector": "#recipe-panel:not(.panel-hidden) #cook-btn"
+    },
+    {
+      "name": "Shared recipe deep link opens recipe tab on mobile",
+      "path": "/?s=900001 @mobile",
+      "expectSelector": "#recipe-panel:not(.panel-hidden) #cook-btn"
+    },
+    {
+      "name": "Homepage card grid is shrinkable on mobile",
+      "path": "/ @mobile",
+      "expectSelector": "#home-mine-list.grid-cols-1"
+    },
+    {
+      "name": "Homepage groups sections into a your-box band",
+      "path": "/",
+      "expectSelector": "#home-band-mine #home-mine-list"
+    },
+    {
+      "name": "Homepage groups sections into a community band",
+      "path": "/",
+      "expectSelector": "#home-band-community #home-community-list"
+    },
+    {
+      "name": "Homepage shows seeded drafts",
+      "path": "/",
+      "expectText": "Staging demo — Draft: birthday cake ideas"
+    },
+    {
+      "name": "Collection deep link opens the collection",
+      "path": "/?coll=900002",
+      "expectText": "Staging Demo Community Picks"
+    },
+    {
+      "name": "Collection comments render",
+      "path": "/?coll=900002",
+      "expectText": "great weeknight shelf"
+    },
+    {
+      "name": "Shared collection is labelled a shared collection",
+      "path": "/?coll=900003",
+      "expectText": "Shared collection"
+    },
+    {
+      "name": "Shared collection lists its members",
+      "path": "/?coll=900003",
+      "expectText": "3 members"
+    },
+    {
+      "name": "Private collection offers Make public",
+      "path": "/?coll=900001",
+      "expectText": "Make public"
     },
     {
       "name": "Public recipe page renders without login",

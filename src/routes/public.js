@@ -157,9 +157,14 @@ function publicRoutes(config) {
   router.get('/api/public/collections', async (req, res) => {
     try {
       const { rows } = await pool.query(
+        // item_count mirrors what the public detail actually renders: only
+        // items whose source is a LIVE shared recipe (see the detail route).
         `SELECT c.id, c.name, c.description, c.username, c.created_at,
                 (SELECT COUNT(*) FROM collection_items i
-                 WHERE i.collection_id = c.id)::int AS item_count
+                 JOIN shared_recipes s ON s.id = i.shared_recipe_id
+                 WHERE i.collection_id = c.id)::int AS item_count,
+                (SELECT COUNT(*) FROM collection_comments cc
+                 WHERE cc.collection_id = c.id AND cc.deleted_at IS NULL)::int AS comment_count
          FROM collections c
          WHERE c.visibility = 'public'
          ORDER BY c.created_at DESC`
@@ -200,13 +205,26 @@ function publicRoutes(config) {
         [id]
       );
 
+      // Comment thread: live rows only, usernames but never user ids.
+      // Anonymous readers get the thread read-only (the SPA swaps the input
+      // box for a sign-in prompt).
+      const { rows: comments } = await pool.query(
+        `SELECT id, username, body, created_at FROM collection_comments
+         WHERE collection_id = $1 AND deleted_at IS NULL
+         ORDER BY created_at ASC LIMIT 200`,
+        [id]
+      );
+
       res.set('Cache-Control', 'public, max-age=60');
       res.json({
         ...coll[0],
         is_owner: false,
         is_member: false,
+        is_shared: false,
         invite_token: null,
         members: [],
+        comments: comments.map((c) => ({ ...c, deleted: false, is_mine: false })),
+        comment_count: comments.length,
         items: items.map((i) => ({
           id: i.id,
           shared_recipe_id: i.shared_recipe_id,

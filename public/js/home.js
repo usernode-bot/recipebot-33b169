@@ -1,8 +1,9 @@
-// Homepage ("the box"): search + new recipe toolbar, Collections (incl.
-// group cookbooks), then "Your favorites" + "Your recipes" + "Your
-// conversations" + "Community recipes" + public collections.
+// Homepage ("the box"): a sticky search + new-recipe toolbar over two
+// labelled bands (issue #32) —
+//   Your box:        favorites → your recipes → collections → drafts
+//   From community:  community recipes → community collections
 // Sections are hidden entirely when empty; the whole page shows an empty
-// state only when all sections have nothing to render.
+// state only when every section has nothing to render.
 const Home = {
   shared: [],
   mine: [],
@@ -14,6 +15,9 @@ const Home = {
   tagFilter: new Set(),
   // When set, the homepage shows this collection's detail instead of the box.
   activeCollection: null,
+  // Drafts are collapsed past this many rows until "Show all" is clicked.
+  DRAFT_PREVIEW: 3,
+  draftsExpanded: false,
 
   esc(str) {
     return String(str ?? '')
@@ -63,7 +67,15 @@ const Home = {
     } catch { /* retry on next visit */ }
   },
 
+  // Writes the "· N" count pill in a section header.
+  _setCount(sectionId, n) {
+    const el = document.getElementById(sectionId)?.querySelector('.home-count');
+    if (el) el.textContent = n ? `· ${n}` : '';
+  },
+
   render() {
+    const bandMine = document.getElementById('home-band-mine');
+    const bandComm = document.getElementById('home-band-community');
     const collSection = document.getElementById('home-collections');
     const favSection = document.getElementById('home-favorites');
     const mineSection = document.getElementById('home-mine');
@@ -73,19 +85,25 @@ const Home = {
     const emptyEl = document.getElementById('home-empty');
     const noMatchEl = document.getElementById('home-no-match');
     const detailEl = document.getElementById('collection-view');
-    const toolbar = document.getElementById('home-search')?.parentElement;
+    const toolbar = document.getElementById('home-toolbar');
     if (!favSection || !mineSection || !commSection) return;
 
-    // Collection detail replaces the box until closed.
+    // Collection detail replaces the box until closed. Blanking the two
+    // bands covers every section inside them.
     const inDetail = !!this.activeCollection;
     detailEl?.classList.toggle('hidden', !inDetail);
-    for (const el of [collSection, favSection, mineSection, convSection, commSection, pubCollSection, emptyEl, noMatchEl, toolbar]) {
+    for (const el of [bandMine, bandComm, emptyEl, noMatchEl, toolbar]) {
       if (el) el.style.display = inDetail ? 'none' : '';
     }
     if (inDetail) {
       this.renderCollectionDetail(detailEl);
       return;
     }
+
+    // Anonymous visitors get the community band only, with a lead-in.
+    if (bandMine) bandMine.style.display = App.isAnonymous ? 'none' : '';
+    document.getElementById('home-anon-lead')
+      ?.classList.toggle('hidden', !App.isAnonymous);
 
     const q = this.searchQuery.trim().toLowerCase();
     const matches = (name, tags) => {
@@ -111,18 +129,6 @@ const Home = {
     const bareConvs = this.conversations.filter(
       (c) => !recipeConvIds.has(c.id) && matches(c.title || t('card.newConversation')));
 
-    // Collections section (the box's organizer) — hidden entirely for
-    // anonymous visitors: an empty personal box is noise, not a prompt.
-    collSection?.classList.toggle('hidden', !!App.isAnonymous);
-    const collList = document.getElementById('home-collections-list');
-    if (collList && !App.isAnonymous) {
-      collList.innerHTML = '';
-      const colls = this.collections.filter((c) => matches(c.name));
-      colls.forEach((c) => collList.appendChild(this.collectionCard(c)));
-      document.getElementById('home-collections-empty')
-        ?.classList.toggle('hidden', colls.length > 0);
-    }
-
     this.renderTagFilters();
 
     const favList = document.getElementById('home-favorites-list');
@@ -130,35 +136,76 @@ const Home = {
     favOwn.forEach((r) => favList.appendChild(this.ownCard(r)));
     favShared.forEach((s) => favList.appendChild(this.sharedCard(s, { favoritesSection: true })));
     favSection.classList.toggle('hidden', favOwn.length + favShared.length === 0);
+    this._setCount('home-favorites', favOwn.length + favShared.length);
 
     const mineList = document.getElementById('home-mine-list');
     mineList.innerHTML = '';
     mineRest.forEach((r) => mineList.appendChild(this.ownCard(r)));
     mineSection.classList.toggle('hidden', mineRest.length === 0);
+    this._setCount('home-mine', mineRest.length);
+
+    // Collections (the box's organizer) — always shown when signed in, so
+    // "+ New collection" is reachable from an empty box.
+    const collList = document.getElementById('home-collections-list');
+    let colls = [];
+    if (collList && !App.isAnonymous) {
+      collList.innerHTML = '';
+      colls = this.collections.filter((c) => matches(c.name));
+      colls.forEach((c) => collList.appendChild(this.collectionCard(c)));
+      document.getElementById('home-collections-empty')
+        ?.classList.toggle('hidden', colls.length > 0);
+      this._setCount('home-collections', colls.length);
+    }
 
     if (convSection) {
       const convList = document.getElementById('home-convs-list');
+      const moreBtn = document.getElementById('home-convs-more');
       convList.innerHTML = '';
-      bareConvs.forEach((c) => convList.appendChild(this.conversationCard(c)));
+      const shownDrafts = this.draftsExpanded
+        ? bareConvs : bareConvs.slice(0, this.DRAFT_PREVIEW);
+      shownDrafts.forEach((c) => convList.appendChild(this.conversationRow(c)));
       convSection.classList.toggle('hidden', bareConvs.length === 0);
+      this._setCount('home-convs', bareConvs.length);
+      if (moreBtn) {
+        const hidden = bareConvs.length - shownDrafts.length;
+        moreBtn.classList.toggle('hidden', hidden === 0 && !this.draftsExpanded);
+        moreBtn.textContent = this.draftsExpanded
+          ? t('home.draftsLess') : t('home.draftsMore', { n: hidden });
+        moreBtn.onclick = () => {
+          this.draftsExpanded = !this.draftsExpanded;
+          this.render();
+        };
+      }
     }
 
     const commList = document.getElementById('home-community-list');
     commList.innerHTML = '';
     shared.forEach((s) => commList.appendChild(this.sharedCard(s)));
     commSection.classList.toggle('hidden', shared.length === 0 && !this.tagFilter.size);
+    this._setCount('home-community', shared.length);
 
+    let pubs = [];
     if (pubCollSection) {
       const pubList = document.getElementById('home-public-collections-list');
       pubList.innerHTML = '';
-      const pubs = this.publicCollections.filter((c) => matches(c.name));
+      pubs = this.publicCollections.filter((c) => matches(c.name));
       pubs.forEach((c) => pubList.appendChild(this.publicCollectionCard(c)));
       pubCollSection.classList.toggle('hidden', pubs.length === 0);
+      this._setCount('home-public-collections', pubs.length);
+    }
+
+    // The community band still carries its label when both its sections are
+    // empty (a signed-out visitor on a fresh install would otherwise see a
+    // bare page); the box band hides its own sections individually.
+    if (bandComm) {
+      bandComm.style.display =
+        (shared.length === 0 && !this.tagFilter.size && pubs.length === 0 && !App.isAnonymous)
+          ? 'none' : '';
     }
 
     const visible =
       favOwn.length + favShared.length + mineRest.length + bareConvs.length + shared.length;
-    emptyEl?.classList.toggle('hidden', !(visible === 0 && !q && this.collections.length === 0));
+    emptyEl?.classList.toggle('hidden', !(visible === 0 && !q && colls.length === 0));
     noMatchEl?.classList.toggle('hidden', !(visible === 0 && q));
   },
 
@@ -193,9 +240,21 @@ const Home = {
   // Editorial "newspaper clipping": white card on the paper page, hairline
   // border, tight radius, whisper of a shadow. A brass kicker (below) names
   // what kind of clipping it is.
+  // min-w-0 matters: without it the card's min-content width (driven by the
+  // line-clamped description, which is a -webkit-box and contributes close
+  // to its max-content width) becomes the floor for its grid track and the
+  // page scrolls sideways on a phone (issue #31).
   _cardShell() {
     const el = document.createElement('div');
-    el.className = 'rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4 flex flex-col gap-2 shadow-[0_1px_3px_rgba(31,43,71,0.06)]';
+    el.className = 'min-w-0 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4 flex flex-col gap-2 shadow-[0_1px_3px_rgba(31,43,71,0.06)]';
+    return el;
+  },
+
+  // Two-line clamped description, safe to put straight into a card.
+  _description(text) {
+    const el = document.createElement('p');
+    el.className = 'min-w-0 text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed line-clamp-2 break-words';
+    el.textContent = text;
     return el;
   },
 
@@ -245,11 +304,13 @@ const Home = {
     return btn;
   },
 
+  // Icon-only so the five-button action row still fits a phone-width card.
   _deleteBtn(conversationId) {
     const btn = document.createElement('button');
-    btn.className = 'px-3 py-1.5 text-xs rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-red-100 dark:hover:bg-red-900/40 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors ml-auto';
-    btn.textContent = t('common.delete');
+    btn.className = 'p-1.5 rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-red-100 dark:hover:bg-red-900/40 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors ml-auto shrink-0';
+    btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>';
     btn.title = t('tip.deleteConversation');
+    btn.setAttribute('aria-label', t('common.delete'));
     btn.addEventListener('click', async () => {
       if (typeof Store !== 'undefined') await Store.deleteConversation(conversationId);
       this.refresh();
@@ -279,12 +340,7 @@ const Home = {
     head.appendChild(heart);
     el.appendChild(head);
 
-    if (recipe.description) {
-      const desc = document.createElement('p');
-      desc.className = 'text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed line-clamp-2';
-      desc.textContent = recipe.description;
-      el.appendChild(desc);
-    }
+    if (recipe.description) el.appendChild(this._description(recipe.description));
 
     const meta = this._metaLine(recipe);
     if (meta) {
@@ -295,7 +351,7 @@ const Home = {
     }
 
     const actions = document.createElement('div');
-    actions.className = 'flex flex-wrap gap-2 mt-auto pt-1';
+    actions.className = 'flex flex-wrap items-center gap-2 mt-auto pt-1';
     const openBtn = this._actionBtn(t('common.open'), true);
     openBtn.addEventListener('click', () => {
       if (typeof Store !== 'undefined') Store.selectConversation(r.conversation_id);
@@ -322,33 +378,24 @@ const Home = {
     return el;
   },
 
-  // Card for one of the requester's conversations that has no recipe yet.
-  conversationCard(c) {
-    const el = this._cardShell();
-    el.appendChild(this._kicker(t('card.conversation')));
-
-    const head = document.createElement('div');
-    head.className = 'flex items-start justify-between gap-2';
-    head.innerHTML = `
-      <div class="min-w-0">
-        <h3 class="font-semibold text-sm truncate">${this.esc(c.title || t('card.newConversation'))}</h3>
-        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${t('card.noRecipeYet')}</p>
+  // Draft: one of the requester's conversations with no recipe yet. A
+  // compact row rather than a card — there's no recipe content to show, and
+  // full cards gave the least interesting section the most page weight.
+  conversationRow(c) {
+    const el = document.createElement('div');
+    el.className = 'min-w-0 flex items-center gap-2 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2';
+    el.innerHTML = `
+      <div class="min-w-0 flex-1">
+        <p class="text-sm truncate">${this.esc(c.title || t('card.newConversation'))}</p>
+        <p class="text-xs text-zinc-400 dark:text-zinc-500">${t('card.noRecipeYet')}</p>
       </div>`;
-    const heart = this._heartBtn(c.is_favorited);
-    heart.addEventListener('click', () =>
-      this.toggleConversationFavorite(c.id, c.is_favorited));
-    head.appendChild(heart);
-    el.appendChild(head);
-
-    const actions = document.createElement('div');
-    actions.className = 'flex flex-wrap gap-2 mt-auto pt-1';
     const openBtn = this._actionBtn(t('common.open'), true);
+    openBtn.classList.add('shrink-0');
     openBtn.addEventListener('click', () => {
       if (typeof Store !== 'undefined') Store.selectConversation(c.id);
     });
-    actions.appendChild(openBtn);
-    actions.appendChild(this._deleteBtn(c.id));
-    el.appendChild(actions);
+    el.appendChild(openBtn);
+    el.appendChild(this._deleteBtn(c.id));
     return el;
   },
 
@@ -375,12 +422,7 @@ const Home = {
     }
     el.appendChild(head);
 
-    if (recipe.description) {
-      const desc = document.createElement('p');
-      desc.className = 'text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed line-clamp-2';
-      desc.textContent = recipe.description;
-      el.appendChild(desc);
-    }
+    if (recipe.description) el.appendChild(this._description(recipe.description));
 
     const meta = this._metaLine(recipe);
     const socialBits = [];
@@ -401,7 +443,7 @@ const Home = {
     el.appendChild(this._ratingRow(s));
 
     const actions = document.createElement('div');
-    actions.className = 'flex flex-wrap gap-2 mt-auto pt-1';
+    actions.className = 'flex flex-wrap items-center gap-2 mt-auto pt-1';
     const viewBtn = this._actionBtn(t('common.view'), true);
     viewBtn.addEventListener('click', () => this.viewShared(s));
     const forkBtn = this._actionBtn(t('common.fork'));
@@ -477,20 +519,36 @@ const Home = {
 
   // ── Collections ───────────────────────────────────────────────────
 
+  // One concept, three labels (issue #34): public wins, then "shared" when
+  // other people are in it or an invite link is out, else a plain
+  // collection. There is no "group cookbook" any more.
+  collectionKind(c) {
+    if (c.visibility === 'public') return t('card.publicCollection');
+    if (c.is_shared) return t('card.sharedCollection');
+    return t('card.collection');
+  },
+
+  _collectionMeta(c) {
+    const bits = [tn('card.recipes', c.item_count)];
+    if (c.is_shared && c.member_count) bits.push(tn('card.members', c.member_count));
+    if (c.comment_count) bits.push(tn('card.collectionComments', c.comment_count));
+    return bits;
+  },
+
   collectionCard(c) {
     const el = this._cardShell();
-    const kind = c.visibility === 'group' ? t('card.groupCookbook')
-      : c.visibility === 'public' ? t('card.publicCollection') : t('card.collection');
-    el.appendChild(this._kicker(kind));
+    el.appendChild(this._kicker(this.collectionKind(c)));
+    const bits = this._collectionMeta(c);
+    if (!c.is_owner) bits.push(t('card.by', { name: this.esc(c.username) }));
     const meta = document.createElement('div');
     meta.className = 'min-w-0';
     meta.innerHTML = `
         <h3 class="font-semibold text-sm truncate">${this.esc(c.name)}</h3>
-        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${tn('card.recipes', c.item_count)}${c.visibility === 'group' ? ` · ${tn('card.members', c.member_count)}` : ''}${c.is_owner ? '' : ` · ${t('card.by', { name: this.esc(c.username) })}`}</p>
-        ${c.description ? `<p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">${this.esc(c.description)}</p>` : ''}`;
+        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${bits.join(' · ')}</p>`;
     el.appendChild(meta);
+    if (c.description) el.appendChild(this._description(c.description));
     const actions = document.createElement('div');
-    actions.className = 'flex flex-wrap gap-2 mt-auto pt-1';
+    actions.className = 'flex flex-wrap items-center gap-2 mt-auto pt-1';
     const openBtn = this._actionBtn(t('common.open'), true);
     openBtn.addEventListener('click', () => this.openCollection(c.id));
     actions.appendChild(openBtn);
@@ -502,14 +560,19 @@ const Home = {
     const el = this._cardShell();
     el.appendChild(this._kicker(t('card.communityCollection')));
     const byline = c.is_mine ? t('card.byYou') : t('card.by', { name: this.esc(c.username) });
-    el.innerHTML += `
-      <div class="min-w-0">
+    const bits = [byline, tn('card.recipes', c.item_count)];
+    if (c.comment_count) bits.push(tn('card.collectionComments', c.comment_count));
+    // appendChild, not `innerHTML +=` — the latter would drop the kicker's
+    // node identity and any listener attached above it.
+    const meta = document.createElement('div');
+    meta.className = 'min-w-0';
+    meta.innerHTML = `
         <h3 class="font-semibold text-sm truncate">${this.esc(c.name)}</h3>
-        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${byline} · ${tn('card.recipes', c.item_count)}</p>
-        ${c.description ? `<p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">${this.esc(c.description)}</p>` : ''}
-      </div>`;
+        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${bits.join(' · ')}</p>`;
+    el.appendChild(meta);
+    if (c.description) el.appendChild(this._description(c.description));
     const actions = document.createElement('div');
-    actions.className = 'flex flex-wrap gap-2 mt-auto pt-1';
+    actions.className = 'flex flex-wrap items-center gap-2 mt-auto pt-1';
     const openBtn = this._actionBtn(t('common.browse'), true);
     openBtn.addEventListener('click', () => this.openCollection(c.id));
     actions.appendChild(openBtn);
@@ -523,13 +586,23 @@ const Home = {
     return App.isAnonymous ? `/api/public/collections/${id}` : `/api/collections/${id}`;
   },
 
+  // Resolves true when the collection actually opened — the boot restore
+  // path clears the `coll` param when it didn't (deleted, private, 404).
   async openCollection(id) {
+    if (!id || Number.isNaN(id)) return false;
     try {
       const res = await fetch(this._collectionUrl(id));
-      if (!res.ok) return;
+      if (!res.ok) return false;
       this.activeCollection = await res.json();
+      // Addressable as `#coll=<id>` so a refresh reopens it, and signing in
+      // from a public collection comes back here.
+      HashParams.set('coll', id);
+      if (App.isAnonymous) App.setSignInPath?.(`/?coll=${id}`);
       this.render();
-    } catch { /* ignore */ }
+      return true;
+    } catch {
+      return false;
+    }
   },
 
   async reloadActiveCollection() {
@@ -543,6 +616,8 @@ const Home = {
 
   closeCollection() {
     this.activeCollection = null;
+    HashParams.set('coll', null);
+    App.setSignInPath?.(null);
     this.render();
   },
 
@@ -553,14 +628,17 @@ const Home = {
 
     const head = document.createElement('div');
     head.className = 'space-y-2 mb-5';
-    const kind = c.visibility === 'group' ? t('card.groupCookbookPlain') : c.visibility === 'public' ? t('card.publicCollection') : t('card.privateCollection');
+    const kind = this.collectionKind(c);
+    const headBits = [kind, t('card.by', { name: this.esc(c.username) }),
+      tn('card.recipes', c.items.length)];
+    if (c.is_shared && c.members?.length) headBits.push(tn('card.members', c.members.length));
     head.innerHTML = `
       <button id="collection-back" class="text-sm text-blue-500 hover:text-blue-400 transition-colors">${t('coll.back')}</button>
       <div class="flex items-start justify-between gap-3 flex-wrap">
         <div class="min-w-0">
           <h2 class="text-xl font-bold">${this.esc(c.name)}</h2>
-          <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-1">${kind} · ${t('card.by', { name: this.esc(c.username) })} · ${tn('card.recipes', c.items.length)}</p>
-          ${c.description ? `<p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">${this.esc(c.description)}</p>` : ''}
+          <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-1">${headBits.join(' · ')}</p>
+          ${c.description ? `<p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1 break-words">${this.esc(c.description)}</p>` : ''}
         </div>
         <div class="flex gap-2 flex-wrap" id="collection-detail-actions"></div>
       </div>`;
@@ -568,26 +646,51 @@ const Home = {
     head.querySelector('#collection-back').addEventListener('click', () => this.closeCollection());
 
     const actions = head.querySelector('#collection-detail-actions');
-    if (c.visibility === 'group' && c.invite_token && c.is_member) {
+    const copyInvite = (token, btn) => {
+      const url = `${location.origin}/?join=${token}`;
+      navigator.clipboard?.writeText(url).then(() => {
+        btn.textContent = t('common.copied');
+        setTimeout(() => { btn.textContent = t('coll.copyInvite'); }, 1500);
+      }).catch(() => window.prompt(t('prompt.shareInvite'), url));
+    };
+    // Invite links live on ANY collection now, not just the old group kind.
+    if (c.invite_token && c.is_member) {
       const inviteBtn = this._actionBtn(t('coll.copyInvite'));
       inviteBtn.title = t('tip.inviteLink');
-      inviteBtn.addEventListener('click', () => {
-        const url = `${location.origin}/?join=${c.invite_token}`;
-        navigator.clipboard?.writeText(url).then(() => {
-          inviteBtn.textContent = t('common.copied');
-          setTimeout(() => { inviteBtn.textContent = t('coll.copyInvite'); }, 1500);
-        }).catch(() => window.prompt(t('prompt.shareInvite'), url));
-      });
+      inviteBtn.addEventListener('click', () => copyInvite(c.invite_token, inviteBtn));
       actions.appendChild(inviteBtn);
     }
     if (c.is_owner) {
-      if (c.visibility !== 'group') {
-        const pubBtn = this._actionBtn(c.visibility === 'public' ? t('coll.makePrivate') : t('coll.publishFeed'));
+      if (!c.invite_token) {
+        const shareBtn = this._actionBtn(t('coll.invitePeople'));
+        shareBtn.title = t('tip.inviteLink');
+        shareBtn.addEventListener('click', async () => {
+          try {
+            const res = await fetch(`/api/collections/${c.id}/invite`, { method: 'POST' });
+            if (!res.ok) throw new Error();
+            const { invite_token: token } = await res.json();
+            copyInvite(token, shareBtn);
+            await this.reloadActiveCollection();
+            this.render();
+          } catch { /* leave the button as-is */ }
+        });
+        actions.appendChild(shareBtn);
+      }
+      // Publicity is one-way (issue #33): "Make public" until it is, then a
+      // plain badge. Deleting the collection is the only way back.
+      if (c.visibility === 'public') {
+        const badge = document.createElement('span');
+        badge.className = 'px-3 py-1.5 text-xs rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 font-medium';
+        badge.textContent = t('coll.publicBadge');
+        actions.appendChild(badge);
+      } else {
+        const pubBtn = this._actionBtn(t('coll.makePublic'));
         pubBtn.addEventListener('click', async () => {
+          if (!confirm(t('coll.makePublicConfirm', { name: c.name }))) return;
           await fetch(`/api/collections/${c.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ visibility: c.visibility === 'public' ? 'private' : 'public' }),
+            body: JSON.stringify({ visibility: 'public' }),
           }).catch(() => {});
           this.refresh();
         });
@@ -614,7 +717,7 @@ const Home = {
         this.refresh();
       });
       actions.appendChild(delBtn);
-    } else if (c.visibility === 'group' && c.is_member && App.currentUser) {
+    } else if (c.is_member && App.currentUser) {
       const leaveBtn = this._actionBtn(t('coll.leave'));
       leaveBtn.addEventListener('click', async () => {
         if (!confirm(t('coll.leaveConfirm', { name: c.name }))) return;
@@ -625,26 +728,52 @@ const Home = {
       actions.appendChild(leaveBtn);
     }
 
-    if (c.visibility === 'group' && c.members?.length) {
+    if (c.members?.length > 1) {
       const membersEl = document.createElement('p');
-      membersEl.className = 'text-xs text-zinc-400 dark:text-zinc-500 mb-4';
+      membersEl.className = 'text-xs text-zinc-400 dark:text-zinc-500 mb-4 break-words';
       membersEl.textContent = t('coll.members', {
         list: c.members.map((m) => m.username + (m.role === 'owner' ? t('coll.ownerSuffix') : '')).join(', '),
       });
       container.appendChild(membersEl);
     }
 
-    const grid = document.createElement('div');
-    grid.className = 'grid gap-3 sm:grid-cols-2 xl:grid-cols-3';
-    container.appendChild(grid);
     if (!c.items.length) {
       const empty = document.createElement('p');
       empty.className = 'text-sm text-zinc-400 dark:text-zinc-600';
       empty.textContent = t('coll.empty');
       container.appendChild(empty);
-      return;
+    } else {
+      const grid = document.createElement('div');
+      grid.className = 'grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3';
+      c.items.forEach((item) => grid.appendChild(this.collectionItemCard(c, item)));
+      container.appendChild(grid);
     }
-    c.items.forEach((item) => grid.appendChild(this.collectionItemCard(c, item)));
+
+    // Comment thread (issue #35) — same widget as the recipe panel's.
+    const commentsWrap = document.createElement('div');
+    commentsWrap.className = 'mt-6 pt-4 border-t border-zinc-200 dark:border-zinc-800';
+    container.appendChild(commentsWrap);
+    CommentThread.render(commentsWrap, {
+      comments: c.comments || [],
+      canModerate: !!c.is_owner,
+      heading: (n) => t('social.collectionComments', { n }),
+      placeholder: t('social.addCollectionComment'),
+      signInReason: t('signin.commentCollection'),
+      onPost: async (body) => {
+        await fetch(`/api/collections/${c.id}/comments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ body }),
+        }).catch(() => {});
+        await this.reloadActiveCollection();
+        this.render();
+      },
+      onDelete: async (id) => {
+        await fetch(`/api/collection-comments/${id}`, { method: 'DELETE' }).catch(() => {});
+        await this.reloadActiveCollection();
+        this.render();
+      },
+    });
   },
 
   collectionItemCard(c, item) {
@@ -654,15 +783,16 @@ const Home = {
     const srcBit = item.snapshot_only
       ? `<span class="text-amber-500" title="${this.esc(t('card.savedCopyTitle'))}">${t('coll.savedCopyBadge')}</span>`
       : item.conversation_id ? t('coll.yourRecipe') : t('card.by', { name: this.esc(item.username) });
-    el.innerHTML += `
-      <div class="min-w-0">
+    const meta = document.createElement('div');
+    meta.className = 'min-w-0';
+    meta.innerHTML = `
         <h3 class="font-semibold text-sm truncate">${this.esc(recipe.title || item.snapshot_title || t('common.untitled'))}</h3>
-        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${srcBit} · ${t('card.addedBy', { name: this.esc(item.added_by_username) })}</p>
-        ${recipe.description ? `<p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">${this.esc(recipe.description)}</p>` : ''}
-      </div>`;
+        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${srcBit} · ${t('card.addedBy', { name: this.esc(item.added_by_username) })}</p>`;
+    el.appendChild(meta);
+    if (recipe.description) el.appendChild(this._description(recipe.description));
 
     const actions = document.createElement('div');
-    actions.className = 'flex flex-wrap gap-2 mt-auto pt-1';
+    actions.className = 'flex flex-wrap items-center gap-2 mt-auto pt-1';
     const viewBtn = this._actionBtn(t('common.view'), true);
     viewBtn.addEventListener('click', () => {
       if (item.conversation_id && typeof Store !== 'undefined') {
@@ -736,8 +866,8 @@ const Home = {
     this.collections.forEach((c) => {
       const row = document.createElement('button');
       row.className = 'w-full text-left px-3 py-2.5 text-sm rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 hover:border-blue-400 dark:hover:border-blue-600 transition-colors flex justify-between items-center gap-2';
-      row.innerHTML = `<span class="truncate">${this.esc(c.name)}${c.visibility === 'group' ? ' 👥' : ''}</span>
-        <span class="text-xs text-zinc-400 shrink-0">${tn('card.recipes', c.item_count)}</span>`;
+      row.innerHTML = `<span class="truncate">${this.esc(c.name)}</span>
+        <span class="text-xs text-zinc-400 shrink-0">${c.is_shared && c.member_count ? `${tn('card.members', c.member_count)} · ` : ''}${tn('card.recipes', c.item_count)}</span>`;
       row.addEventListener('click', () => addTo(c.id));
       list.appendChild(row);
     });
@@ -760,16 +890,15 @@ const Home = {
     };
   },
 
-  // New collection / group cookbook dialog (from the Collections header).
-  openNewCollection(isGroup) {
+  // New collection dialog (from the Collections header). One kind of
+  // collection now — inviting and publishing happen on the collection.
+  openNewCollection() {
     const modal = document.getElementById('new-collection-modal');
     if (!modal) return;
-    document.getElementById('new-collection-title').textContent =
-      isGroup ? t('newColl.cookbookTitle') : t('newColl.title');
-    document.getElementById('new-collection-hint').classList.toggle('hidden', !isGroup);
+    document.getElementById('new-collection-title').textContent = t('newColl.title');
     const input = document.getElementById('new-collection-name');
     input.value = '';
-    input.placeholder = isGroup ? t('newColl.cookbookPlaceholder') : t('newColl.placeholder');
+    input.placeholder = t('newColl.placeholder');
     modal.classList.remove('hidden');
     input.focus();
 
@@ -790,7 +919,7 @@ const Home = {
         const res = await fetch('/api/collections', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, group: isGroup }),
+          body: JSON.stringify({ name }),
         });
         if (!res.ok) throw new Error();
         const created = await res.json();
@@ -885,8 +1014,5 @@ document.getElementById('home-search')?.addEventListener('input', (e) => {
   Home.render();
 });
 document.getElementById('new-collection-btn')?.addEventListener('click', () => {
-  Home.openNewCollection(false);
-});
-document.getElementById('new-cookbook-btn')?.addEventListener('click', () => {
-  Home.openNewCollection(true);
+  Home.openNewCollection();
 });

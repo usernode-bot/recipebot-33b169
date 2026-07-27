@@ -320,13 +320,21 @@
   <!-- Main layout -->
   <div class="flex flex-1 overflow-hidden">
 
-    <!-- Homepage (default first screen; toggled with the chat layout by app.js) -->
-    <div id="homepage" class="flex-1 min-w-0 overflow-y-auto" style="display:none">
+    <!-- Homepage (default first screen; toggled with the chat layout by app.js)
+         overflow-x-hidden is a backstop: overflow-y-auto already computes
+         overflow-x to `auto`, so any child wider than the viewport would
+         otherwise give the whole page a horizontal scrollbar (issue #31). -->
+    <div id="homepage" class="flex-1 min-w-0 overflow-y-auto overflow-x-hidden" style="display:none">
       <div class="max-w-5xl mx-auto p-4 sm:p-6 space-y-8">
-        <!-- Toolbar: recipe search + new recipe (moved here from the old sidebar) -->
-        <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
+        <!-- Toolbar: recipe search + new recipe (moved here from the old
+             sidebar). Sticky so search stays reachable down a long box. -->
+        <!-- Translucent + blurred rather than opaque: the page's fixed
+             radial-gradient overlay paints above non-positioned content but
+             below this sticky (positioned) bar, so a solid fill would read
+             as a floating panel with a visible seam. -->
+        <div id="home-toolbar" class="sticky top-0 z-10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 bg-zinc-50/85 dark:bg-zinc-950/85 backdrop-blur flex flex-col sm:flex-row gap-2 sm:items-center">
           <input id="home-search" type="search" placeholder="Search recipes..." autocomplete="off" data-i18n-placeholder="home.searchPlaceholder"
-            class="flex-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            class="flex-1 min-w-0 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500" />
           <button id="new-conversation-btn" class="shrink-0 rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-sm font-medium text-white transition-colors" data-i18n="home.newRecipe">
             + New recipe
           </button>
@@ -334,57 +342,89 @@
         <!-- Collection detail (opened from a collection card; hides the box sections) -->
         <div id="collection-view" class="hidden"></div>
 
-        <section id="home-collections">
-          <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
-            <h2 class="text-base font-semibold flex items-center gap-2">
-              <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
-              <span data-i18n="home.collections">Collections</span>
-            </h2>
-            <div class="flex gap-2">
-              <button id="new-collection-btn" class="px-3 py-1.5 text-xs rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors" data-i18n="home.newCollection">+ Collection</button>
-              <button id="new-cookbook-btn" class="px-3 py-1.5 text-xs rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors" data-i18n="home.newCookbook">+ Group cookbook</button>
-            </div>
+        <!-- ── Band 1: your box ─────────────────────────────────────
+             Favorites → your recipes → collections → drafts, in
+             decreasing personal relevance (issue #32). Hidden whole for
+             anonymous visitors: an empty personal box is noise. -->
+        <section id="home-band-mine" class="space-y-6">
+          <div class="flex items-center gap-3">
+            <p class="kicker shrink-0" data-i18n="home.bandYours">Your box</p>
+            <div class="flex-1 h-px bg-zinc-200 dark:bg-zinc-800"></div>
           </div>
-          <div id="home-collections-list" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
-          <p id="home-collections-empty" class="hidden text-sm text-zinc-400 dark:text-zinc-600" data-i18n="home.collectionsEmpty">No collections yet — create one, or start a group cookbook and invite your people.</p>
+
+          <section id="home-favorites" class="hidden">
+            <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
+              <svg class="w-4 h-4 text-pink-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
+              <span data-i18n="home.favorites">Your favorites</span>
+              <span class="home-count text-xs font-normal text-zinc-400 dark:text-zinc-500 tabular-nums"></span>
+            </h2>
+            <div id="home-favorites-list" class="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"></div>
+          </section>
+
+          <section id="home-mine" class="hidden">
+            <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
+              <span class="text-orange-400 shrink-0">🍳</span>
+              <span data-i18n="home.yourRecipes">Your recipes</span>
+              <span class="home-count text-xs font-normal text-zinc-400 dark:text-zinc-500 tabular-nums"></span>
+            </h2>
+            <div id="home-mine-list" class="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"></div>
+          </section>
+
+          <section id="home-collections">
+            <div class="flex items-start justify-between mb-3 gap-2 flex-wrap">
+              <h2 class="text-base font-semibold flex items-center gap-2 min-w-0">
+                <svg class="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                <span data-i18n="home.collections">Collections</span>
+                <span class="home-count text-xs font-normal text-zinc-400 dark:text-zinc-500 tabular-nums"></span>
+              </h2>
+              <div class="flex gap-2 flex-wrap items-center">
+                <span id="home-collections-empty" class="hidden text-xs text-zinc-400 dark:text-zinc-500" data-i18n="home.collectionsEmpty">Group your recipes into a shelf —</span>
+                <button id="new-collection-btn" class="px-3 py-1.5 text-xs rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors" data-i18n="home.newCollection">+ New collection</button>
+              </div>
+            </div>
+            <div id="home-collections-list" class="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"></div>
+          </section>
+
+          <!-- Drafts: conversations with no recipe yet. Compact rows, not
+               cards — they're the least interesting thing on the page. -->
+          <section id="home-convs" class="hidden">
+            <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
+              <svg class="w-4 h-4 text-zinc-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+              <span data-i18n="home.drafts">Drafts</span>
+              <span class="home-count text-xs font-normal text-zinc-400 dark:text-zinc-500 tabular-nums"></span>
+            </h2>
+            <div id="home-convs-list" class="space-y-2"></div>
+            <button id="home-convs-more" class="hidden mt-2 text-xs text-blue-500 hover:text-blue-400 transition-colors"></button>
+          </section>
         </section>
 
-        <section id="home-favorites" class="hidden">
-          <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
-            <svg class="w-4 h-4 text-pink-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
-            <span data-i18n="home.favorites">Your favorites</span>
-          </h2>
-          <div id="home-favorites-list" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
-        </section>
-        <section id="home-mine" class="hidden">
-          <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
-            <span class="text-orange-400">🍳</span>
-            <span data-i18n="home.yourRecipes">Your recipes</span>
-          </h2>
-          <div id="home-mine-list" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
-        </section>
-        <section id="home-convs" class="hidden">
-          <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
-            <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-            <span data-i18n="home.yourConversations">Your conversations</span>
-          </h2>
-          <div id="home-convs-list" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
-        </section>
-        <section id="home-community" class="hidden">
-          <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
-            <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6-4a3 3 0 11-3-3m-9 3a3 3 0 10-3-3"/></svg>
-            <span data-i18n="home.communityRecipes">Community recipes</span>
-          </h2>
-          <!-- Tag filter chips (built from tag frequencies by home.js) -->
-          <div id="home-tag-filters" class="hidden flex flex-wrap gap-1.5 mb-3"></div>
-          <div id="home-community-list" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
-        </section>
-        <section id="home-public-collections" class="hidden">
-          <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
-            <svg class="w-4 h-4 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-            <span data-i18n="home.communityCollections">Community collections</span>
-          </h2>
-          <div id="home-public-collections-list" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
+        <!-- ── Band 2: the community ───────────────────────────────── -->
+        <section id="home-band-community" class="space-y-6">
+          <div class="flex items-center gap-3">
+            <p class="kicker shrink-0" data-i18n="home.bandCommunity">From the community</p>
+            <div class="flex-1 h-px bg-zinc-200 dark:bg-zinc-800"></div>
+          </div>
+          <p id="home-anon-lead" class="hidden text-sm text-zinc-500 dark:text-zinc-400 -mt-2" data-i18n="home.anonLead">Browse what everyone is cooking. Sign in to save recipes, cook with the AI, and start your own collections.</p>
+
+          <section id="home-community" class="hidden">
+            <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
+              <svg class="w-4 h-4 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6-4a3 3 0 11-3-3m-9 3a3 3 0 10-3-3"/></svg>
+              <span data-i18n="home.communityRecipes">Community recipes</span>
+              <span class="home-count text-xs font-normal text-zinc-400 dark:text-zinc-500 tabular-nums"></span>
+            </h2>
+            <!-- Tag filter chips (built from tag frequencies by home.js) -->
+            <div id="home-tag-filters" class="hidden flex flex-wrap gap-1.5 mb-3"></div>
+            <div id="home-community-list" class="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"></div>
+          </section>
+
+          <section id="home-public-collections" class="hidden">
+            <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
+              <svg class="w-4 h-4 text-teal-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+              <span data-i18n="home.communityCollections">Community collections</span>
+              <span class="home-count text-xs font-normal text-zinc-400 dark:text-zinc-500 tabular-nums"></span>
+            </h2>
+            <div id="home-public-collections-list" class="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"></div>
+          </section>
         </section>
         <div id="home-empty" class="hidden text-center text-zinc-500 py-16">
           <svg class="w-12 h-12 mx-auto mb-3 text-zinc-300 dark:text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -574,7 +614,7 @@
     </div>
   </div>
 
-  <!-- New collection / cookbook dialog -->
+  <!-- New collection dialog -->
   <div id="new-collection-modal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center">
     <div class="absolute inset-0 bg-black/50" id="new-collection-backdrop"></div>
     <div class="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-t-xl sm:rounded-xl w-full sm:max-w-md p-5 m-0 sm:m-4 shadow-xl">
@@ -585,7 +625,7 @@
       <label for="new-collection-name" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5" data-i18n="common.name">Name</label>
       <input id="new-collection-name" type="text" maxlength="120" placeholder="e.g. Weeknight dinners"
         class="w-full rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3">
-      <p id="new-collection-hint" class="hidden text-xs text-zinc-500 dark:text-zinc-400 mb-3" data-i18n="newColl.hint">A group cookbook is a shared collection — you'll get an invite link to send to family and friends.</p>
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3" data-i18n="newColl.hint">Starts private. You can invite people or make it public from the collection itself.</p>
       <div class="flex justify-end gap-2">
         <button id="new-collection-cancel" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors" data-i18n="common.cancel">Cancel</button>
         <button id="new-collection-confirm" class="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors" data-i18n="common.create">Create</button>
@@ -631,6 +671,7 @@
   <script src="/js/settings.js"></script>
   <script src="/js/store.js"></script>
   <script src="/js/chat.js"></script>
+  <script src="/js/comments.js"></script>
   <script src="/js/recipe.js"></script>
   <script src="/js/home.js"></script>
   <script src="/js/cooking-mode.js"></script>

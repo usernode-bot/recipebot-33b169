@@ -65,6 +65,22 @@ Key architecture notes:
   content. Staging is seeded by `src/db/migrate.js` with a demo
   conversation under sentinel `user_id = 0`; in staging, list/read
   endpoints also include that user's rows.
+- **Collections are one concept** (issue #34) — there is no separate
+  "group cookbook" object. A collection carries two orthogonal
+  properties: `visibility` (`private` = unlisted, `public` = listed in
+  the community feed) and *membership* (`collection_members` +
+  `collection_invites`, available on any collection). The UI calls a
+  collection with other members or a live invite a "shared
+  collection"; that's a derived `is_shared` flag, not a stored state.
+  Don't reintroduce a third visibility value.
+- **Making a collection public is one-way** (issue #33). `PATCH
+  /api/collections/:id` refuses `public → private`; deleting the
+  collection is the escape hatch. Enforced server-side, not just in
+  the UI.
+- `collection_comments` is PUBLIC (like `recipe_comments`): the thread
+  is visible to everyone who can view the collection. Both threads
+  render through the same widget, `public/js/comments.js` — change
+  both call sites together.
 - Per-user daily message limit is global (`DEFAULT_DAILY_MSG_LIMIT`,
   default 50), enforced via the `rate_limits` table.
 - Plain JS, no build step; frontend is vanilla JS + Tailwind CDN.

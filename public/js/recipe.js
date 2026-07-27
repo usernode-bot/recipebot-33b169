@@ -520,70 +520,28 @@ const Recipe = {
       html += '</div>';
     }
 
-    const commentEntry = App.isAnonymous
-      ? `<button id="comment-signin" class="w-full px-4 py-2 text-sm rounded-lg bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 text-left transition-colors mt-2">${t('social.signInToComment')}</button>`
-      : `<form id="comment-form" class="flex gap-2 mt-2">
-        <input id="comment-input" type="text" maxlength="1000" placeholder="${this.escapeHtml(t('social.addComment'))}"
-          class="flex-1 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <button type="submit" class="px-4 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors shrink-0">${t('common.post')}</button>
-      </form>`;
-    html += `<div>
-      <h3 class="text-sm font-semibold mb-2">${t('social.comments', { n: comments.filter((c) => !c.deleted).length })}</h3>
-      <div id="comments-list" class="space-y-2"></div>
-      ${commentEntry}
-    </div>`;
-
+    html += '<div id="comments-block"></div>';
     html += '</div>';
     container.innerHTML = html;
 
-    const list = container.querySelector('#comments-list');
-    const isRecipeOwner = App.viewingShared?.is_mine;
-    if (!comments.length) {
-      const p = document.createElement('p');
-      p.className = 'text-xs text-zinc-400 dark:text-zinc-500';
-      p.textContent = t('social.noComments');
-      list.appendChild(p);
-    }
-    comments.forEach((c) => {
-      const row = document.createElement('div');
-      row.className = 'p-3 rounded-lg bg-zinc-100/70 dark:bg-zinc-900/50 text-sm flex items-start justify-between gap-2';
-      if (c.deleted) {
-        row.innerHTML = `<p class="text-xs italic text-zinc-400 dark:text-zinc-600">${t('social.commentDeleted')}</p>`;
-      } else {
-        row.innerHTML = `<div class="min-w-0">
-          <span class="font-medium">${this.escapeHtml(c.username)}</span>
-          <p class="text-zinc-500 dark:text-zinc-400 mt-0.5 break-words">${this.escapeHtml(c.body)}</p>
-        </div>`;
-        if (c.is_mine || isRecipeOwner) {
-          const del = document.createElement('button');
-          del.className = 'text-xs text-zinc-400 hover:text-red-500 transition-colors shrink-0';
-          del.textContent = t('common.delete');
-          del.addEventListener('click', async () => {
-            await fetch(`/api/comments/${c.id}`, { method: 'DELETE' }).catch(() => {});
-            this.loadSocialSection(sharedId);
-          });
-          row.appendChild(del);
-        }
-      }
-      list.appendChild(row);
-    });
-
-    container.querySelector('#comment-form')?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const input = container.querySelector('#comment-input');
-      const body = input.value.trim();
-      if (!body) return;
-      input.value = '';
-      await fetch(`/api/shared-recipes/${sharedId}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body }),
-      }).catch(() => {});
-      this.loadSocialSection(sharedId);
-    });
-
-    container.querySelector('#comment-signin')?.addEventListener('click', () => {
-      App.promptSignIn(t('signin.comment'));
+    // Thread rendering is shared with the collection detail view — see
+    // public/js/comments.js.
+    CommentThread.render(container.querySelector('#comments-block'), {
+      comments,
+      canModerate: !!App.viewingShared?.is_mine,
+      signInReason: t('signin.comment'),
+      onPost: async (body) => {
+        await fetch(`/api/shared-recipes/${sharedId}/comments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ body }),
+        }).catch(() => {});
+        this.loadSocialSection(sharedId);
+      },
+      onDelete: async (id) => {
+        await fetch(`/api/comments/${id}`, { method: 'DELETE' }).catch(() => {});
+        this.loadSocialSection(sharedId);
+      },
     });
   },
 

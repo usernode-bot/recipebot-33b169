@@ -48,7 +48,12 @@ const Store = {
     }
 
     if (typeof Chat === 'undefined') return false;
-    return await Chat.loadMessages(id);
+    const ok = await Chat.loadMessages(id);
+    // Recipe-first (issue #30): loadMessages sets App.currentRecipe from the
+    // conversation's latest recipe message, so only now can we tell a recipe
+    // apart from a draft. Drafts have nothing to show but the transcript.
+    App.setMobileTab?.(App.currentRecipe ? 'recipe' : 'chat');
+    return ok;
   },
 
   // Look up one shared recipe by id for the `#s=<id>` / `?s=<id>` route.
@@ -96,6 +101,8 @@ const Store = {
     Recipe.currentServings = item.data.default_servings;
     Recipe.servingScale = 1.0;
     Recipe.display(item.data);
+    // A shared item always carries a recipe — show it (issue #30).
+    App.setMobileTab?.('recipe');
 
     if (typeof Chat !== 'undefined') Chat.clear();
 
@@ -125,6 +132,8 @@ const Store = {
     App.viewingVersion = null;
     Recipe.currentServings = recipeData.default_servings;
     Recipe.display(recipeData);
+    // You forked in order to ask for changes — the message box is the point.
+    App.setMobileTab?.('chat');
 
     if (typeof Chat !== 'undefined') {
       Chat.clear();

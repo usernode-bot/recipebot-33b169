@@ -160,10 +160,16 @@ CREATE INDEX IF NOT EXISTS shared_recipes_tags ON shared_recipes USING GIN (tags
 ALTER TABLE pending_replies ADD COLUMN IF NOT EXISTS edit_decision VARCHAR(16);
 ALTER TABLE pending_replies ADD COLUMN IF NOT EXISTS decided_at TIMESTAMPTZ;
 
--- Collections: named sets of recipes. visibility 'private' (owner only),
--- 'group' (a group cookbook — members via collection_members), or 'public'
--- (published to the community feed). PUBLIC table: scoping is enforced in
--- queries, same as shared_recipes.
+-- Collections: named sets of recipes. ONE concept — there is no separate
+-- "group cookbook" object (issue #34). A collection has two orthogonal
+-- properties:
+--   visibility — 'private' (unlisted) or 'public' (listed in the community
+--                feed). One-way: public stays public (issue #33); the
+--                escape hatch is deleting the collection.
+--   membership — rows in collection_members + an invite link, available on
+--                ANY collection. member_count > 1 is what the UI calls a
+--                "shared collection".
+-- PUBLIC table: scoping is enforced in queries, same as shared_recipes.
 CREATE TABLE IF NOT EXISTS collections (
   id          SERIAL PRIMARY KEY,
   user_id     INTEGER NOT NULL,
@@ -171,10 +177,20 @@ CREATE TABLE IF NOT EXISTS collections (
   name        VARCHAR(120) NOT NULL,
   description TEXT,
   visibility  VARCHAR(10) NOT NULL DEFAULT 'private'
-              CHECK (visibility IN ('private', 'group', 'public')),
+              CHECK (visibility IN ('private', 'public')),
   created_at  TIMESTAMPTZ DEFAULT NOW(),
   updated_at  TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migrate pre-#34 databases off the three-way enum. Order matters: drop the
+-- constraint, fold 'group' rows into 'private' (their collection_members
+-- rows survive and keep granting access), then re-add the two-value check.
+-- Drop-then-add is the idempotent form — Postgres has no
+-- ADD CONSTRAINT IF NOT EXISTS.
+ALTER TABLE collections DROP CONSTRAINT IF EXISTS collections_visibility_check;
+UPDATE collections SET visibility = 'private' WHERE visibility = 'group';
+ALTER TABLE collections ADD CONSTRAINT collections_visibility_check
+  CHECK (visibility IN ('private', 'public'));
 
 -- Items are dual-target (own conversation XOR a shared recipe) and ALWAYS
 -- carry a recipe snapshot taken at add time: if the source shared recipe
@@ -248,6 +264,23 @@ CREATE TABLE IF NOT EXISTS recipe_comments (
 );
 
 CREATE INDEX IF NOT EXISTS recipe_comments_shared ON recipe_comments (shared_recipe_id);
+
+-- Comments on collections (issue #35). Same shape and soft-delete semantics
+-- as recipe_comments so the client can share one thread widget. PUBLIC
+-- table: it holds content already visible to everyone who can view the
+-- collection, and collections is public too (a public table must not FK a
+-- private one).
+CREATE TABLE IF NOT EXISTS collection_comments (
+  id            SERIAL PRIMARY KEY,
+  collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+  user_id       INTEGER NOT NULL,
+  username      VARCHAR(255) NOT NULL,
+  body          TEXT NOT NULL,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  deleted_at    TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS collection_comments_coll ON collection_comments (collection_id);
 
 -- The in-app feedback widget was removed (platform-level feedback covers
 -- it now); drop its table, which nothing else used.

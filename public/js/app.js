@@ -16,6 +16,11 @@ window.App = {
   // Set while viewing an old version of a shared recipe ({ version }).
   viewingVersion: null,
   currentView: 'chat',
+  // Which panel the narrow-screen tab switcher is showing ('recipe' | 'chat').
+  // Opening anything that HAS a recipe lands on 'recipe' (issue #30); only
+  // recipe-less states (a draft conversation, a new chat, a fork you're
+  // about to edit) land on 'chat'.
+  mobileTab: 'chat',
 
   preferences: {
     diet: null,
@@ -176,7 +181,9 @@ window.Router = {
   // Only a genuine refresh/re-embed should resurrect a saved route; a
   // deliberate re-open of the app minutes later starts on home.
   MAX_AGE_MS: 30_000,
-  ROUTE_KEYS: ['c', 's', 'cook', 'ing', 'mac', 'ch'],
+  // `coll` addresses an open collection so a refresh (or signing in from a
+  // public collection) comes back to it instead of the box.
+  ROUTE_KEYS: ['c', 's', 'coll', 'cook', 'ing', 'mac', 'ch'],
 
   // Hash params win over query params when both carry the same key.
   read() {
@@ -372,7 +379,7 @@ document.addEventListener('visibilitychange', () => {
   // No route in the URL? A refresh inside the platform shell arrives with a
   // route-less iframe src, so fall back to the route the previous document
   // saved (see Router.restoreCandidate for the eligibility rules).
-  if (!route.c && !route.s && !joinToken) {
+  if (!route.c && !route.s && !route.coll && !joinToken) {
     const candidate = Router.restoreCandidate();
     if (candidate) route = Router.adopt(candidate);
   }
@@ -396,6 +403,18 @@ document.addEventListener('visibilitychange', () => {
 // (read-only shared recipe) when both are somehow present.
 async function restoreRoute(route) {
   if (typeof Store === 'undefined') return App.showView('home');
+
+  // A collection lives on the homepage (it replaces the box), so it's
+  // resolved before the recipe routes and needs no panel setup. Home.refresh
+  // runs first so the detail can fall back to a populated box on a 404.
+  if (route.coll && !route.c && !route.s) {
+    App.showView('home');
+    if (typeof Home !== 'undefined') {
+      const opened = await Home.openCollection(parseInt(route.coll));
+      if (!opened) HashParams.set('coll', null);
+    }
+    return;
+  }
 
   if (route.c && route.s) {
     console.warn('[route] both c and s present — using c', route);
@@ -432,9 +451,8 @@ async function restoreRoute(route) {
     return App.showView('home');
   }
 
-  // The recipe panel is the point of the route — on narrow screens
-  // setupMobileTabs has already defaulted to the chat tab.
-  if (window.innerWidth < 1024) App.setMobileTab?.('recipe');
+  // Store.selectConversation / openShared already picked the tab from
+  // whether a recipe actually loaded (issue #30).
 
   if (route.cook === '1' && typeof CookingMode !== 'undefined') {
     if (App.currentRecipe?.steps?.length) CookingMode.enter(App.currentRecipe);
@@ -448,8 +466,10 @@ function setupHomeButton() {
     // refresh should restore.
     HashParams.set('c', null);
     HashParams.set('s', null);
+    HashParams.set('coll', null);
     HashParams.set('cook', null);
     App.setSignInPath?.(null);
+    if (typeof Home !== 'undefined') Home.activeCollection = null;
     App.showView('home');
   });
 }
@@ -460,6 +480,7 @@ function setupMobileTabs() {
   const chatPanel = document.getElementById('chat-panel');
 
   function setTab(tab) {
+    App.mobileTab = tab;
     tabs.forEach((t) => {
       const active = t.dataset.tab === tab;
       t.classList.toggle('bg-zinc-300', active);
@@ -480,13 +501,28 @@ function setupMobileTabs() {
     t.addEventListener('click', () => setTab(t.dataset.tab));
   });
 
-  // Exposed so a restored recipe route can land on the recipe tab instead
-  // of the chat tab this defaults to on phones.
+  // Exposed so every "open a recipe" path can land on the recipe tab
+  // (Store.selectConversation / openShared) and every recipe-less path can
+  // land on chat. This is the single entry point — nothing else writes
+  // panel-hidden.
   App.setMobileTab = setTab;
 
-  if (window.innerWidth < 1024) {
-    setTab('chat');
-  }
+  // panel-hidden is only meaningful below 1024px, so a desktop→mobile
+  // resize (or a rotate) has to re-apply the tab or the phone layout can
+  // come back showing both panels — or neither.
+  let wasNarrow = window.innerWidth < 1024;
+  window.addEventListener('resize', () => {
+    const narrow = window.innerWidth < 1024;
+    if (narrow === wasNarrow) return;
+    wasNarrow = narrow;
+    if (narrow) setTab(App.mobileTab);
+    else {
+      recipePanel.classList.remove('panel-hidden');
+      chatPanel.classList.remove('panel-hidden');
+    }
+  });
+
+  setTab(App.mobileTab);
 }
 
 let _prefSaveTimer;
@@ -552,6 +588,8 @@ function setupNewConversation() {
     App.viewingShared = null;
     App.viewingVersion = null;
     App.showView('chat');
+    // No recipe yet — the message box is the point of this screen.
+    App.setMobileTab?.('chat');
     HashParams.clear();
     App.setSignInPath?.(null);
     if (typeof Chat !== 'undefined') Chat.clear();

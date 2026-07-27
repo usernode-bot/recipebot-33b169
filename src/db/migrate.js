@@ -332,6 +332,38 @@ async function seedStagingDemo(pool) {
     log.info('db', 'Seeded staging failed-fix-up demo conversation');
   }
 
+  // Drafts (issue #32): conversations that never produced a recipe. Every
+  // other seeded conversation has one, so without these the homepage's
+  // Drafts section — compact rows plus the "Show N more" disclosure past
+  // three — would never render in staging. Four rows so the disclosure
+  // itself is visible.
+  const DRAFT_TITLES = [
+    'Staging demo — Draft: something with leftover rice',
+    'Staging demo — Draft: birthday cake ideas',
+    'Staging demo — Draft: what to do with a glut of tomatoes',
+    'Staging demo — Draft: cold lunches for the week',
+  ];
+  for (let i = 0; i < DRAFT_TITLES.length; i++) {
+    const convId = 900010 + i;
+    await pool.query(
+      `INSERT INTO conversations (id, user_id, title, preferences)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (id) DO NOTHING`,
+      [convId, DEMO_USER_ID, DRAFT_TITLES[i],
+       JSON.stringify({ complexity: 'normal', serving: 'normal' })]
+    );
+    const { rows: draftMsgs } = await pool.query(
+      'SELECT 1 FROM messages WHERE conversation_id = $1 LIMIT 1', [convId]);
+    if (draftMsgs.length === 0) {
+      await pool.query(
+        `INSERT INTO messages (conversation_id, role, content, recipe_data) VALUES
+         ($1, 'user', $2, NULL)`,
+        [convId, 'Staging demo: still thinking about this one.']
+      );
+    }
+  }
+  log.info('db', 'Seeded staging draft conversations');
+
   // Social features: seed the community feed with two shared recipes from
   // two distinct fake creators, plus ratings so aggregates visibly render.
   // Fixed high IDs + ON CONFLICT keep this idempotent across reboots.
@@ -418,14 +450,16 @@ async function seedStagingDemo(pool) {
     [JSON.stringify(DEMO_REMIX)]
   );
 
-  // Collections: a private one for user 0 (with a snapshot-only item that
-  // simulates a deleted source), a public one for the feed rail, and a
-  // group cookbook with members + a fixed invite token for the join flow.
+  // Collections — one concept, three states the UI must render (issue #34):
+  //   900001 private, no members  → "Collection" (Invite people + Make public)
+  //   900002 public               → "Public collection" (Public pill, comments)
+  //   900003 private + 3 members  → "Shared collection · 3 members" + invite
+  // 900001 also carries a snapshot-only item that simulates a deleted source.
   await pool.query(
     `INSERT INTO collections (id, user_id, username, name, description, visibility) VALUES
        (900001, 0, 'staging-demo-user', 'Staging Demo Weeknight', 'Quick dinners seeded for staging.', 'private'),
        (900002, 0, 'staging-demo-user', 'Staging Demo Community Picks', 'A public seeded collection.', 'public'),
-       (900003, 0, 'staging-demo-user', 'Staging Demo Family Cookbook', 'Shared cookbook seeded for staging.', 'group')
+       (900003, 0, 'staging-demo-user', 'Staging Demo Family Cookbook', 'Shared collection seeded for staging.', 'private')
      ON CONFLICT (id) DO NOTHING`
   );
   const SNAPSHOT_ONLY = {
@@ -481,7 +515,20 @@ async function seedStagingDemo(pool) {
        (900002, 900001, 900102, 'staging-demo-baker', 'Staging demo deleted comment', NOW())
      ON CONFLICT (id) DO NOTHING`
   );
-  log.info('db', 'Seeded staging collections, cookbook, lineage, made-it and comments');
+
+  // Collection comments (issue #35) — a brand-new table, so staging starts
+  // empty and the thread would render blank without these. Two live rows on
+  // the public collection plus one soft-deleted (proves the "comment
+  // deleted" placeholder renders and stays out of the count), one on the
+  // shared collection.
+  await pool.query(
+    `INSERT INTO collection_comments (id, collection_id, user_id, username, body, deleted_at) VALUES
+       (900001, 900002, 900103, 'staging-demo-critic', 'Staging demo collection comment: great weeknight shelf.', NULL),
+       (900002, 900002, 900102, 'staging-demo-baker', 'Staging demo deleted collection comment', NOW()),
+       (900003, 900003, 900101, 'staging-demo-cook', 'Staging demo collection comment: adding Nan''s dumplings next.', NULL)
+     ON CONFLICT (id) DO NOTHING`
+  );
+  log.info('db', 'Seeded staging collections, members, lineage, made-it and comments');
 
   // Demo AI-usage row for the user-menu "AI usage today" meter (llm_usage is
   // staging:private, so staging starts empty). Seeded fresh for *today*
