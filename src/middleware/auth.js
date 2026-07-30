@@ -15,8 +15,15 @@ const PUBLIC_PREFIXES = ['/api/public/'];
 function authMiddleware(config) {
   return (req, res, next) => {
     const token = req.query.token || req.headers['x-usernode-token'];
-    if (token && config.jwtSecret) {
-      try { req.user = jwt.verify(token, config.jwtSecret); } catch {}
+    if (token && config.jwtPublicKey) {
+      try {
+        const payload = jwt.verify(token, config.jwtPublicKey, {
+          algorithms: ['RS256'],
+          issuer: 'usernode',
+          audience: 'usernode:app:' + process.env.USERNODE_APP_ID,
+        });
+        if (payload.pur === 'iframe') req.user = payload;
+      } catch {}
     }
 
     if (req.method !== 'GET' || req.path.startsWith('/api/')) {

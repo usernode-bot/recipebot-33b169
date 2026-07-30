@@ -13,14 +13,14 @@ function load() {
     process.exit(1);
   }
 
-  if (!process.env.JWT_SECRET) {
-    console.warn('[config] JWT_SECRET not set — all authenticated routes will reject');
+  if (!process.env.USERNODE_JWT_PUBLIC_KEY) {
+    console.warn('[config] USERNODE_JWT_PUBLIC_KEY not set — all authenticated routes will reject');
   }
 
   const config = {
     port: parseInt(process.env.PORT || '3000', 10),
     databaseUrl: process.env.DATABASE_URL,
-    jwtSecret: process.env.JWT_SECRET || '',
+    jwtPublicKey: process.env.USERNODE_JWT_PUBLIC_KEY || '',
     isStaging: process.env.USERNODE_ENV === 'staging',
     // Platform LLM proxy (production only; staging/standalone get neither)
     llmProxyUrl: process.env.USERNODE_LLM_PROXY_URL || '',
