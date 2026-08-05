@@ -92,20 +92,19 @@ App.showView = function (view) {
 
 // Anonymous mode: one dialog for every ownership/AI affordance. The reason
 // line tells the visitor what signing in unlocks; the primary button opens
-// the app inside Usernode where their account lives.
+// the app inside Usernode where their account lives. Presented by the native
+// kit (sheet on phones, centred modal on desktop) — see js/dialogs.js.
 App.promptSignIn = function (reason) {
   const modal = document.getElementById('sign-in-modal');
   if (!modal) return;
   const reasonEl = document.getElementById('sign-in-reason');
   if (reasonEl) reasonEl.textContent = reason || t('signin.title');
-  modal.classList.remove('hidden');
-  const close = () => {
-    modal.classList.add('hidden');
-    document.getElementById('sign-in-cancel').onclick = null;
-    document.getElementById('sign-in-backdrop').onclick = null;
-  };
+
+  const handle = Dialogs.present(modal, { name: 'signin' });
+  const close = () => handle && handle.dismiss();
+  // The CTA keeps whatever href App.setSignInPath last wrote — following it
+  // navigates away, so there is nothing to clean up beyond the dismiss.
   document.getElementById('sign-in-cancel').onclick = close;
-  document.getElementById('sign-in-backdrop').onclick = close;
 };
 
 // Every "open in Usernode" link (header button + sign-in dialog CTA) points
@@ -260,9 +259,12 @@ window.Router = {
   // query-form duplicates, so a later HashParams.set (which only ever reads
   // the hash) can't silently wipe a route that arrived as ?c=/?s=/?cook=.
   // Everything else in the query — crucially the platform's ?token= — stays.
+  // `ui` is deliberately NOT a ROUTE_KEY: it is a transient screenshot-state
+  // deep link (open this dialog now), so it is consumed once at boot and
+  // stripped — a refresh must not resurrect the dialog.
   normalize(route) {
     const query = new URLSearchParams(location.search);
-    for (const k of [...this.ROUTE_KEYS, 'join']) query.delete(k);
+    for (const k of [...this.ROUTE_KEYS, 'join', 'ui']) query.delete(k);
     const search = query.toString();
     const hash = this.serialize(route);
     history.replaceState(null, '', location.pathname +
@@ -374,6 +376,10 @@ document.addEventListener('visibilitychange', () => {
   const query = new URLSearchParams(location.search);
   // ?join=<token> / #join=<token> — group-cookbook invite link landing.
   const joinToken = hp.join || query.get('join');
+  // ?ui=<name> / #ui=<name> — screenshot-state deep link: boot straight into
+  // a dialog or menu. Pure UI state (no DB writes), so it works in every
+  // environment. Read before normalize() strips it.
+  const uiState = hp.ui || query.get('ui');
 
   let route = Router.read();
   // No route in the URL? A refresh inside the platform shell arrives with a
@@ -397,7 +403,58 @@ document.addEventListener('visibilitychange', () => {
   } else {
     await restoreRoute(route);
   }
+
+  // Resolved last, so recipe-scoped states (?c=…&ui=publish) find their
+  // recipe already loaded.
+  if (uiState) openUiState(uiState);
 })();
+
+// Screenshot-state deep links. Each value opens exactly one dialog or menu
+// and writes nothing to the database — see "Make the changed screen
+// URL-reachable" in the platform conventions. Recipe-scoped states are
+// skipped when the route they need failed to restore.
+function openUiState(name) {
+  const hasRecipe = !!App.currentRecipe;
+  switch (name) {
+    case 'settings':
+      window.SettingsUI?.openSettings();
+      break;
+    case 'usermenu':
+      window.SettingsUI?.openMenu();
+      break;
+    case 'shortcuts':
+      if (typeof ShortcutsModal !== 'undefined') ShortcutsModal.open();
+      break;
+    case 'signin':
+      App.promptSignIn(t('signin.saveBox'));
+      break;
+    case 'theme':
+      App.openThemeMenu?.();
+      break;
+    case 'newcollection':
+      if (typeof Home !== 'undefined') Home.openNewCollection();
+      break;
+    case 'collectionpick':
+      if (typeof Home !== 'undefined') Home.openCollectionPicker(null);
+      break;
+    case 'madeit':
+      if (typeof Recipe !== 'undefined' && hasRecipe) Recipe.promptMadeItNote();
+      break;
+    case 'publish':
+      if (typeof Recipe !== 'undefined' && hasRecipe) {
+        Recipe.promptPublish(App.currentRecipe, { isUpdate: false });
+      }
+      break;
+    case 'versions':
+      if (typeof Recipe !== 'undefined' && App.viewingShared?.id) Recipe.openVersionHistory();
+      break;
+    case 'export':
+      if (typeof Recipe !== 'undefined' && hasRecipe) Recipe.openExportMenu();
+      break;
+    default:
+      console.warn('[route] unknown ui state', name);
+  }
+}
 
 // Boot dispatch for a resolved route. `c` (own conversation) wins over `s`
 // (read-only shared recipe) when both are somehow present.
@@ -645,25 +702,45 @@ function setupDarkMode() {
     }
   }
 
-  const isOpen = () => !menu.classList.contains('hidden');
+  // Presented as a native popover — the kit owns positioning, outside-click
+  // and Escape dismissal, so none of that is wired here any more.
+  let popover = null;
+  let closedAt = 0;
 
-  function setOpen(open) {
-    menu.classList.toggle('hidden', !open);
-    toggle.setAttribute('aria-expanded', String(open));
+  function openMenu() {
+    // The kit dismisses on an anchor re-click; without this guard that same
+    // click would immediately re-open the menu.
+    if (popover || Date.now() - closedAt < 250) return;
+    popover = Dialogs.menu(toggle, menu, {
+      name: 'theme',
+      onDismiss() {
+        popover = null;
+        closedAt = Date.now();
+        toggle.setAttribute('aria-expanded', 'false');
+      },
+    });
+    toggle.setAttribute('aria-expanded', 'true');
+    options.find((o) => o.getAttribute('aria-checked') === 'true')?.focus();
+  }
+
+  function closeMenu() {
+    if (popover) popover.dismiss();
   }
 
   toggle.addEventListener('click', (e) => {
     e.stopPropagation();
-    const open = !isOpen();
-    setOpen(open);
-    if (open) options.find((o) => o.getAttribute('aria-checked') === 'true')?.focus();
+    if (popover) closeMenu();
+    else openMenu();
   });
+
+  // Exposed for the ?ui=theme screenshot deep link.
+  App.openThemeMenu = openMenu;
 
   for (const opt of options) {
     opt.addEventListener('click', () => {
       try { localStorage.theme = opt.dataset.themeMode; } catch { /* storage blocked: session-only */ }
       apply();
-      setOpen(false);
+      closeMenu();
       toggle.focus();
     });
   }
@@ -676,21 +753,6 @@ function setupDarkMode() {
     const step = e.key === 'ArrowDown' ? 1 : -1;
     options[(Math.max(i, 0) + step + options.length) % options.length].focus();
   });
-
-  document.addEventListener('click', (e) => {
-    if (!isOpen()) return;
-    if (menu.contains(e.target) || toggle.contains(e.target)) return;
-    setOpen(false);
-  });
-
-  // Escape closes the menu and stops there — cooking mode, the shortcuts
-  // modal and the settings modal each bind Escape too.
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape' || !isOpen()) return;
-    e.stopPropagation();
-    setOpen(false);
-    toggle.focus();
-  }, true);
 
   media.addEventListener('change', () => {
     if (getMode() === 'system') apply();
@@ -730,7 +792,6 @@ function setupPanelResize() {
   divider.addEventListener('mousedown', (e) => {
     e.preventDefault();
     dragging = true;
-    chatPanel.classList.remove('chat-ready');
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
   });
@@ -745,7 +806,6 @@ function setupPanelResize() {
   document.addEventListener('mouseup', () => {
     if (!dragging) return;
     dragging = false;
-    chatPanel.classList.add('chat-ready');
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
     localStorage.setItem('chatPanelWidth', parseInt(chatPanel.style.width));

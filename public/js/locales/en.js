@@ -128,10 +128,16 @@ I18N.register('en', {
   'coll.yourRecipe': 'your recipe',
   'coll.savedCopyBadge': 'saved copy',
 
-  // ── Prompts (window.prompt) ──
-  'prompt.copyLink': 'Copy this link:',
-  'prompt.shareInvite': 'Share this invite link:',
-  'prompt.collectionName': 'Collection name:',
+  // ── Prompts (native kit alerts with an inset field) ──
+  'prompt.copyLink': 'Copy this link',
+  'prompt.shareInvite': 'Share this invite link',
+  'prompt.collectionName': 'Collection name',
+
+  // ── Toasts (transient confirmation, replaced button-label flashes) ──
+  'common.ok': 'OK',
+  'toast.linkCopied': 'Link copied',
+  'toast.inviteCopied': 'Invite link copied',
+  'toast.addedToCollection': 'Added to collection',
 
   // ── Chat ──
   'chat.welcome': 'Set your preferences, then start chatting.',
@@ -308,6 +314,7 @@ I18N.register('en', {
   'social.viewLink': 'view',
 
   // ── Alerts / confirms ──
+  'alert.importFailed': 'Import failed',
   'alert.invalidRecipe': 'Invalid recipe file. Must have "title" and "steps".',
   'alert.parseError': 'Could not parse JSON file: {msg}',
   'confirm.deleteConversation': 'Delete this conversation?',
@@ -343,6 +350,8 @@ I18N.register('en', {
   'card.collectionComments_one': '{n} comment',
   'card.collectionComments_other': '{n} comments',
   'coll.makePublic': 'Make public',
+  'coll.joinTitle': 'Join collection',
+  'coll.join': 'Join',
   'coll.makePublicConfirm': 'Make "{name}" public? Anyone will be able to find it in Community collections. This cannot be undone.',
   'coll.publicBadge': 'Public',
   'coll.invitePeople': 'Invite people',

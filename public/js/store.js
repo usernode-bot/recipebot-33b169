@@ -147,7 +147,11 @@ const Store = {
   },
 
   async deleteConversation(id) {
-    if (!confirm(t('confirm.deleteConversation'))) return;
+    const ok = await UI.confirmDestructive({
+      title: t('confirm.deleteConversation'),
+      confirmLabel: t('common.delete'),
+    });
+    if (!ok) return;
     await fetch(`/api/conversations/${id}`, { method: 'DELETE' }).catch(() => {});
     if (App.currentConversationId === id) {
       App.currentConversationId = null;

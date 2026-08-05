@@ -1,3 +1,130 @@
+/* ── Native kit theming ────────────────────────────────────────────
+   The usernode-native kit routes every colour and radius through --un-*
+   custom properties. Re-theme it here (warm-paper palette, paprika accent)
+   — NEVER by out-specificity-ing kit selectors or copying its stylesheet.
+   Physics, thresholds and gesture geometry are deliberately not themeable. */
+:root {
+  --un-accent: #b85a24;
+  --un-accent-contrast: #ffffff;
+  --un-surface: #FAF6EE;
+  --un-group-bg: #FFFFFF;
+  --un-sheet-bg: #FAF6EE;
+  --un-navbar-bg: #FAF6EE;
+  /* Popovers have no backdrop behind them — keep this fully opaque. */
+  --un-popover-bg: #FFFFFF;
+  --un-hairline: #E7DFCC;
+  --un-muted: #5A6378;
+  --un-switch-track-off: #D8CDB0;
+  --un-switch-thumb: #FFFFFF;
+  --un-action-danger: #C9563B;
+  --un-action-neutral: #E7DFCC;
+  --un-action-text: #1F2B47;
+  --un-toast-bg: #1F2B47;
+  --un-toast-text: #F3EDDF;
+  --un-toast-action: #F0B48A;
+  --un-radius: 0.5rem;
+  --un-radius-card: 0.375rem;
+}
+
+.dark {
+  --un-accent: #E07A3F;
+  --un-accent-contrast: #141A2B;
+  --un-surface: #141A2B;
+  --un-group-bg: #1F2B47;
+  --un-sheet-bg: #1F2B47;
+  --un-navbar-bg: #141A2B;
+  --un-popover-bg: #1F2B47;
+  --un-hairline: #333B54;
+  --un-muted: #8B90A2;
+  --un-switch-track-off: #454D66;
+  --un-switch-thumb: #FFFFFF;
+  --un-action-neutral: #333B54;
+  --un-action-text: #F3EDDF;
+  --un-toast-bg: #F3EDDF;
+  --un-toast-text: #1F2B47;
+  --un-toast-action: #96461A;
+}
+
+/* Kit-presented dialog content is app-owned markup with no surface of its
+   own — the sheet/modal supplies the background. These only bound its
+   width inside the kit's card. */
+[data-un-dialog] {
+  max-width: 28rem;
+  margin-inline: auto;
+}
+
+#shortcuts-modal[data-un-dialog],
+#sign-in-modal[data-un-dialog] {
+  max-width: 24rem;
+}
+
+/* ── Fallback chrome ───────────────────────────────────────────────
+   Only ever used when native.js failed to load (offline dev, blocked CDN).
+   Same semantics as the kit — a dialog must never be lost because a
+   third-party script didn't arrive. */
+.rb-fallback-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 26, 43, 0.5);
+  padding: 1rem;
+}
+
+.rb-fallback-backdrop.rb-fallback-sheet {
+  align-items: flex-end;
+  padding: 0;
+}
+
+.rb-fallback-card {
+  width: 100%;
+  max-width: 30rem;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 0.75rem;
+  background: var(--un-sheet-bg);
+  border: 1px solid var(--un-hairline);
+  box-shadow: 0 12px 40px rgba(20, 26, 43, 0.25);
+}
+
+.rb-fallback-sheet .rb-fallback-card {
+  max-width: none;
+  border-radius: 0.75rem 0.75rem 0 0;
+}
+
+.rb-fallback-popover {
+  position: fixed;
+  z-index: 95;
+  border-radius: 0.5rem;
+  background: var(--un-popover-bg);
+  border: 1px solid var(--un-hairline);
+  box-shadow: 0 8px 24px rgba(20, 26, 43, 0.2);
+}
+
+.rb-fallback-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 100;
+  max-width: min(28rem, calc(100vw - 2rem));
+  padding: 0.625rem 1rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  background: var(--un-toast-bg);
+  color: var(--un-toast-text);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.rb-fallback-toast.is-visible {
+  opacity: 1;
+  visibility: visible;
+}
+
 /* ── Editorial type: Fraunces for display, Inter for body ─────────── */
 body {
   font-family: Inter, system-ui, -apple-system, sans-serif;
@@ -23,14 +150,13 @@ h1, h2, h3, .font-display {
   #chat-panel.chat-open {
     width: 420px;
   }
+  /* No width transition: the chat panel is a high-frequency toggle, and
+     animating it reads as lag rather than polish (platform fidelity rule). */
   #chat-panel.chat-closed {
     width: 0;
     min-width: 0;
     overflow: hidden;
     border: none;
-  }
-  #chat-panel.chat-ready {
-    transition: width 200ms;
   }
 }
 

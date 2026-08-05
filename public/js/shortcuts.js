@@ -1,25 +1,34 @@
+// Presented by the native kit (see js/dialogs.js) — backdrop tap, Escape and
+// swipe-down dismissal all come from there, so this only owns open/close.
 const ShortcutsModal = {
   el: null,
+  handle: null,
 
   init() {
     this.el = document.getElementById('shortcuts-modal');
     document.getElementById('shortcuts-help-btn')?.addEventListener('click', () => this.toggle());
     document.getElementById('shortcuts-close')?.addEventListener('click', () => this.close());
-    this.el?.addEventListener('click', (e) => {
-      if (e.target === this.el) this.close();
+  },
+
+  open() {
+    if (!this.el || this.handle) return;
+    this.handle = Dialogs.present(this.el, {
+      name: 'shortcuts',
+      onDismiss: () => { this.handle = null; },
     });
   },
 
   toggle() {
-    this.el?.classList.toggle('hidden');
+    if (this.handle) this.close();
+    else this.open();
   },
 
   close() {
-    this.el?.classList.add('hidden');
+    if (this.handle) this.handle.dismiss();
   },
 
   isOpen() {
-    return this.el && !this.el.classList.contains('hidden');
+    return !!this.handle;
   },
 };
 
@@ -30,8 +39,9 @@ document.addEventListener('keydown', (e) => {
   const input = document.activeElement;
   const typing = input?.tagName === 'TEXTAREA' || input?.tagName === 'INPUT';
 
+  // The kit owns Escape while a dialog is presented; '?' still toggles.
   if (ShortcutsModal.isOpen()) {
-    if (e.key === 'Escape') ShortcutsModal.close();
+    if (e.key === '?' && !mod && !typing) ShortcutsModal.close();
     return;
   }
 

@@ -14,6 +14,17 @@
     display: none !important;
   }
 
+  /* Dialog / menu content is app-owned markup the native kit moves into its
+     own layer while presented. Hide it by our own hook (never by kit-internal
+     class names) so Ctrl+P with a sheet open still prints just the recipe. */
+  [data-un-dialog],
+  [data-un-menu],
+  .rb-fallback-backdrop,
+  .rb-fallback-popover,
+  .rb-fallback-toast {
+    display: none !important;
+  }
+
   body {
     background: white !important;
     color: black !important;

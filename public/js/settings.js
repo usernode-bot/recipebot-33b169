@@ -1,27 +1,47 @@
-// User menu (header) + App settings modal with the per-user AI model picker.
+// User menu (header) + App settings dialog with the per-user AI model picker.
 // The model list comes from /api/auth/me (App.llm.models); the choice is
 // saved immediately into the same preferences JSONB the recipe chips use.
 // The menu also shows "AI usage today" — the platform's authoritative spend
 // meter via usernode.getLlmUsage() when available, falling back to the app's
 // local estimate (GET /api/usage/today) in staging/standalone/direct-key mode.
+//
+// Presentation is the native kit's (issue #39): the menu is a popover, the
+// settings panel a sheet/modal, and save feedback is a toast — so there is no
+// outside-click, Escape or transient-status plumbing in here any more.
 (function () {
   const menuBtn = document.getElementById('user-menu-btn');
   const menu = document.getElementById('user-menu');
   const modal = document.getElementById('settings-modal');
   const optionsEl = document.getElementById('model-options');
-  const statusEl = document.getElementById('settings-status');
   if (!menuBtn || !menu || !modal) return;
 
+  let menuPopover = null;
+  let menuClosedAt = 0;
+
+  function openMenu() {
+    // The kit dismisses on an anchor re-click; without this guard that same
+    // click would immediately re-open the menu.
+    if (menuPopover || Date.now() - menuClosedAt < 250) return;
+    menuPopover = Dialogs.menu(menuBtn, menu, {
+      name: 'usermenu',
+      onDismiss() {
+        menuPopover = null;
+        menuClosedAt = Date.now();
+        menuBtn.setAttribute('aria-expanded', 'false');
+      },
+    });
+    menuBtn.setAttribute('aria-expanded', 'true');
+    refreshUsage();
+  }
+
   function closeMenu() {
-    menu.classList.add('hidden');
-    menuBtn.setAttribute('aria-expanded', 'false');
+    if (menuPopover) menuPopover.dismiss();
   }
 
   menuBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    const nowHidden = menu.classList.toggle('hidden');
-    menuBtn.setAttribute('aria-expanded', String(!nowHidden));
-    if (!nowHidden) refreshUsage();
+    if (menuPopover) closeMenu();
+    else openMenu();
   });
 
   function fmtCents(cents) {
@@ -83,6 +103,13 @@
     const footnoteEl = document.getElementById('usage-footnote');
     if (!section || !amountEl) return;
 
+    // An anonymous visitor has no per-user spend to show, and /api/usage/today
+    // is behind the JWT gate — asking for it would only log a 401.
+    if (App.isAnonymous) {
+      section.classList.add('hidden');
+      return;
+    }
+
     // Muted "…" placeholder while loading — no reflow on refresh.
     section.classList.remove('hidden');
     amountEl.textContent = '…';
@@ -125,32 +152,23 @@
     renderMeter(cents, null, false);
   }
 
-  document.addEventListener('click', (e) => {
-    if (menu.classList.contains('hidden')) return;
-    if (menu.contains(e.target) || menuBtn.contains(e.target)) return;
-    closeMenu();
-  });
+  let settingsDialog = null;
 
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    closeMenu();
-    if (!modal.classList.contains('hidden')) showModal(false);
-  });
+  function openSettings() {
+    renderOptions();
+    settingsDialog = Dialogs.present(modal, {
+      name: 'settings',
+      onDismiss() { settingsDialog = null; },
+    });
+  }
 
   document.getElementById('open-settings').addEventListener('click', () => {
     closeMenu();
-    showModal(true);
+    openSettings();
   });
-  document.getElementById('settings-close').addEventListener('click', () => showModal(false));
-  document.getElementById('settings-backdrop').addEventListener('click', () => showModal(false));
-
-  function showModal(visible) {
-    modal.classList.toggle('hidden', !visible);
-    if (visible) {
-      statusEl.classList.add('hidden');
-      renderOptions();
-    }
-  }
+  document.getElementById('settings-close').addEventListener('click', () => {
+    if (settingsDialog) settingsDialog.dismiss();
+  });
 
   function currentModel() {
     if (App.preferences && App.preferences.model) return App.preferences.model;
@@ -206,21 +224,15 @@
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        showStatus(data.error || t('settings.saveFailed'), true);
+        UI.toast(data.error || t('settings.saveFailed'));
         return;
       }
-      showStatus(t('settings.saved'), false);
+      UI.toast(t('settings.saved'));
     } catch {
-      showStatus(t('settings.networkError'), true);
+      UI.toast(t('settings.networkError'));
     }
   }
 
-  let _statusTimer;
-  function showStatus(text, isError) {
-    statusEl.textContent = text;
-    statusEl.className = 'text-sm mt-3 ' + (isError ? 'text-red-500' : 'text-green-500');
-    statusEl.classList.remove('hidden');
-    clearTimeout(_statusTimer);
-    _statusTimer = setTimeout(() => statusEl.classList.add('hidden'), 3000);
-  }
+  // Exposed for the ?ui=settings / ?ui=usermenu screenshot deep links.
+  window.SettingsUI = { openSettings, openMenu };
 })();

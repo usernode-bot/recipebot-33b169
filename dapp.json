@@ -309,6 +309,66 @@
       "name": "Public page lists remixes",
       "path": "/r/staging-demo-recipe",
       "expectText": "Staging Demo Remixed Stir Fry"
+    },
+    {
+      "name": "Native UI kit stylesheet is loaded",
+      "path": "/",
+      "expectSelector": "link[href*=\"usernode-native/v1/native.css\"]"
+    },
+    {
+      "name": "Settings opens as a native dialog",
+      "path": "/?ui=settings",
+      "expectSelector": "html[data-dialog=\"settings\"] #settings-modal"
+    },
+    {
+      "name": "Account menu opens with the usage meter",
+      "path": "/?ui=usermenu",
+      "expectSelector": "html[data-dialog=\"usermenu\"] #usage-section"
+    },
+    {
+      "name": "Theme menu opens as a popover",
+      "path": "/?ui=theme",
+      "expectSelector": "html[data-dialog=\"theme\"] [data-theme-mode=\"system\"]"
+    },
+    {
+      "name": "Shortcuts opens as a native dialog",
+      "path": "/?ui=shortcuts",
+      "expectSelector": "html[data-dialog=\"shortcuts\"] #shortcuts-modal"
+    },
+    {
+      "name": "New-collection dialog opens",
+      "path": "/?ui=newcollection",
+      "expectSelector": "html[data-dialog=\"newcollection\"] #new-collection-name"
+    },
+    {
+      "name": "Add-to-collection picker opens with seeded collections",
+      "path": "/?ui=collectionpick",
+      "expectText": "Staging Demo Weeknight"
+    },
+    {
+      "name": "Sign-in dialog opens",
+      "path": "/?ui=signin",
+      "expectSelector": "html[data-dialog=\"signin\"] #sign-in-go"
+    },
+    {
+      "name": "Made-it dialog opens on a recipe",
+      "path": "/?c=900003&ui=madeit",
+      "expectSelector": "html[data-dialog=\"madeit\"] #made-it-note"
+    },
+    {
+      "name": "Publish dialog opens with proposed tags",
+      "path": "/?c=900003&ui=publish",
+      "expectText": "one-pot"
+    },
+    {
+      "name": "Export menu opens on a recipe",
+      "path": "/?c=900003&ui=export",
+      "expectSelector": "html[data-dialog=\"export\"] #export-json"
+    },
+    {
+      "name": "Version history opens for a v2 recipe",
+      "path": "/?s=900002&ui=versions",
+      "expectText": "Swapped chicken for tofu"
     }
   ]
 }

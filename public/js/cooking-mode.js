@@ -127,7 +127,7 @@ const CookingMode = {
         madeBtn.classList.add('hidden');
       } else {
         madeBtn.addEventListener('click', () => {
-          if (typeof Recipe !== 'undefined') Recipe.markMadeIt(madeBtn);
+          if (typeof Recipe !== 'undefined') Recipe.markMadeIt();
         });
       }
     }

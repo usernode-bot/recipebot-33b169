@@ -144,13 +144,15 @@ const Recipe = {
           ${this.renderShareControls()}
           ${this.renderCollectionControl()}
           ${this.renderShareLinkControl()}
-          <div class="relative">
+          <div>
             <button id="export-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.export')}</button>
-            <div id="export-menu" class="hidden absolute top-full mt-1 left-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg overflow-hidden z-10 min-w-[160px]">
+            <!-- Presented by unNative.popover (Dialogs.menu): content only,
+                 no surface or positioning of its own. -->
+            <div id="export-menu" class="hidden min-w-[180px] py-1" data-un-menu>
               <button id="export-md" class="block w-full px-4 py-2.5 text-sm text-left hover:bg-zinc-100 dark:hover:bg-zinc-800">${t('recipe.downloadMd')}</button>
               <button id="export-copy-md" class="block w-full px-4 py-2.5 text-sm text-left hover:bg-zinc-100 dark:hover:bg-zinc-800">${t('recipe.copyMd')}</button>
               <button id="export-json" class="block w-full px-4 py-2.5 text-sm text-left hover:bg-zinc-100 dark:hover:bg-zinc-800">${t('recipe.downloadJson')}</button>
-              <div class="border-t border-zinc-200 dark:border-zinc-700"></div>
+              <div class="border-t border-zinc-200 dark:border-zinc-700 my-1"></div>
               <label id="import-json-label" class="block w-full px-4 py-2.5 text-sm text-left hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer">${t('recipe.importJson')}
                 <input type="file" id="import-json-input" accept=".json,application/json" class="hidden">
               </label>
@@ -312,8 +314,33 @@ const Recipe = {
     return `<button id="copy-link-btn" title="${this.escapeHtml(t('recipe.copyLinkTitle'))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.copyLink')}</button>`;
   },
 
+  // ── Export menu (native popover) ──────────────────────────────
+  //
+  // The menu markup is rebuilt with every display(), so the handle is
+  // dropped whenever the recipe re-renders — always re-query the anchor.
+  openExportMenu() {
+    const btn = document.getElementById('export-btn');
+    const menu = document.getElementById('export-menu');
+    if (!btn || !menu) return;
+    if (this._exportMenu || Date.now() - (this._exportClosedAt || 0) < 250) return;
+    this._exportMenu = Dialogs.menu(btn, menu, {
+      name: 'export',
+      placement: 'bottom-start',
+      onDismiss: () => {
+        this._exportMenu = null;
+        this._exportClosedAt = Date.now();
+      },
+    });
+  },
+
+  closeExportMenu() {
+    if (this._exportMenu) this._exportMenu.dismiss();
+  },
+
   // ── "Made it" ────────────────────────────────────────────────
 
+  // Resolves the note (possibly '') or null when cancelled. Dismissing the
+  // kit sheet — backdrop, Escape, swipe-down — counts as cancelling.
   promptMadeItNote() {
     return new Promise((resolve) => {
       const modal = document.getElementById('made-it-modal');
@@ -322,30 +349,29 @@ const Recipe = {
       const confirmBtn = document.getElementById('made-it-confirm');
       const cancelBtn = document.getElementById('made-it-cancel');
       const closeBtn = document.getElementById('made-it-close');
-      const backdrop = document.getElementById('made-it-backdrop');
 
       input.value = '';
-      modal.classList.remove('hidden');
-      input.focus();
 
-      const done = (val) => {
-        modal.classList.add('hidden');
-        confirmBtn.removeEventListener('click', onConfirm);
-        cancelBtn.removeEventListener('click', onCancel);
-        closeBtn.removeEventListener('click', onCancel);
-        backdrop.removeEventListener('click', onCancel);
-        resolve(val);
-      };
-      const onConfirm = () => done(input.value.trim());
-      const onCancel = () => done(null);
+      let settled = null;
+      const dialog = Dialogs.present(modal, {
+        name: 'madeit',
+        onPresent() { input.focus({ preventScroll: true }); },
+        onDismiss() {
+          confirmBtn.removeEventListener('click', onConfirm);
+          cancelBtn.removeEventListener('click', onCancel);
+          closeBtn.removeEventListener('click', onCancel);
+          resolve(settled);
+        },
+      });
+      const onConfirm = () => { settled = input.value.trim(); dialog.dismiss(); };
+      const onCancel = () => dialog.dismiss();
       confirmBtn.addEventListener('click', onConfirm);
       cancelBtn.addEventListener('click', onCancel);
       closeBtn.addEventListener('click', onCancel);
-      backdrop.addEventListener('click', onCancel);
     });
   },
 
-  async markMadeIt(btn) {
+  async markMadeIt() {
     if (App.isAnonymous) return App.promptSignIn(t('signin.madeIt'));
     const note = await this.promptMadeItNote();
     if (note === null) return; // cancelled
@@ -361,13 +387,13 @@ const Recipe = {
       });
       if (!res.ok) throw new Error();
       const data = await res.json();
-      if (btn) btn.textContent = t('recipe.madeItDone', { n: data.made_count });
+      UI.toast(t('recipe.madeItDone', { n: data.made_count }));
       if (App.viewingShared) {
         App.viewingShared.made_count = data.made_count;
         if (App.viewingShared.id) this.loadSocialSection(App.viewingShared.id);
       }
     } catch {
-      if (btn) btn.textContent = t('recipe.madeItFailed');
+      UI.toast(t('recipe.madeItFailed'));
     }
   },
 
@@ -383,7 +409,6 @@ const Recipe = {
       const confirmBtn = document.getElementById('share-note-confirm');
       const cancelBtn = document.getElementById('share-note-cancel');
       const closeBtn = document.getElementById('share-note-close');
-      const backdrop = document.getElementById('share-note-backdrop');
       const titleEl = document.getElementById('share-note-title');
       const noteField = document.getElementById('share-note-field');
       const tagsList = document.getElementById('share-tags-list');
@@ -417,7 +442,6 @@ const Recipe = {
       input.value = '';
       tagInput.value = '';
       renderTags();
-      modal.classList.remove('hidden');
 
       const onTagKey = (e) => {
         if (e.key !== 'Enter') return;
@@ -431,21 +455,27 @@ const Recipe = {
       };
       tagInput.addEventListener('keydown', onTagKey);
 
-      const done = (val) => {
-        modal.classList.add('hidden');
-        confirmBtn.removeEventListener('click', onConfirm);
-        cancelBtn.removeEventListener('click', onCancel);
-        closeBtn.removeEventListener('click', onCancel);
-        backdrop.removeEventListener('click', onCancel);
-        tagInput.removeEventListener('keydown', onTagKey);
-        resolve(val);
+      // Dismissing the sheet any other way (backdrop, Escape, swipe-down)
+      // resolves null, i.e. cancelled — same contract as before.
+      let result = null;
+      const dialog = Dialogs.present(modal, {
+        name: 'publish',
+        onDismiss() {
+          confirmBtn.removeEventListener('click', onConfirm);
+          cancelBtn.removeEventListener('click', onCancel);
+          closeBtn.removeEventListener('click', onCancel);
+          tagInput.removeEventListener('keydown', onTagKey);
+          resolve(result);
+        },
+      });
+      const onConfirm = () => {
+        result = { tags: tags.slice(), note: input.value.trim() };
+        dialog.dismiss();
       };
-      const onConfirm = () => done({ tags: tags.slice(), note: input.value.trim() });
-      const onCancel = () => done(null);
+      const onCancel = () => dialog.dismiss();
       confirmBtn.addEventListener('click', onConfirm);
       cancelBtn.addEventListener('click', onCancel);
       closeBtn.addEventListener('click', onCancel);
-      backdrop.addEventListener('click', onCancel);
     });
   },
 
@@ -554,7 +584,12 @@ const Recipe = {
     const list = document.getElementById('version-history-list');
     if (!modal || !list) return;
     list.innerHTML = `<p class="text-sm text-zinc-400 dark:text-zinc-500">${t('common.loading')}</p>`;
-    modal.classList.remove('hidden');
+    // Presented before the fetch resolves — the kit re-measures on content
+    // growth, so late-rendered rows still get the full presentation.
+    this._versionDialog = Dialogs.present(modal, {
+      name: 'versions',
+      onDismiss: () => { this._versionDialog = null; },
+    });
 
     try {
       const res = await fetch(`/api/shared-recipes/${vs.id}/versions`);
@@ -583,9 +618,13 @@ const Recipe = {
     }
   },
 
+  closeVersionHistory() {
+    if (this._versionDialog) this._versionDialog.dismiss();
+  },
+
   viewVersion(v) {
     const vs = App.viewingShared;
-    document.getElementById('version-history-modal')?.classList.add('hidden');
+    this.closeVersionHistory();
     if (!vs) return;
     if (v.version === vs.current_version) return this.backToCurrentVersion();
     App.viewingVersion = { version: v.version };
@@ -629,18 +668,16 @@ const Recipe = {
           }),
         });
         if (!res.ok) throw new Error('share failed');
-        if (btn) btn.textContent = t('recipe.sharedBang');
+        UI.toast(t('recipe.sharedBang'));
         if (App.currentRecipe) App.currentRecipe.tags = result.tags;
         if (typeof Store !== 'undefined') await Store.refresh();
-        setTimeout(() => this.display(App.currentRecipe), 800);
+        this.display(App.currentRecipe);
       } catch {
-        if (btn) btn.textContent = t('recipe.shareFailed');
+        UI.toast(t('recipe.shareFailed'));
       }
     });
 
-    display.querySelector('#made-it-btn')?.addEventListener('click', (e) => {
-      this.markMadeIt(e.currentTarget);
-    });
+    display.querySelector('#made-it-btn')?.addEventListener('click', () => this.markMadeIt());
 
     display.querySelector('#add-collection-btn')?.addEventListener('click', () => {
       if (App.isAnonymous) return App.promptSignIn(t('signin.saveBox'));
@@ -651,9 +688,9 @@ const Recipe = {
       if (target) Home.openCollectionPicker(target);
     });
 
-    display.querySelector('#copy-link-btn')?.addEventListener('click', (e) => {
+    display.querySelector('#copy-link-btn')?.addEventListener('click', () => {
       const slug = this._currentShareSlug();
-      if (slug && typeof Home !== 'undefined') Home.copyShareLink(slug, e.currentTarget);
+      if (slug && typeof Home !== 'undefined') Home.copyShareLink(slug);
     });
 
     display.querySelector('#fork-btn')?.addEventListener('click', () => {
@@ -709,12 +746,12 @@ const Recipe = {
     });
 
     const exportBtn = display.querySelector('#export-btn');
-    const exportMenu = display.querySelector('#export-menu');
-    exportBtn?.addEventListener('click', () => exportMenu.classList.toggle('hidden'));
-    display.querySelector('#export-md')?.addEventListener('click', () => { this.exportMarkdown(recipe); exportMenu.classList.add('hidden'); });
-    display.querySelector('#export-copy-md')?.addEventListener('click', () => { this.copyMarkdown(recipe); exportMenu.classList.add('hidden'); });
-    display.querySelector('#export-json')?.addEventListener('click', () => { this.exportJSON(recipe); exportMenu.classList.add('hidden'); });
-    display.querySelector('#import-json-input')?.addEventListener('change', (e) => { this.importJSON(e); exportMenu.classList.add('hidden'); });
+    exportBtn?.addEventListener('click', () => this.openExportMenu());
+    const closeExport = () => this.closeExportMenu();
+    display.querySelector('#export-md')?.addEventListener('click', () => { this.exportMarkdown(recipe); closeExport(); });
+    display.querySelector('#export-copy-md')?.addEventListener('click', () => { this.copyMarkdown(recipe); closeExport(); });
+    display.querySelector('#export-json')?.addEventListener('click', () => { this.exportJSON(recipe); closeExport(); });
+    display.querySelector('#import-json-input')?.addEventListener('change', (e) => { this.importJSON(e); closeExport(); });
 
     // Step timer buttons
     display.querySelectorAll('.step-timer-btn').forEach((btn) => {
@@ -1034,13 +1071,7 @@ const Recipe = {
     };
     const md = this._buildMarkdown(recipe, servings, scale, macros);
 
-    navigator.clipboard.writeText(md).then(() => {
-      const btn = document.getElementById('export-copy-md');
-      if (btn) {
-        btn.textContent = t('common.copied');
-        setTimeout(() => { btn.textContent = t('recipe.copyMd'); }, 1500);
-      }
-    });
+    navigator.clipboard.writeText(md).then(() => UI.toast(t('common.copied')));
   },
 
   importJSON(event) {
@@ -1053,7 +1084,7 @@ const Recipe = {
         const recipe = JSON.parse(e.target.result);
 
         if (!recipe.title || !recipe.steps || !Array.isArray(recipe.steps)) {
-          alert(t('alert.invalidRecipe'));
+          UI.alert({ title: t('alert.importFailed'), message: t('alert.invalidRecipe') });
           return;
         }
 
@@ -1069,7 +1100,10 @@ const Recipe = {
 
         Chat.appendMessage('assistant', t('chat.importedRecipe', { title: recipe.title }));
       } catch (err) {
-        alert(t('alert.parseError', { msg: err.message }));
+        UI.alert({
+          title: t('alert.importFailed'),
+          message: t('alert.parseError', { msg: err.message }),
+        });
       }
 
       event.target.value = '';
@@ -1303,9 +1337,8 @@ const Recipe = {
   },
 };
 
+// Backdrop / Escape / swipe-down dismissal is the kit's; only the explicit
+// ✕ needs wiring.
 document.getElementById('version-history-close')?.addEventListener('click', () => {
-  document.getElementById('version-history-modal')?.classList.add('hidden');
-});
-document.getElementById('version-history-backdrop')?.addEventListener('click', () => {
-  document.getElementById('version-history-modal')?.classList.add('hidden');
+  Recipe.closeVersionHistory();
 });

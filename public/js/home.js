@@ -474,15 +474,13 @@ const Home = {
     return el;
   },
 
-  copyShareLink(slug, btn) {
+  // Confirmation is a toast, not a rewritten button label — the button the
+  // visitor pressed stays labelled as itself.
+  copyShareLink(slug) {
     const url = `${location.origin}/r/${slug}`;
-    navigator.clipboard?.writeText(url).then(() => {
-      if (btn) {
-        const orig = btn.textContent;
-        btn.textContent = t('common.copied');
-        setTimeout(() => { btn.textContent = orig; }, 1500);
-      }
-    }).catch(() => window.prompt(t('prompt.copyLink'), url));
+    navigator.clipboard?.writeText(url)
+      .then(() => UI.toast(t('toast.linkCopied')))
+      .catch(() => UI.showValue({ title: t('prompt.copyLink'), value: url }));
   },
 
   _ratingRow(s) {
@@ -646,18 +644,17 @@ const Home = {
     head.querySelector('#collection-back').addEventListener('click', () => this.closeCollection());
 
     const actions = head.querySelector('#collection-detail-actions');
-    const copyInvite = (token, btn) => {
+    const copyInvite = (token) => {
       const url = `${location.origin}/?join=${token}`;
-      navigator.clipboard?.writeText(url).then(() => {
-        btn.textContent = t('common.copied');
-        setTimeout(() => { btn.textContent = t('coll.copyInvite'); }, 1500);
-      }).catch(() => window.prompt(t('prompt.shareInvite'), url));
+      navigator.clipboard?.writeText(url)
+        .then(() => UI.toast(t('toast.inviteCopied')))
+        .catch(() => UI.showValue({ title: t('prompt.shareInvite'), value: url }));
     };
     // Invite links live on ANY collection now, not just the old group kind.
     if (c.invite_token && c.is_member) {
       const inviteBtn = this._actionBtn(t('coll.copyInvite'));
       inviteBtn.title = t('tip.inviteLink');
-      inviteBtn.addEventListener('click', () => copyInvite(c.invite_token, inviteBtn));
+      inviteBtn.addEventListener('click', () => copyInvite(c.invite_token));
       actions.appendChild(inviteBtn);
     }
     if (c.is_owner) {
@@ -669,7 +666,7 @@ const Home = {
             const res = await fetch(`/api/collections/${c.id}/invite`, { method: 'POST' });
             if (!res.ok) throw new Error();
             const { invite_token: token } = await res.json();
-            copyInvite(token, shareBtn);
+            copyInvite(token);
             await this.reloadActiveCollection();
             this.render();
           } catch { /* leave the button as-is */ }
@@ -686,7 +683,12 @@ const Home = {
       } else {
         const pubBtn = this._actionBtn(t('coll.makePublic'));
         pubBtn.addEventListener('click', async () => {
-          if (!confirm(t('coll.makePublicConfirm', { name: c.name }))) return;
+          // One-way (issue #33) — the action sheet spells that out.
+          const ok = await UI.confirmDestructive({
+            title: t('coll.makePublicConfirm', { name: c.name }),
+            confirmLabel: t('coll.makePublic'),
+          });
+          if (!ok) return;
           await fetch(`/api/collections/${c.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -698,12 +700,16 @@ const Home = {
       }
       const renameBtn = this._actionBtn(t('common.rename'));
       renameBtn.addEventListener('click', async () => {
-        const name = window.prompt(t('prompt.collectionName'), c.name);
-        if (!name || !name.trim()) return;
+        const name = await UI.prompt({
+          title: t('prompt.collectionName'),
+          value: c.name,
+          okLabel: t('common.rename'),
+        });
+        if (!name) return;
         await fetch(`/api/collections/${c.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim() }),
+          body: JSON.stringify({ name }),
         }).catch(() => {});
         this.refresh();
       });
@@ -711,7 +717,11 @@ const Home = {
       const delBtn = this._actionBtn(t('common.delete'));
       delBtn.classList.add('hover:text-red-500');
       delBtn.addEventListener('click', async () => {
-        if (!confirm(t('coll.deleteConfirm', { name: c.name }))) return;
+        const ok = await UI.confirmDestructive({
+          title: t('coll.deleteConfirm', { name: c.name }),
+          confirmLabel: t('common.delete'),
+        });
+        if (!ok) return;
         await fetch(`/api/collections/${c.id}`, { method: 'DELETE' }).catch(() => {});
         this.closeCollection();
         this.refresh();
@@ -720,7 +730,11 @@ const Home = {
     } else if (c.is_member && App.currentUser) {
       const leaveBtn = this._actionBtn(t('coll.leave'));
       leaveBtn.addEventListener('click', async () => {
-        if (!confirm(t('coll.leaveConfirm', { name: c.name }))) return;
+        const ok = await UI.confirmDestructive({
+          title: t('coll.leaveConfirm', { name: c.name }),
+          confirmLabel: t('coll.leave'),
+        });
+        if (!ok) return;
         await fetch(`/api/collections/${c.id}/members/${App.currentUser.id}`, { method: 'DELETE' }).catch(() => {});
         this.closeCollection();
         this.refresh();
@@ -820,6 +834,8 @@ const Home = {
   },
 
   // Add-to-collection picker: target is { sharedRecipeId } or { conversationId }.
+  // A null target is the ?ui=collectionpick screenshot state — the picker
+  // renders, but there is nothing to add, so picking a row just closes it.
   async openCollectionPicker(target) {
     const modal = document.getElementById('collection-pick-modal');
     const list = document.getElementById('collection-pick-list');
@@ -830,18 +846,20 @@ const Home = {
       const res = await fetch('/api/collections');
       if (res.ok) this.collections = await res.json();
     } catch { /* fall back to whatever is cached */ }
-    modal.classList.remove('hidden');
 
-    const close = () => {
-      modal.classList.add('hidden');
-      document.getElementById('collection-pick-close').onclick = null;
-      document.getElementById('collection-pick-backdrop').onclick = null;
-      document.getElementById('collection-pick-create').onclick = null;
-    };
+    const dialog = Dialogs.present(modal, {
+      name: 'collectionpick',
+      onDismiss() {
+        document.getElementById('collection-pick-create').onclick = null;
+      },
+    });
+    const close = () => dialog && dialog.dismiss();
     document.getElementById('collection-pick-close').onclick = close;
-    document.getElementById('collection-pick-backdrop').onclick = close;
+
+    const hasTarget = !!(target && (target.conversationId || target.sharedRecipeId));
 
     const addTo = async (collectionId) => {
+      if (!hasTarget) return close();
       try {
         const res = await fetch(`/api/collections/${collectionId}/items`, {
           method: 'POST',
@@ -850,6 +868,7 @@ const Home = {
         });
         if (!res.ok) throw new Error();
         close();
+        UI.toast(t('toast.addedToCollection'));
         this.refresh();
       } catch {
         close();
@@ -899,18 +918,17 @@ const Home = {
     const input = document.getElementById('new-collection-name');
     input.value = '';
     input.placeholder = t('newColl.placeholder');
-    modal.classList.remove('hidden');
-    input.focus();
 
-    const close = () => {
-      modal.classList.add('hidden');
-      document.getElementById('new-collection-close').onclick = null;
-      document.getElementById('new-collection-backdrop').onclick = null;
-      document.getElementById('new-collection-cancel').onclick = null;
-      document.getElementById('new-collection-confirm').onclick = null;
-    };
+    const dialog = Dialogs.present(modal, {
+      name: 'newcollection',
+      onPresent() { input.focus({ preventScroll: true }); },
+      onDismiss() {
+        document.getElementById('new-collection-cancel').onclick = null;
+        document.getElementById('new-collection-confirm').onclick = null;
+      },
+    });
+    const close = () => dialog && dialog.dismiss();
     document.getElementById('new-collection-close').onclick = close;
-    document.getElementById('new-collection-backdrop').onclick = close;
     document.getElementById('new-collection-cancel').onclick = close;
     document.getElementById('new-collection-confirm').onclick = async () => {
       const name = input.value.trim();
@@ -937,11 +955,16 @@ const Home = {
       if (!res.ok) return;
       const info = await res.json();
       if (!info.already_member) {
-        const ok = confirm(t('coll.joinConfirm', {
-          name: info.name,
-          members: tn('card.members', info.member_count),
-          recipes: tn('card.recipes', info.item_count),
-        }));
+        const ok = await UI.alert({
+          title: t('coll.joinTitle'),
+          message: t('coll.joinConfirm', {
+            name: info.name,
+            members: tn('card.members', info.member_count),
+            recipes: tn('card.recipes', info.item_count),
+          }),
+          okLabel: t('coll.join'),
+          cancelLabel: t('common.cancel'),
+        });
         if (!ok) return;
         await fetch(`/api/collections/join/${encodeURIComponent(token)}`, { method: 'POST' });
       }
