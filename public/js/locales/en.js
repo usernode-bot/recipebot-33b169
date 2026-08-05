@@ -66,6 +66,7 @@ I18N.register('en', {
   'card.forkedFromTitle': 'Forked from {name}',
   'card.remixedFrom': '⑂ remixed from {name}',
   'card.noRecipeYet': 'no recipe yet',
+  'card.updated': 'updated {d}',
   'card.newConversation': 'New conversation',
   'card.prep': 'Prep: {t}',
   'card.cook': 'Cook: {t}',

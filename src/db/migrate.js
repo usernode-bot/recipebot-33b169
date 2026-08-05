@@ -194,7 +194,8 @@ const DEMO_RECIPE_LEGACY = { ...DEMO_RECIPE_2, title: 'Staging Demo Legacy Tofu 
 // `extraReply` optionally seeds an EARLIER reply row (an abandoned proposal),
 // which is the shape that used to resurrect a settled diff.
 async function seedEditDecisionDemo(
-  pool, convId, title, newRecipe, replyId, replyStatus, editDecision = null, extraReply = null
+  pool, convId, title, newRecipe, replyId, replyStatus, editDecision = null, extraReply = null,
+  ageDays = 0
 ) {
   await pool.query(
     `INSERT INTO conversations (id, user_id, title, preferences)
@@ -208,18 +209,25 @@ async function seedEditDecisionDemo(
     [convId]
   );
   if (rows.length === 0) {
+    // `ageDays` shifts the WHOLE conversation back in time so "Your recipes"
+    // has an unambiguous newest-first order in staging (issue #40). The
+    // within-conversation spacing is untouched: the issue #16 / #24
+    // regressions depend on old recipe → reply → newer recipe, with the
+    // pending_replies row (seeded below, also shifted) landing between the
+    // two recipe messages.
     await pool.query(
       `INSERT INTO messages (conversation_id, role, content, recipe_data, created_at) VALUES
-       ($1, 'user', 'Staging demo: make me a quick chicken stir fry', NULL, NOW() - interval '11 min'),
-       ($1, 'assistant', $2, $3, NOW() - interval '10 min'),
-       ($1, 'user', 'Staging demo: now make it vegan', NULL, NOW() - interval '6 min'),
-       ($1, 'assistant', $4, $5, NOW() - interval '4 min')`,
+       ($1, 'user', 'Staging demo: make me a quick chicken stir fry', NULL, NOW() - $6::interval - interval '11 min'),
+       ($1, 'assistant', $2, $3, NOW() - $6::interval - interval '10 min'),
+       ($1, 'user', 'Staging demo: now make it vegan', NULL, NOW() - $6::interval - interval '6 min'),
+       ($1, 'assistant', $4, $5, NOW() - $6::interval - interval '4 min')`,
       [
         convId,
         `[Recipe: ${DEMO_RECIPE.title}]`,
         JSON.stringify(DEMO_RECIPE),
         `[Recipe: ${newRecipe.title}]`,
         JSON.stringify(newRecipe),
+        `${ageDays} days`,
       ]
     );
   }
@@ -229,20 +237,24 @@ async function seedEditDecisionDemo(
   if (extraReply) {
     await pool.query(
       `INSERT INTO pending_replies (id, conversation_id, user_id, status, edit_decision, events, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, '[]', NOW() - interval '8 min', NOW() - interval '7 min')
+       VALUES ($1, $2, $3, $4, $5, '[]', NOW() - $6::interval - interval '8 min',
+               NOW() - $6::interval - interval '7 min')
        ON CONFLICT (id) DO NOTHING`,
-      [extraReply.replyId, convId, DEMO_USER_ID, extraReply.status, extraReply.editDecision || null]
+      [extraReply.replyId, convId, DEMO_USER_ID, extraReply.status,
+       extraReply.editDecision || null, `${ageDays} days`]
     );
   }
 
   // Reply created between the old and new recipe messages, so the client
-  // treats the newer recipe message as this reply's proposed edit.
+  // treats the newer recipe message as this reply's proposed edit. Shifted
+  // by the same `ageDays` as the messages above so the relation holds.
   await pool.query(
     `INSERT INTO pending_replies (id, conversation_id, user_id, status, edit_decision, decided_at, events, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, CASE WHEN $5::varchar IS NULL THEN NULL ELSE NOW() - interval '3 min' END,
-             '[]', NOW() - interval '5 min', NOW() - interval '4 min')
+     VALUES ($1, $2, $3, $4, $5,
+             CASE WHEN $5::varchar IS NULL THEN NULL ELSE NOW() - $6::interval - interval '3 min' END,
+             '[]', NOW() - $6::interval - interval '5 min', NOW() - $6::interval - interval '4 min')
      ON CONFLICT (id) DO NOTHING`,
-    [replyId, convId, DEMO_USER_ID, replyStatus, editDecision]
+    [replyId, convId, DEMO_USER_ID, replyStatus, editDecision, `${ageDays} days`]
   );
 }
 
@@ -261,14 +273,17 @@ async function seedStagingDemo(pool) {
     [DEMO_CONV_ID]
   );
   if (rows.length === 0) {
+    // Explicit timestamps (rather than the NOW() default) so this
+    // conversation's newest recipe sits at a known point in the "Your
+    // recipes" recency order — see the ageDays ladder below (issue #40).
     await pool.query(
-      `INSERT INTO messages (conversation_id, role, content, recipe_data) VALUES
-       ($1, 'user', 'Staging demo: make me a quick chicken stir fry', NULL),
-       ($1, 'assistant', 'Here''s a quick weeknight chicken stir fry — ready in about 25 minutes.', NULL),
-       ($1, 'assistant', '[Recipe: Staging Demo Chicken Stir Fry]', $2),
-       ($1, 'user', 'Staging demo: now make it vegan', NULL),
-       ($1, 'assistant', 'Swapped the chicken for extra-firm tofu.', NULL),
-       ($1, 'assistant', '[Recipe: Staging Demo Tofu Stir Fry]', $3)`,
+      `INSERT INTO messages (conversation_id, role, content, recipe_data, created_at) VALUES
+       ($1, 'user', 'Staging demo: make me a quick chicken stir fry', NULL, NOW() - interval '2 days 20 min'),
+       ($1, 'assistant', 'Here''s a quick weeknight chicken stir fry — ready in about 25 minutes.', NULL, NOW() - interval '2 days 18 min'),
+       ($1, 'assistant', '[Recipe: Staging Demo Chicken Stir Fry]', $2, NOW() - interval '2 days 15 min'),
+       ($1, 'user', 'Staging demo: now make it vegan', NULL, NOW() - interval '2 days 10 min'),
+       ($1, 'assistant', 'Swapped the chicken for extra-firm tofu.', NULL, NOW() - interval '2 days 6 min'),
+       ($1, 'assistant', '[Recipe: Staging Demo Tofu Stir Fry]', $3, NOW() - interval '2 days 4 min')`,
       [DEMO_CONV_ID, JSON.stringify(DEMO_RECIPE), JSON.stringify(DEMO_RECIPE_2)]
     );
     log.info('db', 'Seeded staging demo conversation');
@@ -276,13 +291,15 @@ async function seedStagingDemo(pool) {
 
   // Issue #16 regression seeds: an already-accepted edit (must open to the
   // normal recipe view) and an undecided edit (must open to the diff).
+  // The trailing ageDays argument spaces these conversations out in time so
+  // the homepage's newest-first recipe order is visible (issue #40).
   await seedEditDecisionDemo(
     pool, 900003, 'Staging demo — Accepted edit stir fry',
-    DEMO_RECIPE_ACCEPTED, 900301, 'done', 'accepted'
+    DEMO_RECIPE_ACCEPTED, 900301, 'done', 'accepted', null, 5
   );
   await seedEditDecisionDemo(
     pool, 900004, 'Staging demo — Pending edit stir fry',
-    DEMO_RECIPE_PENDING, 900302, 'done', null
+    DEMO_RECIPE_PENDING, 900302, 'done', null, null, 0
   );
 
   // Issue #24 regression seeds. 900006: a newer accepted edit alongside an
@@ -293,11 +310,11 @@ async function seedStagingDemo(pool) {
   await seedEditDecisionDemo(
     pool, 900006, 'Staging demo — Superseded edit stir fry',
     DEMO_RECIPE_SUPERSEDED, 900304, 'done', 'accepted',
-    { replyId: 900303, status: 'done', editDecision: null }
+    { replyId: 900303, status: 'done', editDecision: null }, 9
   );
   await seedEditDecisionDemo(
     pool, 900007, 'Staging demo — Legacy acknowledged edit',
-    DEMO_RECIPE_LEGACY, 900305, 'acknowledged', null
+    DEMO_RECIPE_LEGACY, 900305, 'acknowledged', null, null, 14
   );
   log.info('db', 'Seeded staging edit-decision demo conversations');
 
@@ -334,35 +351,65 @@ async function seedStagingDemo(pool) {
 
   // Drafts (issue #32): conversations that never produced a recipe. Every
   // other seeded conversation has one, so without these the homepage's
-  // Drafts section — compact rows plus the "Show N more" disclosure past
-  // three — would never render in staging. Four rows so the disclosure
-  // itself is visible.
-  const DRAFT_TITLES = [
-    'Staging demo — Draft: something with leftover rice',
-    'Staging demo — Draft: birthday cake ideas',
-    'Staging demo — Draft: what to do with a glut of tomatoes',
-    'Staging demo — Draft: cold lunches for the week',
+  // Drafts section — now the FIRST section of "Your box" (issue #40),
+  // compact rows plus the "Show N more" disclosure past three — would never
+  // render in staging. Four rows so the disclosure itself is visible.
+  //
+  // The timestamps carry the issue #40 demonstration: conversation
+  // created_at and message created_at are seeded independently, and the
+  // FIRST entry is the proof row — the OLDEST conversation of the set but
+  // the most recently messaged, so it can only sort first under the new
+  // last-activity order (the old `ORDER BY c.created_at DESC` put it last).
+  const DRAFTS = [
+    { title: 'Staging demo — Draft: something with leftover rice',
+      createdDaysAgo: 40, activeDaysAgo: 0, activeHours: 2 },
+    { title: 'Staging demo — Draft: birthday cake ideas',
+      createdDaysAgo: 1, activeDaysAgo: 1 },
+    { title: 'Staging demo — Draft: what to do with a glut of tomatoes',
+      createdDaysAgo: 4, activeDaysAgo: 4 },
+    { title: 'Staging demo — Draft: cold lunches for the week',
+      createdDaysAgo: 30, activeDaysAgo: 30 },
   ];
-  for (let i = 0; i < DRAFT_TITLES.length; i++) {
+  for (let i = 0; i < DRAFTS.length; i++) {
     const convId = 900010 + i;
+    const draft = DRAFTS[i];
     await pool.query(
-      `INSERT INTO conversations (id, user_id, title, preferences)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO conversations (id, user_id, title, preferences, created_at)
+       VALUES ($1, $2, $3, $4, NOW() - $5::interval)
        ON CONFLICT (id) DO NOTHING`,
-      [convId, DEMO_USER_ID, DRAFT_TITLES[i],
-       JSON.stringify({ complexity: 'normal', serving: 'normal' })]
+      [convId, DEMO_USER_ID, draft.title,
+       JSON.stringify({ complexity: 'normal', serving: 'normal' }),
+       `${draft.createdDaysAgo} days`]
     );
     const { rows: draftMsgs } = await pool.query(
       'SELECT 1 FROM messages WHERE conversation_id = $1 LIMIT 1', [convId]);
     if (draftMsgs.length === 0) {
       await pool.query(
-        `INSERT INTO messages (conversation_id, role, content, recipe_data) VALUES
-         ($1, 'user', $2, NULL)`,
-        [convId, 'Staging demo: still thinking about this one.']
+        `INSERT INTO messages (conversation_id, role, content, recipe_data, created_at) VALUES
+         ($1, 'user', $2, NULL, NOW() - $3::interval - $4::interval)`,
+        [convId, 'Staging demo: still thinking about this one.',
+         `${draft.activeDaysAgo} days`, `${draft.activeHours || 0} hours`]
       );
     }
   }
   log.info('db', 'Seeded staging draft conversations');
+
+  // Two of the demo user's own recipes are favorited (issue #40): 900003 is
+  // 5 days old, 900007 is 14, so own-recipe cards in "Your favorites" lead
+  // with 900003. NOTE: is_favorited is scoped to the REQUESTER
+  // (recipe_favorites.user_id = $1), not to the row's owner, so a staging
+  // tester signed in as themselves won't see these — they favorite a card
+  // with the heart to check that ordering. Seeded anyway so the demo user's
+  // own view is coherent. Own-conversation favorites are the dual-target
+  // form of recipe_favorites; the partial unique index keeps this idempotent.
+  await pool.query(
+    `INSERT INTO recipe_favorites (user_id, conversation_id)
+     VALUES ($1, 900003), ($1, 900007)
+     ON CONFLICT (user_id, conversation_id) WHERE conversation_id IS NOT NULL
+     DO NOTHING`,
+    [DEMO_USER_ID]
+  );
+  log.info('db', 'Seeded staging own-recipe favorites');
 
   // Social features: seed the community feed with two shared recipes from
   // two distinct fake creators, plus ratings so aggregates visibly render.

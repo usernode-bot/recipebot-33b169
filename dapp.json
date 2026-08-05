@@ -271,6 +271,26 @@
       "expectText": "Staging demo — Draft: birthday cake ideas"
     },
     {
+      "name": "Drafts lead the your-box band",
+      "path": "/",
+      "expectSelector": "#home-band-mine > section:first-of-type#home-convs"
+    },
+    {
+      "name": "Favorites follow drafts in the your-box band",
+      "path": "/",
+      "expectSelector": "#home-convs + #home-favorites"
+    },
+    {
+      "name": "Draft rows show when they were last worked on",
+      "path": "/",
+      "expectText": "no recipe yet · updated"
+    },
+    {
+      "name": "Own recipe cards show their updated date",
+      "path": "/",
+      "expectText": "by you · updated"
+    },
+    {
       "name": "Collection deep link opens the collection",
       "path": "/?coll=900002",
       "expectText": "Staging Demo Community Picks"

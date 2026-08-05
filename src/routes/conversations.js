@@ -11,10 +11,16 @@ function conversationRoutes(config) {
   const ownerClause = (col) =>
     config.isStaging ? `${col} IN ($1, 0)` : `${col} = $1`;
 
+  // Ordered by last activity, newest first (issue #40): the homepage's
+  // Drafts section leads "Your box", and a draft you replied to today should
+  // outrank one created later but never touched again. last_activity_at
+  // falls back to the conversation's own created_at for an empty thread.
   router.get('/api/conversations', async (req, res) => {
     try {
       const { rows } = await pool.query(
         `SELECT c.id, c.title, c.created_at,
+           COALESCE((SELECT MAX(m2.created_at) FROM messages m2
+                     WHERE m2.conversation_id = c.id), c.created_at) AS last_activity_at,
            (SELECT s.share_slug FROM shared_recipes s
             WHERE s.conversation_id = c.id LIMIT 1) AS share_slug,
            EXISTS (SELECT 1 FROM recipe_favorites f
@@ -27,7 +33,8 @@ function conversationRoutes(config) {
                                           WHERE m.conversation_id = c.id AND m.recipe_data IS NOT NULL
                                           ORDER BY m.created_at DESC LIMIT 1)) AS shared_up_to_date
          FROM conversations c
-         WHERE ${ownerClause('c.user_id')} ORDER BY c.created_at DESC`,
+         WHERE ${ownerClause('c.user_id')}
+         ORDER BY last_activity_at DESC, c.id DESC`,
         [req.user.id]
       );
       res.json(rows);

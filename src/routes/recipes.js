@@ -34,11 +34,18 @@ function recipeRoutes(config) {
   const ownerClause = (col) =>
     config.isStaging ? `${col} IN ($1, 0)` : `${col} = $1`;
 
-  // The requester's created recipes (latest recipe per conversation).
+  // The requester's created recipes (latest recipe per conversation),
+  // newest recipe activity first (issue #40). `created_at` here is the
+  // LATEST recipe message's timestamp, not the conversation's — i.e. when
+  // the recipe was created or last edited. The DISTINCT ON has to order by
+  // c.id first (Postgres requires it), so the recency sort has to happen in
+  // an outer query; the id tiebreaker keeps the order stable when two rows
+  // share a timestamp (seeded rows do).
   router.get('/api/recipes', async (req, res) => {
     try {
       const { rows } = await pool.query(
-        `SELECT DISTINCT ON (c.id)
+        `SELECT * FROM (
+         SELECT DISTINCT ON (c.id)
            m.id, m.recipe_data AS data, m.conversation_id, m.created_at,
            c.title AS conversation_title,
            EXISTS (SELECT 1 FROM recipe_favorites f
@@ -55,7 +62,9 @@ function recipeRoutes(config) {
          FROM messages m
          JOIN conversations c ON c.id = m.conversation_id
          WHERE ${config.isStaging ? 'c.user_id IN ($1, 0)' : 'c.user_id = $1'} AND m.recipe_data IS NOT NULL
-         ORDER BY c.id, m.created_at DESC`,
+         ORDER BY c.id, m.created_at DESC
+         ) r
+         ORDER BY r.created_at DESC, r.id DESC`,
         [req.user.id]
       );
       res.json(rows);

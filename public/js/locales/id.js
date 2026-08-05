@@ -59,6 +59,7 @@ I18N.register('id', {
   'card.forkedFromTitle': 'Fork dari {name}',
   'card.remixedFrom': '⑂ remix dari {name}',
   'card.noRecipeYet': 'belum ada resep',
+  'card.updated': 'diperbarui {d}',
   'card.newConversation': 'Percakapan baru',
   'card.prep': 'Persiapan: {t}',
   'card.cook': 'Memasak: {t}',

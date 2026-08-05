@@ -1,9 +1,14 @@
 // Homepage ("the box"): a sticky search + new-recipe toolbar over two
 // labelled bands (issue #32) —
-//   Your box:        favorites → your recipes → collections → drafts
+//   Your box:        drafts → favorites → your recipes → collections
 //   From community:  community recipes → community collections
 // Sections are hidden entirely when empty; the whole page shows an empty
 // state only when every section has nothing to render.
+//
+// Within the box, drafts and your own recipes are ordered newest activity
+// first (issue #40) — drafts by their last message, recipes by their last
+// recipe message. The servers already sort that way; the client re-sorts
+// anyway so a cached or partial response can't resurrect the old order.
 const Home = {
   shared: [],
   mine: [],
@@ -22,6 +27,26 @@ const Home = {
   esc(str) {
     return String(str ?? '')
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  },
+
+  // Newest activity first, id descending as the tiebreaker — seeded rows
+  // and rapid-fire edits can share a timestamp, and an unstable order would
+  // shuffle cards between renders. Sorts in place: callers pass the fresh
+  // arrays that `filter` already returned, never `this.mine` itself.
+  _byRecency(rows, stamp) {
+    return rows.sort((a, b) => {
+      const ta = Date.parse(stamp(a)) || 0;
+      const tb = Date.parse(stamp(b)) || 0;
+      return tb - ta || (b.id || 0) - (a.id || 0);
+    });
+  },
+
+  // Short localized date for the "updated …" line. Returns '' for a missing
+  // or unparseable timestamp so the caller can drop the bit entirely.
+  _shortDate(value) {
+    if (!value) return '';
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(I18N.lang);
   },
 
   async refresh() {
@@ -116,18 +141,23 @@ const Home = {
       return (tags || []).some((t) => this.tagFilter.has(t));
     };
 
-    const favOwn = this.mine.filter((r) =>
-      r.is_favorited && matches(r.data?.title || r.conversation_title, r.data?.tags));
-    const mineRest = this.mine.filter((r) =>
-      !r.is_favorited && matches(r.data?.title || r.conversation_title, r.data?.tags));
+    // `created_at` on a recipe row is its latest recipe message's timestamp
+    // — when the recipe was created or last edited.
+    const recipeStamp = (r) => r.created_at;
+    const favOwn = this._byRecency(this.mine.filter((r) =>
+      r.is_favorited && matches(r.data?.title || r.conversation_title, r.data?.tags)), recipeStamp);
+    const mineRest = this._byRecency(this.mine.filter((r) =>
+      !r.is_favorited && matches(r.data?.title || r.conversation_title, r.data?.tags)), recipeStamp);
     const favShared = this.favorites.filter((s) => matches(s.data?.title, s.tags));
     const shared = this.shared.filter((s) => matches(s.data?.title, s.tags) && tagMatch(s.tags));
 
     // Conversations without a recipe yet (recipe-bearing ones already show
-    // as cards in "Your recipes" / "Your favorites").
+    // as cards in "Your recipes" / "Your favorites"), most recently worked
+    // on first.
     const recipeConvIds = new Set(this.mine.map((r) => r.conversation_id));
-    const bareConvs = this.conversations.filter(
-      (c) => !recipeConvIds.has(c.id) && matches(c.title || t('card.newConversation')));
+    const bareConvs = this._byRecency(this.conversations.filter(
+      (c) => !recipeConvIds.has(c.id) && matches(c.title || t('card.newConversation'))),
+    (c) => c.last_activity_at || c.created_at);
 
     this.renderTagFilters();
 
@@ -327,12 +357,15 @@ const Home = {
     const madeBit = r.made_count > 0 ? ` · ${t('card.made', { n: r.made_count })}` : '';
     const remixBit = r.forked_from_username
       ? ` · <span title="${this.esc(t('card.forkedFromTitle', { name: r.forked_from_username }))}">${t('card.forkedFrom', { name: this.esc(r.forked_from_username) })}</span>` : '';
+    // Names the recency the list is sorted by (issue #40).
+    const dated = this._shortDate(r.created_at);
+    const updatedBit = dated ? ` · ${t('card.updated', { d: this.esc(dated) })}` : '';
     const head = document.createElement('div');
     head.className = 'flex items-start justify-between gap-2';
     head.innerHTML = `
       <div class="min-w-0">
         <h3 class="font-semibold text-sm truncate">${this.esc(recipe.title || r.conversation_title || t('common.untitled'))}</h3>
-        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${t('card.byYou')}${r.is_shared ? ` · <span class="text-blue-400">${t('card.shared')}</span>` : ''}${madeBit}${remixBit}</p>
+        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${t('card.byYou')}${r.is_shared ? ` · <span class="text-blue-400">${t('card.shared')}</span>` : ''}${madeBit}${remixBit}${updatedBit}</p>
       </div>`;
     const heart = this._heartBtn(r.is_favorited);
     heart.addEventListener('click', () =>
@@ -380,14 +413,16 @@ const Home = {
 
   // Draft: one of the requester's conversations with no recipe yet. A
   // compact row rather than a card — there's no recipe content to show, and
-  // full cards gave the least interesting section the most page weight.
+  // full cards would give the leading section all the page weight.
   conversationRow(c) {
     const el = document.createElement('div');
+    const dated = this._shortDate(c.last_activity_at || c.created_at);
+    const updatedBit = dated ? ` · ${t('card.updated', { d: this.esc(dated) })}` : '';
     el.className = 'min-w-0 flex items-center gap-2 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2';
     el.innerHTML = `
       <div class="min-w-0 flex-1">
         <p class="text-sm truncate">${this.esc(c.title || t('card.newConversation'))}</p>
-        <p class="text-xs text-zinc-400 dark:text-zinc-500">${t('card.noRecipeYet')}</p>
+        <p class="text-xs text-zinc-400 dark:text-zinc-500">${t('card.noRecipeYet')}${updatedBit}</p>
       </div>`;
     const openBtn = this._actionBtn(t('common.open'), true);
     openBtn.classList.add('shrink-0');

@@ -59,6 +59,7 @@ I18N.register('es', {
   'card.forkedFromTitle': 'Bifurcada de {name}',
   'card.remixedFrom': '⑂ remix de {name}',
   'card.noRecipeYet': 'aún sin receta',
+  'card.updated': 'actualizado {d}',
   'card.newConversation': 'Nueva conversación',
   'card.prep': 'Prep: {t}',
   'card.cook': 'Cocción: {t}',
