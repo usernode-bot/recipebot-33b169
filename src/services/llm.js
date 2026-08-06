@@ -106,18 +106,44 @@ function llmMode(config) {
 // tighter `timeoutMs` (e.g. the recipe fix-up retry).
 const LLM_TIMEOUT_MS = 120_000;
 
-// Non-streaming Messages API call. `userToken` is the requester's platform
-// JWT, forwarded so the proxy can bill/authorize the right user.
-async function createMessage(config, params, userToken, { timeoutMs = LLM_TIMEOUT_MS } = {}) {
-  const mode = llmMode(config);
+// Streaming timeouts are ACTIVITY-based, not total-duration based (issue #43).
+// A non-streaming call had to finish the whole reply inside one flat budget, so
+// the expensive turn right after `fetch_webpage` — adaptive thinking plus a
+// full display_recipe payload with per-ingredient macros — routinely blew past
+// 120s and the user lost everything. With streaming we only give up when the
+// upstream goes SILENT for `idleMs`; a reply that keeps producing tokens keeps
+// running, bounded by `maxMs` so a pathological stream can't run forever.
+const LLM_IDLE_TIMEOUT_MS = 60_000;
+const LLM_MAX_TURN_MS = 300_000;
 
-  if (mode === 'disabled') {
-    const err = new Error('LLM disabled');
-    err.code = 'llm_unavailable';
-    err.userMessage = 'AI features are unavailable in this environment.';
-    throw err;
-  }
+// HTTP statuses worth another attempt: transient upstream/proxy trouble.
+// 429 is included only when its body code is NOT one of the budget codes —
+// those are settled facts for the rest of the UTC day (see isRetryable).
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504, 529]);
+const NON_RETRYABLE_CODES = new Set([
+  'grant_required', 'app_cap_exceeded', 'budget_exceeded', 'llm_unavailable',
+  'turn_too_long',
+]);
 
+// Should the turn loop try this failure again? Timeouts only qualify when
+// nothing was streamed yet — retrying after partial prose would duplicate it
+// on screen.
+function isRetryable(err) {
+  if (!err || NON_RETRYABLE_CODES.has(err.code)) return false;
+  if (err.code === 'timeout') return !err.streamedContent;
+  if (err.code === 'network_error') return true;
+  if (typeof err.status === 'number') return RETRYABLE_STATUSES.has(err.status);
+  return false;
+}
+
+function disabledError() {
+  const err = new Error('LLM disabled');
+  err.code = 'llm_unavailable';
+  err.userMessage = 'AI features are unavailable in this environment.';
+  return err;
+}
+
+function requestTarget(config, mode, userToken) {
   const url = mode === 'proxy'
     ? `${config.llmProxyUrl}/v1/messages`
     : 'https://api.anthropic.com/v1/messages';
@@ -128,6 +154,44 @@ async function createMessage(config, params, userToken, { timeoutMs = LLM_TIMEOU
   } else {
     headers['x-api-key'] = config.anthropicApiKey;
   }
+  return { url, headers };
+}
+
+// Turn a non-2xx Messages API response into a coded error. Shared by the
+// streaming and non-streaming paths so both surface identical `code` values
+// to the client's `errors.<code>` lookup.
+async function httpError(resp, mode) {
+  let body = null;
+  try { body = await resp.json(); } catch {}
+  const code = body?.code || body?.error?.type || '';
+  log.error('llm', 'Messages API error', { status: resp.status, code, mode });
+
+  // Always carry a machine-readable code so the client can render the
+  // error in the user's language; 'llm_failed' is the generic fallback.
+  const err = new Error(`LLM request failed (${resp.status})`);
+  err.code = code || 'llm_failed';
+  err.status = resp.status;
+  if (code === 'grant_required') {
+    err.userMessage = 'RecipeBot needs your permission to use AI. Approve access when prompted, then send your message again.';
+  } else if (code === 'app_cap_exceeded') {
+    err.userMessage = 'Your daily AI cap for RecipeBot is spent — it resets at midnight UTC.';
+  } else if (code === 'budget_exceeded') {
+    err.userMessage = 'Your overall daily AI budget is exhausted — it resets at midnight UTC.';
+  } else {
+    err.userMessage = 'The AI request failed. Please try again.';
+  }
+  return err;
+}
+
+// Non-streaming Messages API call. `userToken` is the requester's platform
+// JWT, forwarded so the proxy can bill/authorize the right user. Kept as the
+// fallback for environments where the stream can't be opened at all.
+async function createMessage(config, params, userToken, { timeoutMs = LLM_TIMEOUT_MS } = {}) {
+  const mode = llmMode(config);
+
+  if (mode === 'disabled') throw disabledError();
+
+  const { url, headers } = requestTarget(config, mode, userToken);
 
   let resp;
   try {
@@ -149,34 +213,296 @@ async function createMessage(config, params, userToken, { timeoutMs = LLM_TIMEOU
       : `LLM request failed: ${e.message}`);
     err.code = timedOut ? 'timeout' : 'network_error';
     err.userMessage = timedOut
-      ? 'The AI request timed out. Please try again.'
+      ? 'The AI took too long to answer — this usually happens with very long recipes. Your message is still here; tap Try again.'
       : 'The AI request failed. Please try again.';
     throw err;
   }
 
-  if (!resp.ok) {
-    let body = null;
-    try { body = await resp.json(); } catch {}
-    const code = body?.code || body?.error?.type || '';
-    log.error('llm', 'Messages API error', { status: resp.status, code, mode });
+  if (!resp.ok) throw await httpError(resp, mode);
 
-    // Always carry a machine-readable code so the client can render the
-    // error in the user's language; 'llm_failed' is the generic fallback.
-    const err = new Error(`LLM request failed (${resp.status})`);
-    err.code = code || 'llm_failed';
-    if (code === 'grant_required') {
-      err.userMessage = 'RecipeBot needs your permission to use AI. Approve access when prompted, then send your message again.';
-    } else if (code === 'app_cap_exceeded') {
-      err.userMessage = 'Your daily AI cap for RecipeBot is spent — it resets at midnight UTC.';
-    } else if (code === 'budget_exceeded') {
-      err.userMessage = 'Your overall daily AI budget is exhausted — it resets at midnight UTC.';
+  return resp.json();
+}
+
+// Split a raw SSE byte stream into `{event, data}` records. Kept as a tiny
+// hand-rolled parser rather than a dependency: the Messages API stream is
+// plain `event:`/`data:` pairs separated by a blank line.
+function parseSseChunk(buffer) {
+  const records = [];
+  let idx;
+  while ((idx = buffer.indexOf('\n\n')) !== -1) {
+    const raw = buffer.slice(0, idx);
+    buffer = buffer.slice(idx + 2);
+    let event = null;
+    const dataLines = [];
+    for (const line of raw.split('\n')) {
+      if (line.startsWith(':')) continue; // comment / heartbeat
+      if (line.startsWith('event:')) event = line.slice(6).trim();
+      else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
+    }
+    if (dataLines.length) records.push({ event, data: dataLines.join('\n') });
+  }
+  return { records, rest: buffer };
+}
+
+// Streaming Messages API call, reassembled into the exact same shape the
+// non-streaming call returns — `{ id, model, stop_reason, usage, content }` —
+// so the turn loop is agnostic about which transport ran.
+//
+// `onDelta({type, text})` fires as text/thinking arrives so the route can push
+// it to the client mid-turn. `onOpen()` fires once the stream is confirmed
+// open, which is what lets the caller know a fallback is no longer safe.
+async function streamMessage(config, params, userToken, {
+  idleMs = LLM_IDLE_TIMEOUT_MS,
+  maxMs = LLM_MAX_TURN_MS,
+  onDelta = null,
+  onOpen = null,
+} = {}) {
+  const mode = llmMode(config);
+  if (mode === 'disabled') throw disabledError();
+
+  const { url, headers } = requestTarget(config, mode, userToken);
+  const startedAt = Date.now();
+  let firstDeltaMs = null;
+  let streamedContent = false;
+
+  const controller = new AbortController();
+  let reason = null; // 'idle' | 'max'
+  let idleTimer = null;
+  const armIdle = () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { reason = 'idle'; controller.abort(); }, idleMs);
+  };
+  const maxTimer = setTimeout(() => { reason = 'max'; controller.abort(); }, maxMs);
+  armIdle();
+
+  const fail = (e) => {
+    const aborted = e.name === 'AbortError' || e.name === 'TimeoutError';
+    const timedOut = aborted && reason !== null;
+    log.error('llm', timedOut
+      ? `Streaming call aborted (${reason})`
+      : 'Streaming request failed', {
+      mode,
+      idle_ms: idleMs,
+      max_ms: maxMs,
+      elapsed_ms: Date.now() - startedAt,
+      first_delta_ms: firstDeltaMs,
+      streamed_content: streamedContent,
+      error: e.message,
+    });
+    const err = new Error(timedOut
+      ? `LLM stream aborted after ${Date.now() - startedAt}ms (${reason})`
+      : `LLM request failed: ${e.message}`);
+    if (reason === 'max') {
+      err.code = 'turn_too_long';
+      err.userMessage = 'The AI is taking much longer than expected. Please try again — asking for a simpler recipe usually helps.';
+    } else if (timedOut) {
+      err.code = 'timeout';
+      err.userMessage = 'The AI took too long to answer — this usually happens with very long recipes. Your message is still here; tap Try again.';
     } else {
+      err.code = 'network_error';
       err.userMessage = 'The AI request failed. Please try again.';
     }
+    err.streamedContent = streamedContent;
+    return err;
+  };
+
+  let resp;
+  try {
+    resp = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ...params, stream: true }),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    clearTimeout(idleTimer);
+    clearTimeout(maxTimer);
+    const err = fail(e);
+    // Nothing was received at all — the caller may still fall back to the
+    // non-streaming transport (Considerations: proxy streaming is untested).
+    err.streamNeverOpened = true;
     throw err;
   }
 
-  return resp.json();
+  if (!resp.ok) {
+    clearTimeout(idleTimer);
+    clearTimeout(maxTimer);
+    const err = await httpError(resp, mode);
+    err.streamNeverOpened = true;
+    throw err;
+  }
+
+  if (!resp.body) {
+    clearTimeout(idleTimer);
+    clearTimeout(maxTimer);
+    const err = new Error('LLM stream had no body');
+    err.code = 'network_error';
+    err.userMessage = 'The AI request failed. Please try again.';
+    err.streamNeverOpened = true;
+    throw err;
+  }
+
+  const message = {
+    id: null,
+    model: params.model,
+    stop_reason: null,
+    usage: { input_tokens: 0, output_tokens: 0 },
+    content: [],
+  };
+  // Partial tool-input JSON, keyed by content-block index. Only promoted onto
+  // the block at content_block_stop — a half-streamed recipe must never reach
+  // the validator.
+  const partialJson = new Map();
+  let sawFirstEvent = false;
+
+  const handle = (rec) => {
+    if (!rec.data || rec.data === '[DONE]') return;
+    let evt;
+    try { evt = JSON.parse(rec.data); } catch { return; }
+    const type = evt.type || rec.event;
+
+    if (type === 'ping') return;
+
+    if (type === 'error') {
+      const code = evt.error?.code || evt.error?.type || '';
+      const err = new Error(evt.error?.message || 'LLM stream error');
+      err.code = code || 'llm_failed';
+      if (code === 'grant_required') {
+        err.userMessage = 'RecipeBot needs your permission to use AI. Approve access when prompted, then send your message again.';
+      } else if (code === 'app_cap_exceeded') {
+        err.userMessage = 'Your daily AI cap for RecipeBot is spent — it resets at midnight UTC.';
+      } else if (code === 'budget_exceeded') {
+        err.userMessage = 'Your overall daily AI budget is exhausted — it resets at midnight UTC.';
+      } else if (code === 'overloaded_error') {
+        err.userMessage = 'The AI is busy right now. Please try again.';
+        err.status = 529;
+      } else {
+        err.userMessage = 'The AI request failed. Please try again.';
+      }
+      err.streamedContent = streamedContent;
+      throw err;
+    }
+
+    if (type === 'message_start') {
+      const m = evt.message || {};
+      message.id = m.id || null;
+      message.model = m.model || message.model;
+      const u = m.usage || {};
+      message.usage.input_tokens = u.input_tokens || 0;
+      if (u.cache_read_input_tokens) message.usage.cache_read_input_tokens = u.cache_read_input_tokens;
+      if (u.cache_creation_input_tokens) message.usage.cache_creation_input_tokens = u.cache_creation_input_tokens;
+      if (u.output_tokens) message.usage.output_tokens = u.output_tokens;
+      return;
+    }
+
+    if (type === 'content_block_start') {
+      const block = evt.content_block || {};
+      const seeded = { ...block };
+      if (seeded.type === 'text' && typeof seeded.text !== 'string') seeded.text = '';
+      if (seeded.type === 'thinking' && typeof seeded.thinking !== 'string') seeded.thinking = '';
+      if (seeded.type === 'redacted_thinking' && typeof seeded.data !== 'string') seeded.data = '';
+      if (seeded.type === 'tool_use') {
+        seeded.input = {};
+        partialJson.set(evt.index, '');
+      }
+      message.content[evt.index] = seeded;
+      return;
+    }
+
+    if (type === 'content_block_delta') {
+      const block = message.content[evt.index];
+      const d = evt.delta || {};
+      if (!block) return;
+      if (d.type === 'text_delta') {
+        block.text = (block.text || '') + (d.text || '');
+        streamedContent = true;
+        if (firstDeltaMs === null) firstDeltaMs = Date.now() - startedAt;
+        if (onDelta && d.text) onDelta({ type: 'text', text: d.text });
+      } else if (d.type === 'thinking_delta') {
+        block.thinking = (block.thinking || '') + (d.thinking || '');
+        if (firstDeltaMs === null) firstDeltaMs = Date.now() - startedAt;
+        if (onDelta && d.thinking) onDelta({ type: 'thinking', text: d.thinking });
+      } else if (d.type === 'signature_delta') {
+        // Required: a thinking block replayed into the next turn's messages
+        // without its signature is rejected with a 400.
+        block.signature = (block.signature || '') + (d.signature || '');
+      } else if (d.type === 'input_json_delta') {
+        partialJson.set(evt.index, (partialJson.get(evt.index) || '') + (d.partial_json || ''));
+      }
+      return;
+    }
+
+    if (type === 'content_block_stop') {
+      const block = message.content[evt.index];
+      if (block && block.type === 'tool_use') {
+        const raw = partialJson.get(evt.index) || '';
+        try {
+          block.input = raw.trim() ? JSON.parse(raw) : {};
+        } catch (e) {
+          // A half-streamed / malformed tool payload must never reach the
+          // recipe validator as if it were complete — an empty input fails
+          // validation loudly and triggers the normal fix-up round.
+          log.warn('llm', 'Tool input JSON did not parse', {
+            name: block.name, length: raw.length, error: e.message,
+          });
+          block.input = {};
+        }
+        partialJson.delete(evt.index);
+      }
+      return;
+    }
+
+    if (type === 'message_delta') {
+      if (evt.delta?.stop_reason) message.stop_reason = evt.delta.stop_reason;
+      if (evt.usage?.output_tokens) message.usage.output_tokens = evt.usage.output_tokens;
+      return;
+    }
+  };
+
+  try {
+    const decoder = new TextDecoder();
+    let buffer = '';
+    for await (const chunk of resp.body) {
+      armIdle();
+      if (!sawFirstEvent) {
+        sawFirstEvent = true;
+        if (onOpen) onOpen();
+      }
+      buffer += decoder.decode(chunk, { stream: true });
+      const { records, rest } = parseSseChunk(buffer);
+      buffer = rest;
+      for (const rec of records) handle(rec);
+    }
+    buffer += decoder.decode();
+    const { records } = parseSseChunk(buffer);
+    for (const rec of records) handle(rec);
+  } catch (e) {
+    clearTimeout(idleTimer);
+    clearTimeout(maxTimer);
+    if (e.code && e.userMessage) {
+      // Coded in-stream error thrown from handle() — pass it through.
+      e.streamedContent = streamedContent;
+      throw e;
+    }
+    throw fail(e);
+  } finally {
+    clearTimeout(idleTimer);
+    clearTimeout(maxTimer);
+  }
+
+  // Holes are possible if the upstream skipped an index; compact them so
+  // downstream `.some()` / `for…of` never sees undefined.
+  message.content = message.content.filter(Boolean);
+
+  log.info('llm', 'Streaming call complete', {
+    mode,
+    elapsed_ms: Date.now() - startedAt,
+    first_delta_ms: firstDeltaMs,
+    stop_reason: message.stop_reason,
+    usage: message.usage,
+  });
+
+  return message;
 }
 
 const SYSTEM_PROMPT = `You are a friendly, knowledgeable cooking assistant. Your role is to help users discover, create, and refine recipes.
@@ -314,7 +640,7 @@ const TOOLS = [
   {
     name: 'fetch_webpage',
     description:
-      'Fetch and read the content of a webpage. Use when the user pastes a URL or to read a page found via web_search.',
+      'Fetch and read the content of a webpage. Use when the user pastes a URL or to read a page found via web_search. When the page publishes structured recipe data you get the exact ingredient list and instructions; otherwise you get the article prose, which may be truncated (the result says so explicitly — never invent amounts for a part you could not read).',
     input_schema: {
       type: 'object',
       properties: {
@@ -421,6 +747,10 @@ module.exports = {
   isEnabled,
   llmMode,
   createMessage,
+  streamMessage,
+  isRetryable,
+  LLM_IDLE_TIMEOUT_MS,
+  LLM_MAX_TURN_MS,
   TOOLS,
   MODELS,
   DEFAULT_MODEL,

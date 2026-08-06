@@ -38,12 +38,15 @@ const Chat = {
   },
 
   _finalizeActiveStatus() {
+    this._stopElapsed();
     if (this._activeStatusLine) {
       const icon = this._activeStatusLine.querySelector('.status-icon');
       if (icon) {
         icon.classList.remove('spinning');
         icon.outerHTML = this._statusIconCheck;
       }
+      const elapsed = this._activeStatusLine.querySelector('.status-elapsed');
+      if (elapsed) elapsed.remove();
       this._activeStatusLine = null;
     }
   },
@@ -52,11 +55,14 @@ const Chat = {
   // (e.g. "Fixing recipe format...") gets an ✕ instead of a checkmark so the
   // user can see which step died.
   _failActiveStatus() {
+    this._stopElapsed();
     if (this._activeStatusLine) {
       const icon = this._activeStatusLine.querySelector('.status-icon');
       if (icon) {
         icon.outerHTML = this._statusIconError;
       }
+      const elapsed = this._activeStatusLine.querySelector('.status-elapsed');
+      if (elapsed) elapsed.remove();
       this._activeStatusLine.classList.add('status-line-error');
       this._activeStatusLine = null;
     }
@@ -69,7 +75,106 @@ const Chat = {
     if (data.kind === 'search') return t('chat.searching', { query: data.query });
     if (data.kind === 'fetch') return t('chat.reading', { url: data.url });
     if (data.kind === 'fixup') return t('chat.fixingFormat');
+    if (data.kind === 'retrying') return t('chat.retrying');
     return data.text;
+  },
+
+  // Error codes worth offering a retry for: something transient went wrong,
+  // so re-running the same message is a reasonable next move. Budget/permission
+  // codes are deliberately excluded — retrying those just fails again.
+  _retryableCodes: new Set([
+    'timeout', 'turn_too_long', 'network_error', 'llm_failed',
+    'interrupted', 'recipe_fixup_failed', 'overloaded_error',
+  ]),
+
+  // Render a failed reply's message plus, when the failure is worth retrying,
+  // a Try again button that re-runs the existing user message server-side (no
+  // retyping, no duplicate message, no extra daily-allowance charge).
+  _appendErrorBlock(target, data, replyId) {
+    const errEl = document.createElement('div');
+    errEl.className = 'msg-assistant px-4 py-2.5';
+    errEl.textContent = this._errorText(data);
+    target.appendChild(errEl);
+
+    if (!replyId || !this._retryableCodes.has(data.code || '')) return errEl;
+
+    // One retry button at a time — the stale checker and the error event can
+    // both land, and duplicate ids would be invalid markup.
+    document.getElementById('chat-retry')?.remove();
+
+    const btn = document.createElement('button');
+    btn.id = 'chat-retry';
+    btn.type = 'button';
+    btn.className = 'chat-retry-btn';
+    btn.textContent = t('chat.tryAgain');
+    btn.addEventListener('click', () => this._retryReply(replyId, btn));
+    target.appendChild(btn);
+
+    const container = document.getElementById('chat-messages');
+    container.scrollTop = container.scrollHeight;
+    return errEl;
+  },
+
+  async _retryReply(replyId, btn) {
+    if (this.streaming) return;
+    btn.disabled = true;
+    btn.textContent = t('chat.retrying');
+    try {
+      const res = await fetch(`/api/chat/${replyId}/retry`, { method: 'POST' });
+      if (!res.ok) {
+        btn.disabled = false;
+        btn.textContent = t('chat.tryAgain');
+        const errEl = document.createElement('div');
+        errEl.className = 'msg-assistant px-4 py-2.5';
+        errEl.textContent = t('errors.tryAgain');
+        btn.parentNode.appendChild(errEl);
+        return;
+      }
+      const { replyId: newReplyId } = await res.json();
+      btn.remove();
+      this.streaming = true;
+      this._setStreamingBtn(true);
+      this._initStreamUI();
+      this._activeReplyId = newReplyId;
+      this._lastEventIndex = -1;
+      this._connectStream(newReplyId);
+    } catch {
+      btn.disabled = false;
+      btn.textContent = t('chat.tryAgain');
+    }
+  },
+
+  // Elapsed-time affordance on the active step line. A long silent wait used to
+  // be indistinguishable from a hung app; after ~15s the line shows how long
+  // it's been, and past ~45s it says long recipes legitimately take a while.
+  _startElapsed(line) {
+    this._stopElapsed();
+    const startedAt = Date.now();
+    const label = document.createElement('span');
+    label.className = 'status-elapsed';
+    line.appendChild(label);
+    this._elapsedTimer = setInterval(() => {
+      const secs = Math.round((Date.now() - startedAt) / 1000);
+      if (secs < 15) return;
+      label.textContent = ` · ${secs}s`;
+      if (secs >= 45 && !this._stillWorkingEl && line.parentNode) {
+        this._stillWorkingEl = document.createElement('div');
+        this._stillWorkingEl.className = 'status-detail status-still-working';
+        this._stillWorkingEl.textContent = t('chat.stillWorking');
+        line.parentNode.insertBefore(this._stillWorkingEl, line.nextSibling);
+      }
+    }, 1000);
+  },
+
+  _stopElapsed() {
+    if (this._elapsedTimer) {
+      clearInterval(this._elapsedTimer);
+      this._elapsedTimer = null;
+    }
+    if (this._stillWorkingEl) {
+      this._stillWorkingEl.remove();
+      this._stillWorkingEl = null;
+    }
   },
 
   // Warning events/log entries: localized by `kind`, falling back to the
@@ -108,7 +213,10 @@ const Chat = {
     line.className = 'status-line';
     line.innerHTML = `${active ? this._statusIconSpinner : this._statusIconCheck}<span>${text}</span>`;
     target.appendChild(line);
-    if (active) this._activeStatusLine = line;
+    if (active) {
+      this._activeStatusLine = line;
+      this._startElapsed(line);
+    }
     const container = document.getElementById('chat-messages');
     container.scrollTop = container.scrollHeight;
     return line;
@@ -191,6 +299,8 @@ const Chat = {
 
       const pr = data.pendingReply;
       const isProcessing = pr?.status === 'processing';
+      // A reply that ended in an error can be re-run from its persisted log.
+      const failedReplyId = pr && pr.status === 'error' ? pr.id : null;
 
       if (isProcessing) {
         const cutoff = new Date(pr.createdAt).getTime();
@@ -199,10 +309,10 @@ const Chat = {
         );
         const saved = this.messages;
         this.messages = renderMsgs;
-        this.renderAll(data.preferences);
+        this.renderAll(data.preferences, failedReplyId);
         this.messages = saved;
       } else {
-        this.renderAll(data.preferences);
+        this.renderAll(data.preferences, failedReplyId);
       }
 
       const allRecipeMsgs = this.messages.filter(m => m.recipe_data);
@@ -324,10 +434,13 @@ const Chat = {
           }
           this._removeSpinner();
           if (status === 'error' || status === 'not_found') {
-            const errEl = document.createElement('div');
-            errEl.className = 'msg-assistant px-4 py-2.5';
-            errEl.textContent = t('errors.interrupted');
-            if (wrapper) wrapper.appendChild(errEl);
+            if (wrapper) {
+              this._appendErrorBlock(
+                wrapper,
+                { error: t('errors.interrupted'), code: 'interrupted' },
+                status === 'error' ? replyId : null
+              );
+            }
           }
           this._cleanupStream();
         } catch { /* network error, will retry next interval */ }
@@ -364,6 +477,7 @@ const Chat = {
         wrapper.appendChild(line);
         wrapper.appendChild(thinkingEl);
         this._activeStatusLine = line;
+        this._startElapsed(line);
       }
       thinkingText += data.text;
       thinkingEl.textContent = thinkingText;
@@ -408,6 +522,7 @@ const Chat = {
         line.appendChild(link);
         wrapper.appendChild(line);
         this._activeStatusLine = line;
+        this._startElapsed(line);
       } else if (data.kind === 'search' || data.text?.startsWith('Searching:')) {
         this._finalizeActiveStatus();
         this._activeStatusDetail = null;
@@ -425,6 +540,7 @@ const Chat = {
         wrapper.appendChild(detail);
         this._activeStatusLine = line;
         this._activeStatusDetail = detail;
+        this._startElapsed(line);
       } else {
         this._appendStatusLine(wrapper, this._statusText(data), true);
       }
@@ -518,10 +634,7 @@ const Chat = {
         if (dedup(data)) return;
         this._removeSpinner();
         this._failActiveStatus();
-        const errEl = document.createElement('div');
-        errEl.className = 'msg-assistant px-4 py-2.5';
-        errEl.textContent = this._errorText(data);
-        wrapper.appendChild(errEl);
+        this._appendErrorBlock(wrapper, data, replyId);
         this._cleanupStream();
         if (data.code === 'grant_required' && typeof usernode !== 'undefined' && usernode.requestLlmAccess) {
           // Ask the platform shell for AI consent so the next send works.
@@ -629,6 +742,7 @@ const Chat = {
       this._eventSource = null;
     }
     clearInterval(this._staleTimer);
+    this._stopElapsed();
     this._activeReplyId = null;
     this._lastEventIndex = -1;
     this.streaming = false;
@@ -689,7 +803,7 @@ const Chat = {
     </div>`;
   },
 
-  _renderResponseLog(container, responseLog) {
+  _renderResponseLog(container, responseLog, failedReplyId = null) {
     const wrap = document.createElement('div');
     container.appendChild(wrap);
     for (const entry of responseLog) {
@@ -698,6 +812,18 @@ const Chat = {
         el.className = 'msg-assistant px-4 py-2.5';
         el.innerHTML = this.renderMarkdown(entry.content);
         wrap.appendChild(el);
+        continue;
+      }
+
+      // A persisted failure (e.g. a timeout after reading a web source):
+      // render the same message and Try again button the live stream showed,
+      // so leaving and coming back doesn't lose the explanation.
+      if (entry.type === 'error') {
+        this._appendErrorBlock(
+          wrap,
+          { error: entry.text, code: entry.kind || 'llm_failed' },
+          failedReplyId
+        );
         continue;
       }
 
@@ -770,7 +896,9 @@ const Chat = {
     }
   },
 
-  renderAll(preferences) {
+  // `failedReplyId` is the id of the conversation's newest reply when it ended
+  // in an error — passed down so a persisted failure can offer Try again.
+  renderAll(preferences, failedReplyId = null) {
     const container = document.getElementById('chat-messages');
     const welcome = document.getElementById('chat-welcome');
     container.innerHTML = '';
@@ -797,7 +925,7 @@ const Chat = {
         skipAssistant = false;
         this.appendMessage('user', msg.content);
         if (msg.response_log?.length) {
-          this._renderResponseLog(container, msg.response_log);
+          this._renderResponseLog(container, msg.response_log, failedReplyId);
           skipAssistant = true;
         }
       } else if (skipAssistant) {

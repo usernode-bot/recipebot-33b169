@@ -181,6 +181,21 @@
       "expectSelector": ".status-line-warning"
     },
     {
+      "name": "Timed-out reply shows the retry button",
+      "path": "/?c=900008",
+      "expectSelector": "#chat-retry"
+    },
+    {
+      "name": "Timed-out reply explains the timeout",
+      "path": "/?c=900008",
+      "expectText": "Try again"
+    },
+    {
+      "name": "Timed-out reply marks the failed read",
+      "path": "/?c=900008",
+      "expectSelector": ".status-line-error"
+    },
+    {
       "name": "Collections section renders",
       "path": "/",
       "expectSelector": "#home-collections"

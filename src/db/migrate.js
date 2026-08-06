@@ -349,6 +349,58 @@ async function seedStagingDemo(pool) {
     log.info('db', 'Seeded staging failed-fix-up demo conversation');
   }
 
+  // Timed-out-web-read demo (issue #43): a reply that read a source and then
+  // hit the AI timeout. The failure is persisted in the response_log, so
+  // reopening the conversation must show the ✕ on the "Reading:" step, the
+  // explanation, and a working "Try again" button — the behaviour that simply
+  // vanished on reload before this change.
+  await pool.query(
+    `INSERT INTO conversations (id, user_id, title, preferences, created_at)
+     VALUES ($1, $2, $3, $4, NOW() - interval '2 days')
+     ON CONFLICT (id) DO NOTHING`,
+    [900008, DEMO_USER_ID, 'Staging demo — Timed-out web read', JSON.stringify({ complexity: 'serious', serving: 'normal' })]
+  );
+  const { rows: timeoutDemoRows } = await pool.query(
+    'SELECT 1 FROM messages WHERE conversation_id = $1 LIMIT 1',
+    [900008]
+  );
+  if (timeoutDemoRows.length === 0) {
+    const sourceUrl = 'https://www.seriouseats.com/best-vegetarian-bean-chile-recipe';
+    const timedOutReplyLog = [
+      { type: 'thinking', kind: 'thinking', text: 'Thinking...', detail: 'The user wants the Serious Eats treatment, so I should read the source first.' },
+      {
+        type: 'status', kind: 'search', text: 'Searching: serious eats vegetarian bean chili',
+        query: 'serious eats vegetarian bean chili',
+        results: [{ title: 'The Best Vegetarian Bean Chili', url: sourceUrl }],
+      },
+      // ok:false mirrors what markLastStatusFailed writes at runtime: the step
+      // that was in flight when the reply died renders with an ✕.
+      { type: 'status', kind: 'fetch', text: `Reading: ${sourceUrl}`, url: sourceUrl, ok: false },
+      {
+        type: 'error', kind: 'timeout', ok: false,
+        text: 'The AI took too long to answer — this usually happens with very long recipes. Your message is still here; tap Try again.',
+      },
+    ];
+    await pool.query(
+      `INSERT INTO messages (conversation_id, role, content, recipe_data, response_log, created_at) VALUES
+       ($1, 'user', 'Staging demo: a hearty vegetarian bean chili', NULL, NULL, NOW() - interval '2 days'),
+       ($1, 'assistant', '[Recipe: Staging Demo Chicken Stir Fry]', $2, NULL, NOW() - interval '2 days' + interval '1 min'),
+       ($1, 'user', 'Staging demo: make this like the Serious Eats version', NULL, $3, NOW() - interval '2 days' + interval '6 min')`,
+      [900008, JSON.stringify(DEMO_RECIPE), JSON.stringify(timedOutReplyLog)]
+    );
+    // status='error' is what conversations.js reports as the newest reply, and
+    // what the client turns into the Try again affordance.
+    await pool.query(
+      `INSERT INTO pending_replies (id, conversation_id, user_id, status, events, created_at, updated_at)
+       VALUES (900306, 900008, $1, 'error', '[]'::jsonb,
+               NOW() - interval '2 days' + interval '6 min',
+               NOW() - interval '2 days' + interval '8 min')
+       ON CONFLICT (id) DO NOTHING`,
+      [DEMO_USER_ID]
+    );
+    log.info('db', 'Seeded staging timed-out-web-read demo conversation');
+  }
+
   // Drafts (issue #32): conversations that never produced a recipe. Every
   // other seeded conversation has one, so without these the homepage's
   // Drafts section — now the FIRST section of "Your box" (issue #40),

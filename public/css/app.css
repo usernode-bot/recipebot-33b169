@@ -362,6 +362,49 @@ h1, h2, h3, .font-display {
   color: #d97706;
 }
 
+/* Elapsed-time counter on the active step line — appears after ~15s so a long
+   wait reads as progress rather than a hung app. */
+.status-elapsed {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.status-still-working {
+  font-style: italic;
+}
+
+/* "Try again" on a failed reply. Re-runs the existing message server-side, so
+   the user never has to retype after a timeout. */
+.chat-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  margin: 0.25rem 1rem 0.5rem;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: 9999px;
+  border: 1px solid #E07A3F;
+  background: rgba(224, 122, 63, 0.1);
+  color: #b85a24;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.chat-retry-btn:hover:not(:disabled) {
+  background: rgba(224, 122, 63, 0.2);
+}
+
+.chat-retry-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+:is(.dark .chat-retry-btn) {
+  color: #E8935B;
+}
+
 :is(.dark .status-line) {
   color: #7A82A0;
 }
