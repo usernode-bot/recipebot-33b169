@@ -399,6 +399,12 @@ document.addEventListener('visibilitychange', () => {
   // a dialog or menu. Pure UI state (no DB writes), so it works in every
   // environment. Read before normalize() strips it.
   const uiState = hp.ui || query.get('ui');
+  // ?scale=<multiplier> / ?servings=<n> — screenshot-state deep link that
+  // opens a recipe (or cooking mode) already scaled, so a URL can reach the
+  // scaled view (issue #49). Pure UI state, no DB writes, so it works in
+  // every environment.
+  App.deepLinkScale = parseFloat(hp.scale || query.get('scale')) || null;
+  App.deepLinkServings = parseInt(hp.servings || query.get('servings'), 10) || null;
 
   let route = Router.read();
   // No route in the URL? A refresh inside the platform shell arrives with a
@@ -530,10 +536,29 @@ async function restoreRoute(route) {
   // Store.selectConversation / openShared already picked the tab from
   // whether a recipe actually loaded (issue #30).
 
+  applyDeepLinkScale();
+
   if (route.cook === '1' && typeof CookingMode !== 'undefined') {
     if (App.currentRecipe?.steps?.length) CookingMode.enter(App.currentRecipe);
     else HashParams.set('cook', null);
   }
+}
+
+// Applies the ?scale= / ?servings= deep link to the loaded recipe. Skipped
+// while an undecided edit is on screen — that view owns the panel.
+function applyDeepLinkScale() {
+  if (typeof Recipe === 'undefined' || !App.currentRecipe) return;
+  if (Recipe.diffMode || App.pendingRecipe) return;
+  let changed = false;
+  if (App.deepLinkServings) {
+    Recipe.currentServings = Math.max(1, App.deepLinkServings);
+    changed = true;
+  }
+  if (App.deepLinkScale) {
+    Recipe.servingScale = Math.max(0.5, Math.min(2.0, App.deepLinkScale));
+    changed = true;
+  }
+  if (changed) Recipe.display(App.currentRecipe);
 }
 
 function setupHomeButton() {

@@ -38,7 +38,10 @@ const CookingMode = {
     if (this.overlay) this.overlay.remove();
 
     const recipe = this.recipe;
-    const scale = (Recipe?.currentServings || recipe.default_servings) / recipe.default_servings;
+    // One multiplier for the whole app: servings AND the `Scale` control
+    // (issue #49 — cooking mode used to drop the latter, so a scaled recipe
+    // showed its original amounts once you started cooking).
+    const scale = Recipe ? Recipe.scaleFor(recipe) : 1;
 
     const el = document.createElement('div');
     el.id = 'cooking-overlay';
@@ -96,11 +99,14 @@ const CookingMode = {
           <h2 class="text-lg font-semibold">${this.escapeHtml(recipe.title)}</h2>
           <div id="cm-timers" class="flex flex-wrap gap-2"></div>
         </div>
+        <div class="flex items-center gap-2">
+        ${this.buildScaleControls(recipe)}
         <button id="cm-exit" class="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-400 hover:text-zinc-900 dark:hover:text-white">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
           </svg>
         </button>
+        </div>
       </div>
       <div id="cm-body" class="flex-1 overflow-y-auto">
         <div class="max-w-2xl mx-auto px-6">
@@ -119,6 +125,7 @@ const CookingMode = {
     this.overlay = el;
 
     el.querySelector('#cm-exit').addEventListener('click', () => this.exit());
+    this.bindScaleControls(el, recipe);
     // "Made it" from the natural moment — the end-of-cook screen. Only
     // shown when there's a target to mark (own conversation or shared).
     const madeBtn = el.querySelector('#cm-made-it');
@@ -201,6 +208,62 @@ const CookingMode = {
         Recipe.saveUIStateToServer();
       });
     });
+  },
+
+  // Servings / scale, right where the cook needs them: changing either one
+  // re-renders every amount on screen and is saved like any other change
+  // made in the recipe view.
+  buildScaleControls(recipe) {
+    if (typeof Recipe === 'undefined') return '';
+    const btn = 'w-7 h-7 rounded flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors text-zinc-500';
+    const group = 'flex items-center gap-1 rounded-lg bg-zinc-100 dark:bg-zinc-900 px-1';
+    return `
+      <div id="cm-scale-controls" class="flex items-center gap-2 text-sm">
+        <span class="text-zinc-400 dark:text-zinc-500 hidden sm:inline">${t('recipe.servings')}</span>
+        <div class="${group}">
+          <button class="cm-servings-btn ${btn}" data-delta="-1" aria-label="${this.escapeHtml(t('recipe.servings'))} -">&minus;</button>
+          <span id="cm-servings-count" class="font-semibold w-5 text-center tabular-nums">${Recipe.servingsFor(recipe)}</span>
+          <button class="cm-servings-btn ${btn}" data-delta="1" aria-label="${this.escapeHtml(t('recipe.servings'))} +">+</button>
+        </div>
+        <span class="text-zinc-400 dark:text-zinc-500 hidden sm:inline">${t('recipe.scale')}</span>
+        <div class="${group}">
+          <button class="cm-scale-btn ${btn}" data-delta="-0.25" aria-label="${this.escapeHtml(t('recipe.scale'))} -">&minus;</button>
+          <span id="cm-scale-count" class="font-semibold w-8 text-center tabular-nums">${Recipe.scaleLabel()}</span>
+          <button class="cm-scale-btn ${btn}" data-delta="0.25" aria-label="${this.escapeHtml(t('recipe.scale'))} +">+</button>
+        </div>
+      </div>`;
+  },
+
+  bindScaleControls(el, recipe) {
+    if (typeof Recipe === 'undefined') return;
+    el.querySelectorAll('.cm-servings-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const delta = parseInt(btn.dataset.delta);
+        Recipe.currentServings = Math.max(1, Recipe.servingsFor(recipe) + delta);
+        Recipe.saveUIStateToServer();
+        this.rerender();
+      });
+    });
+    el.querySelectorAll('.cm-scale-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const delta = parseFloat(btn.dataset.delta);
+        Recipe.servingScale = Math.max(0.5, Math.min(2.0,
+          Math.round(((Recipe.servingScale || 1) + delta) * 100) / 100));
+        Recipe.saveUIStateToServer();
+        this.rerender();
+      });
+    });
+  },
+
+  // Rebuild the overlay in place (running timers and scroll position
+  // survive) after something that changes every printed amount.
+  rerender() {
+    if (!this.active || !this.recipe) return;
+    const scrollTop = this.overlay?.querySelector('#cm-body')?.scrollTop || 0;
+    this.createOverlay();
+    const body = this.overlay?.querySelector('#cm-body');
+    if (body) body.scrollTop = scrollTop;
+    this.renderTimers();
   },
 
   handleKey(e) {

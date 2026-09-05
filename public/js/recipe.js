@@ -32,9 +32,9 @@ const Recipe = {
     display.classList.remove('hidden');
     this.diffMode = false;
 
-    const servings = this.currentServings || recipe.default_servings;
+    const servings = this.servingsFor(recipe);
     const ss = this.servingScale;
-    const ingredientScale = (servings / recipe.default_servings) * ss;
+    const ingredientScale = this.scaleFor(recipe);
     const baseMacros = this.computeMacros(recipe, 1);
     const perServingMacros = {
       calories: (baseMacros.calories / servings) * ss,
@@ -49,7 +49,7 @@ const Recipe = {
       recipe.cook_time ? t('card.cook', { t: recipe.cook_time }) : '',
     ].filter(Boolean).join('  ·  ');
 
-    const scaleLabel = ss === 1.0 ? '1×' : `${ss}×`;
+    const scaleLabel = this.scaleLabel();
 
     // Byline while viewing someone's shared recipe read-only (no owned
     // conversation yet — sending a chat message auto-forks it).
@@ -1000,8 +1000,8 @@ const Recipe = {
   // ── Export ────────────────────────────────────────────────────
 
   exportMarkdown(recipe) {
-    const servings = this.currentServings || recipe.default_servings;
-    const scale = (servings / recipe.default_servings) * this.servingScale;
+    const servings = this.servingsFor(recipe);
+    const scale = this.scaleFor(recipe);
     const baseMacros = this.computeMacros(recipe, 1);
     const macros = {
       calories: (baseMacros.calories / servings) * this.servingScale,
@@ -1060,8 +1060,8 @@ const Recipe = {
   },
 
   copyMarkdown(recipe) {
-    const servings = this.currentServings || recipe.default_servings;
-    const scale = (servings / recipe.default_servings) * this.servingScale;
+    const servings = this.servingsFor(recipe);
+    const scale = this.scaleFor(recipe);
     const baseMacros = this.computeMacros(recipe, 1);
     const macros = {
       calories: (baseMacros.calories / servings) * this.servingScale,
@@ -1267,6 +1267,24 @@ const Recipe = {
   },
 
   // ── Helpers ────────────────────────────────────────────────────
+
+  // Servings + scale are one multiplier, and it has to be the SAME one
+  // everywhere a quantity is printed — the recipe view, the export and
+  // cooking mode (issue #49: cook mode used to ignore the `Scale` control
+  // and showed unscaled amounts).
+  servingsFor(recipe) {
+    return this.currentServings || recipe?.default_servings || 1;
+  },
+
+  scaleFor(recipe) {
+    const base = recipe?.default_servings || 1;
+    return (this.servingsFor(recipe) / base) * (this.servingScale || 1);
+  },
+
+  scaleLabel() {
+    const ss = this.servingScale || 1;
+    return ss === 1.0 ? '1\u00D7' : `${ss}\u00D7`;
+  },
 
   computeMacros(recipe, scale) {
     const totals = { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 };

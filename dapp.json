@@ -256,6 +256,26 @@
       "expectSelector": "#cm-exit"
     },
     {
+      "name": "Cooking mode scales quantities to the recipe scale",
+      "path": "/?c=900003&cook=1&scale=2",
+      "expectText": "800g"
+    },
+    {
+      "name": "Cooking mode shows the scale it is cooking at",
+      "path": "/?c=900003&cook=1&scale=2",
+      "expectText": "2\u00d7"
+    },
+    {
+      "name": "Cooking mode offers servings and scale controls",
+      "path": "/?c=900003&cook=1&scale=2",
+      "expectSelector": "#cooking-overlay #cm-scale-controls .cm-scale-btn"
+    },
+    {
+      "name": "Cooking mode at default scale shows base quantities",
+      "path": "/?c=900003&cook=1",
+      "expectText": "400g"
+    },
+    {
       "name": "Recipe deep link opens recipe tab on mobile",
       "path": "/?c=900003 @mobile",
       "expectSelector": "#recipe-panel:not(.panel-hidden) #cook-btn"
