@@ -1,6 +1,8 @@
 {
   "name": "RecipeBot",
-  "icon": { "emoji": "🍳" },
+  "icon": {
+    "emoji": "🍳"
+  },
   "llm": {
     "purpose": "Generates and refines cooking recipes in chat",
     "suggested_daily_cap_cents": 300
@@ -263,7 +265,7 @@
     {
       "name": "Cooking mode shows the scale it is cooking at",
       "path": "/?c=900003&cook=1&scale=2",
-      "expectText": "2\u00d7"
+      "expectText": "2×"
     },
     {
       "name": "Cooking mode offers servings and scale controls",
@@ -450,5 +452,9 @@
       "path": "/?s=900002&ui=versions",
       "expectText": "Swapped chicken for tofu"
     }
-  ]
+  ],
+  "governance": {
+    "approvers": "invited",
+    "approvals": "default"
+  }
 }
