@@ -456,5 +456,9 @@
   "visibility": {
     "build": "public",
     "view": "public"
+  },
+  "governance": {
+    "approvers": "invited",
+    "approvals": "default"
   }
 }
