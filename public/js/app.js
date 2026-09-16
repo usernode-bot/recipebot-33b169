@@ -5,7 +5,7 @@ window.App = {
   // sign-in prompts on every ownership/AI action).
   isAnonymous: false,
   // Where accounts live; every sign-in prompt links here.
-  PLATFORM_APP_URL: 'https://social-vibecoding.usernodelabs.org/#app/recipebot-33b169/full',
+  PLATFORM_APP_URL: `${window.__PLATFORM_ORIGIN__ || ''}/#app/recipebot-33b169/full`,
   currentConversationId: null,
   currentRecipe: null,
   pendingRecipe: null,

@@ -91,11 +91,15 @@
       };
     })();
   </script>
-  <script src="https://social-vibecoding.usernodelabs.org/usernode-bridge/v1/bridge.js"></script>
+  <script src="__USERNODE_PLATFORM_ORIGIN__/usernode-bridge/v1/bridge.js"></script>
+  <!-- Client scripts read the platform origin from here rather than hardcoding
+       one: the document is rendered at boot from USERNODE_PLATFORM_ORIGIN, so a
+       domain move reaches app.js without another release. -->
+  <script>window.__PLATFORM_ORIGIN__ = "__USERNODE_PLATFORM_ORIGIN__";</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="__USERNODE_PLATFORM_ORIGIN__/usernode-tailwind/v1/tailwind.js"></script>
   <script>tailwind.config = {
     darkMode: 'class',
     // hover: styles must not stick after a tap on a touchscreen (native kit
@@ -202,8 +206,8 @@
        before app.css so the app stylesheet stays the last word on its own
        selectors; kit chrome is re-themed only through the --un-* variables
        declared at the top of app.css. -->
-  <link rel="stylesheet" href="https://social-vibecoding.usernodelabs.org/usernode-native/v1/native.css">
-  <script src="https://social-vibecoding.usernodelabs.org/usernode-native/v1/native.js"></script>
+  <link rel="stylesheet" href="__USERNODE_PLATFORM_ORIGIN__/usernode-native/v1/native.css">
+  <script src="__USERNODE_PLATFORM_ORIGIN__/usernode-native/v1/native.js"></script>
   <link rel="stylesheet" href="/css/app.css">
   <link rel="stylesheet" href="/css/print.css" media="print">
   <script>
@@ -223,7 +227,7 @@
       <!-- Back to the homepage recipe list; hidden on the homepage itself (see App.showView) -->
       <!-- A real link so cmd/ctrl/middle-click opens home in a new tab (issue #45);
            plain clicks are intercepted in setupHomeButton and stay in-app. -->
-      <a id="home-btn" href="https://social-vibecoding.usernodelabs.org/#app/recipebot-33b169/full" class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" title="Back to recipes" aria-label="Back to recipes" data-i18n-title="header.backToRecipes" data-i18n-aria-label="header.backToRecipes" style="display:none">
+      <a id="home-btn" href="__USERNODE_PLATFORM_ORIGIN__/#app/recipebot-33b169/full" class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" title="Back to recipes" aria-label="Back to recipes" data-i18n-title="header.backToRecipes" data-i18n-aria-label="header.backToRecipes" style="display:none">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
         </svg>
@@ -281,7 +285,7 @@
       <button id="shortcuts-help-btn" class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-sm font-mono font-bold" title="Keyboard shortcuts" data-i18n-title="header.shortcuts">?</button>
       <span id="rate-limit-display" class="text-xs text-zinc-500 hidden sm:inline"></span>
       <!-- Anonymous mode: shown by app.js when there is no signed-in user -->
-      <a id="sign-in-btn" class="hidden px-3 py-1.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors" href="https://social-vibecoding.usernodelabs.org/#app/recipebot-33b169/full" data-i18n="header.signIn">Sign in</a>
+      <a id="sign-in-btn" class="hidden px-3 py-1.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors" href="__USERNODE_PLATFORM_ORIGIN__/#app/recipebot-33b169/full" data-i18n="header.signIn">Sign in</a>
       <div class="relative">
         <button id="user-menu-btn" class="hidden items-center gap-1.5 p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" title="Account menu" aria-haspopup="true" aria-expanded="false" data-i18n-title="header.accountMenu">
           <svg class="w-5 h-5 sm:hidden text-zinc-400 dark:text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -585,7 +589,7 @@
     <p class="kicker mb-2">RecipeBot</p>
     <h3 id="sign-in-reason" class="text-lg font-semibold mb-2">Sign in to do this</h3>
     <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-4" data-i18n="signin.body">Your box, cookbooks, and the AI cook live in your Usernode account. It takes a moment — this recipe will still be here.</p>
-    <a id="sign-in-go" class="block w-full px-4 py-2.5 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors" href="https://social-vibecoding.usernodelabs.org/#app/recipebot-33b169/full" data-i18n="signin.cta">Open RecipeBot in Usernode →</a>
+    <a id="sign-in-go" class="block w-full px-4 py-2.5 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors" href="__USERNODE_PLATFORM_ORIGIN__/#app/recipebot-33b169/full" data-i18n="signin.cta">Open RecipeBot in Usernode →</a>
     <button id="sign-in-cancel" class="mt-2 w-full px-4 py-2.5 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors" data-i18n="signin.keepBrowsing">Keep browsing</button>
   </div>
 
