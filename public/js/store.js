@@ -86,6 +86,7 @@ const Store = {
     App.viewingShared = {
       id: item.id,
       username: item.username,
+      featured_image: item.featured_image || item.data?.image || null,
       is_mine: item.is_mine,
       avg_rating: item.avg_rating,
       rating_count: item.rating_count,

@@ -16,6 +16,10 @@ async function migrate(config) {
 
   log.info('db', 'Running migrations...');
   await pool.query(schema);
+  // Featured-image column added after shared_recipes first shipped; the
+  // CREATE TABLE IF NOT EXISTS in schema.sql can't add columns to an
+  // existing table, and a fresh DB needs the table to exist first.
+  await pool.query('ALTER TABLE shared_recipes ADD COLUMN IF NOT EXISTS featured_image TEXT');
   log.info('db', 'Schema up to date');
 
   // Clean up stale rate limit rows
@@ -477,6 +481,12 @@ async function seedStagingDemo(pool) {
      VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (id) DO NOTHING`,
     [900002, 900002, 'staging-demo-chef', 900002, JSON.stringify(DEMO_RECIPE_2)]
+  );
+  // Featured images for the seeded community recipes. The schema backfill
+  // may already have filled these from the titles; keep both idempotent.
+  await pool.query(
+    `UPDATE shared_recipes SET featured_image = featured_image_for_title(recipe_data->>'title')
+     WHERE id IN (900001, 900002) AND featured_image IS NULL`
   );
   // Version history for the demo chef's shared recipe: v1 (chicken) → v2
   // (tofu, matching its current recipe_data) so testers can browse history.

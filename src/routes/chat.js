@@ -3,7 +3,7 @@ const { EventEmitter } = require('events');
 const { getPool } = require('../db/pool');
 const { createMessage, streamMessage, isRetryable, isEnabled, buildSystemPrompt, getCreateParams, isValidModel, resolveLocale, estimateMicrocents, LLM_IDLE_TIMEOUT_MS, LLM_MAX_TURN_MS } = require('../services/llm');
 const { validate, getSchemaReminder } = require('../services/recipe-validator');
-const { fetchWebpage, MAX_CONTENT_LENGTH } = require('../services/web');
+const { fetchWebpage, MAX_CONTENT_LENGTH, fallbackImageForTitle } = require('../services/web');
 const { webSearch, init: initSearch } = require('../services/search');
 const { rateLimitMiddleware } = require('../middleware/rate-limit');
 const log = require('../services/logger');
@@ -753,6 +753,10 @@ async function streamWithToolHandling(
   // and '[recipe]' logging — and `lastErrors` keeps the most recent
   // validation errors for failure reporting.
   const fixState = { attempts: 0, pending: null, lastErrors: null };
+  // Most recent finished-dish photo returned by fetch_webpage in this
+  // reply. display_recipe persists it on the recipe JSON so published
+  // community recipes always have a featured image.
+  let lastFetchedImage = null;
 
   // Set once a VALID recipe reaches the client. After that, a later turn
   // timing out is a partial success — deliver what we have with a warning
@@ -896,7 +900,7 @@ async function streamWithToolHandling(
         }
         const toolResult = await handleToolCall(
           block, config, currentMessages, systemPrompt, send, convId, pool, userId, responseLog,
-          fixState, replyState
+          fixState, replyState, { onImage: (url) => { lastFetchedImage = url; } }
         );
         toolResults.push({ toolUseId: block.id, result: toolResult });
       }
@@ -1039,7 +1043,7 @@ function recordUsage(pool, userId, model, usage) {
   ).catch((err) => log.warn('chat', 'Failed to record llm usage', { message: err.message }));
 }
 
-async function handleToolCall(block, config, messages, systemPrompt, send, convId, pool, userId, responseLog, fixState, replyState) {
+async function handleToolCall(block, config, messages, systemPrompt, send, convId, pool, userId, responseLog, fixState, replyState, hooks) {
   const lastEntry = () => responseLog[responseLog.length - 1];
 
   if (block.name === 'web_search') {
@@ -1060,6 +1064,7 @@ async function handleToolCall(block, config, messages, systemPrompt, send, convI
     send('status', { text: `Reading: ${block.input.url}`, kind: 'fetch', url: block.input.url });
     const result = await fetchWebpage(block.input.url);
     if (result.error) return result.error;
+    if (result.image && hooks?.onImage) hooks.onImage(result.image);
 
     // Say explicitly what kind of read this was. Silent truncation is what
     // invited the model to confidently invent the amounts it never saw — and
@@ -1076,14 +1081,23 @@ async function handleToolCall(block, config, messages, systemPrompt, send, convI
   }
 
   if (block.name === 'display_recipe') {
-    return await handleRecipeDisplay(block.input, send, convId, pool, userId, fixState, replyState);
+    return await handleRecipeDisplay(block.input, send, convId, pool, userId, fixState, replyState, hooks);
   }
 
   return 'Unknown tool';
 }
 
-async function handleRecipeDisplay(recipeData, send, convId, pool, userId, fixState, replyState) {
+async function handleRecipeDisplay(recipeData, send, convId, pool, userId, fixState, replyState, hooks) {
   const recipe = recipeData;
+
+  // Featured image: prefer the photo the model copied from the source
+  // page (finished dish as published); fall back to a deterministic
+  // keyword image from the title so a published recipe never ships
+  // without one.
+  if (typeof recipe.image !== 'string' || !/^https:\/\//i.test(recipe.image)) {
+    recipe.image = fallbackImageForTitle(recipe.title) || null;
+  }
+
   const { valid, errors } = validate(recipe);
 
   if (valid) {
@@ -1098,6 +1112,7 @@ async function handleRecipeDisplay(recipeData, send, convId, pool, userId, fixSt
       fixState.attempts = 0;
     }
     fixState.lastErrors = null;
+    if (hooks?.onImage && /^https:\/\//i.test(recipe.image)) hooks.onImage(recipe.image);
     send('recipe', recipe);
     await updateConversationTitle(pool, convId, recipe.title, send);
     await pool.query(

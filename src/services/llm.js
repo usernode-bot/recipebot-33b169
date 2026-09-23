@@ -543,6 +543,7 @@ A good pattern: search first, read 1-2 of the best results, then synthesize into
 
 ## Guidelines
 
+- Featured image: the recipe you display MUST carry an image: an HTTPS URL of a photo of the finished dish, plated and ready to serve. When the recipe came from web_search or fetch_webpage, copy the exact image URL the page metadata provided (it is in the fetch result's "Image:" line). For an invented recipe, give the best matching finished-dish photo URL you know. Never link a raw ingredient photo or an empty placeholder.
 - Be conversational but concise in your text responses. Keep your message short — the recipe itself goes in the tool call, not your message.
 - When modifying an existing recipe, make MINIMAL changes — only change the parts the user asked about. Keep all other steps, ingredients, amounts, and macros identical. Call display_recipe again with the full updated recipe (including unchanged parts).`;
 
@@ -558,6 +559,10 @@ const TOOLS = [
         title: { type: 'string' },
         description: { type: 'string' },
         default_servings: { type: 'integer' },
+        image: {
+          type: 'string',
+          description: 'Required. HTTPS URL of a photo of the finished dish, plated and ready to eat. Use the exact image URL from the source page when the recipe came from web_search / fetch_webpage; for a recipe you invented, give the best matching finished-dish photo URL you know.',
+        },
         prep_time: { type: 'string' },
         cook_time: { type: 'string' },
         notes: { type: 'string' },
@@ -619,7 +624,7 @@ const TOOLS = [
           },
         },
       },
-      required: ['version', 'title', 'default_servings', 'steps'],
+      required: ['version', 'title', 'default_servings', 'image', 'steps'],
     },
   },
   {

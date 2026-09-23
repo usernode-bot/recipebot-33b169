@@ -96,6 +96,7 @@ const Recipe = {
         <div>
           <h2 class="text-2xl font-bold tracking-tight">${this.escapeHtml(recipe.title)}</h2>
           ${bylineHtml}
+          ${(App.viewingShared && (App.viewingShared.featured_image || recipe.image)) ? `<img src="${this.escapeHtml(App.viewingShared.featured_image || recipe.image)}" alt="${this.escapeHtml(recipe.title)}" class="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 aspect-[3/2] object-cover bg-zinc-100 dark:bg-zinc-900" onerror="this.remove()">` : ''}
           ${recipe.description ? `<p class="text-zinc-500 dark:text-zinc-400 text-sm mt-1.5 leading-relaxed">${this.renderInline(recipe.description)}</p>` : ''}
           ${tagChipsHtml}
         </div>
