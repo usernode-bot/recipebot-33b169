@@ -459,6 +459,20 @@ const Home = {
     const el = this._cardShell();
     el.appendChild(this._kicker(s.forked_from_username ? t('card.remix') : t('card.communityRecipe')));
 
+    // Featured image: the finished dish as published. The card itself is
+    // the tap target for viewing, so the image stays plain (no nested
+    // card, no extra chrome).
+    const imageUrl = s.featured_image || recipe.image;
+    if (imageUrl) {
+      const img = document.createElement('img');
+      img.src = imageUrl;
+      img.alt = recipe.title || t('common.untitled');
+      img.loading = 'lazy';
+      img.className = 'w-full rounded-md border border-zinc-200 dark:border-zinc-700 aspect-[3/2] object-cover bg-zinc-100 dark:bg-zinc-900';
+      img.addEventListener('error', () => img.remove());
+      el.appendChild(img);
+    }
+
     const remixBit = s.forked_from_username
       ? ` · ${t('card.remixedFrom', { name: this.esc(s.forked_from_username) })}` : '';
     const byline = s.is_mine ? t('card.byYou') : t('card.by', { name: this.esc(s.username) });

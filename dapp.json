@@ -338,6 +338,16 @@
       "expectSelector": "#home-community-list a[href*=\"?path=/?s=\"]"
     },
     {
+      "name": "Community cards show the finished-dish photo",
+      "path": "/",
+      "expectSelector": "#home-community-list img[src*=\"unsplash\"]"
+    },
+    {
+      "name": "Recipe panel shows the featured image",
+      "path": "/?s=900001",
+      "expectSelector": "#recipe-display img"
+    },
+    {
       "name": "Collection Open is a cmd-clickable deep link",
       "path": "/",
       "expectSelector": "#home-collections-list a[href*=\"?path=/?coll=\"]"
