@@ -34,6 +34,10 @@ const Store = {
     App.pendingRecipe = null;
     App.viewingShared = null;
     App.viewingVersion = null;
+    if (typeof Recipe !== 'undefined') {
+      Recipe._editorOpen = false;
+      Recipe._editorOriginal = null;
+    }
     App.showView('chat');
     HashParams.set('s', null);
     HashParams.set('c', id);
@@ -83,6 +87,8 @@ const Store = {
     App.pendingRecipe = null;
     App.currentRecipe = item.data;
     App.viewingVersion = null;
+    Recipe._editorOpen = false;
+    Recipe._editorOriginal = null;
     App.viewingShared = {
       id: item.id,
       username: item.username,
@@ -123,6 +129,8 @@ const Store = {
     App.showView('chat');
     App.currentConversationId = null;
     App.currentRecipe = recipeData;
+    Recipe._editorOpen = false;
+    Recipe._editorOriginal = null;
     App.viewingShared = meta ? {
       username: meta.username,
       id: meta.id || null,
@@ -157,6 +165,8 @@ const Store = {
       App.currentConversationId = null;
       App.currentRecipe = null;
       App.pendingRecipe = null;
+      Recipe._editorOpen = false;
+      Recipe._editorOriginal = null;
       HashParams.clear();
       if (typeof Chat !== 'undefined') Chat.clear();
       document.getElementById('recipe-display')?.classList.add('hidden');

@@ -180,6 +180,10 @@ const DEMO_RECIPE_PENDING = { ...DEMO_RECIPE_2, title: 'Staging Demo Pending Tof
 // recorded in the pre-#24 representation (status = 'acknowledged').
 const DEMO_RECIPE_SUPERSEDED = { ...DEMO_RECIPE_2, title: 'Staging Demo Superseded Tofu Stir Fry' };
 const DEMO_RECIPE_LEGACY = { ...DEMO_RECIPE_2, title: 'Staging Demo Legacy Tofu Stir Fry' };
+// Manual-editor demo: a conversation with exactly one recipe message and no
+// pending_replies row, so the Edit button renders and the editor can be
+// driven without an AI diff in the way.
+const DEMO_RECIPE_EDITABLE = { ...DEMO_RECIPE, title: 'Staging Demo Editable Stir Fry' };
 
 // Regression seeds for issues #16 / #24 (accept-edit screen reappearing): a
 // conversation whose recipe was edited, with pending_replies rows in given
@@ -317,6 +321,30 @@ async function seedStagingDemo(pool) {
     DEMO_RECIPE_LEGACY, 900305, 'acknowledged', null, null, 14
   );
   log.info('db', 'Seeded staging edit-decision demo conversations');
+
+  // Manual-editor demo (issue: "Add people ability to edit the recipe"):
+  // the /?c=900009 deep link opens a recipe with a working Edit button and
+  // no pending AI proposal. The conversation title differs from the recipe
+  // title so a save visibly renames it, and the seeded grams differ from the
+  // recipe's so a changed amount is visible in the form.
+  await pool.query(
+    `INSERT INTO conversations (id, user_id, title, preferences, created_at)
+     VALUES (900009, $1, 'Staging demo — Editable recipe', $2, NOW() - interval '3 days')
+     ON CONFLICT (id) DO NOTHING`,
+    [DEMO_USER_ID, JSON.stringify({ complexity: 'normal', serving: 'normal' })]
+  );
+  const { rows: editableRows } = await pool.query(
+    'SELECT 1 FROM messages WHERE conversation_id = 900009 LIMIT 1'
+  );
+  if (editableRows.length === 0) {
+    await pool.query(
+      `INSERT INTO messages (conversation_id, role, content, recipe_data, created_at) VALUES
+       (900009, 'user', 'Staging demo: a stir fry I can edit by hand', NULL, NOW() - interval '3 days' + interval '2 min'),
+       (900009, 'assistant', 'Here''s the stir fry, ready for manual edits.', $1, NOW() - interval '3 days' + interval '4 min')`,
+      [JSON.stringify(DEMO_RECIPE_EDITABLE)]
+    );
+    log.info('db', 'Seeded staging manual-edit demo conversation');
+  }
 
   // Failed-fix-up demo: a conversation whose last reply ended with a failed
   // "Fixing recipe format..." step, so reloaded history shows the ✕ and
