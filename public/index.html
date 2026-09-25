@@ -172,6 +172,18 @@
           pink: { 400: '#D96A4E', 500: '#C9563B' },
           // Macro pills (fat) — muted plum that sits on paper.
           violet: { 50: '#F2EDF4', 400: '#9D86B4', 500: '#8A72A3', 600: '#755E8E', 950: '#2A2138' },
+          // Issue #63: wider palette. A cuisine-tint family per card kicker
+          // and tag chip (see home.js tintForTags) plus one new amber shade,
+          // so the homepage reads as many cuisines instead of one accent.
+          sage: { 50: '#EDF3EA', 100: '#DCEBD8', 200: '#B9D7B1', 300: '#8FBC86', 400: '#5F7A34', 500: '#4F6A2B', 600: '#3E5422', 700: '#2F3F1A', 900: '#1F2A11', 950: '#161F0C' },
+          chili: { 50: '#FBEDE7', 100: '#F5DBD0', 200: '#EFB79F', 300: '#E48A65', 400: '#D96A4E', 500: '#B54A2C', 600: '#933A22', 700: '#6B3413', 900: '#4A2A15', 950: '#38200F' },
+          plum: { 50: '#F4EFF2', 100: '#E7DCE2', 200: '#D0BCCB', 300: '#B091A8', 400: '#9D86B4', 500: '#7E5F92', 600: '#634776', 700: '#4A3558', 900: '#2A2138', 950: '#1F1929' },
+          aegean: { 50: '#E9F2F5', 100: '#D3E8EC', 200: '#A8D2DB', 300: '#6FA9BC', 400: '#4A8AA0', 500: '#3A6F84', 600: '#2D5768', 700: '#22424F', 900: '#172C36', 950: '#10202A' },
+          lemongrass: { 50: '#FBF4DC', 100: '#F5EBC8', 200: '#EFE1B3', 400: '#C9A227', 500: '#A8861D', 600: '#8A6D17', 700: '#6B5A12', 900: '#4A3D0E', 950: '#38200F' },
+          moss: { 50: '#EDF3EA', 100: '#DCEBD8', 200: '#B9D7B1', 300: '#8FBC86', 400: '#7F9147', 500: '#6B7B3C', 600: '#54632F', 700: '#414D24', 900: '#2B3318', 950: '#20260F' },
+          amber: { 50: '#FBF4DC', 100: '#F5EBC8', 200: '#EFE1B3', 400: '#C9A227', 500: '#C9A227', 600: '#A8861D', 800: '#6B5A12', 900: '#4A3D0E', 950: '#3A300A' },
+          red: { 100: '#F5DBD0', 400: '#D96A4E', 500: '#B54A2C', 600: '#933A22', 900: '#4A2A15' },
+          rose: { 400: '#D96A4E', 500: '#C9563B', 600: '#B54A2C' },
         },
       },
     },
@@ -462,6 +474,7 @@
         </div>
         <div id="home-no-match" class="hidden text-center text-zinc-500 py-16">
           <p class="text-sm" data-i18n="home.noMatch">No recipes match your search</p>
+          <button id="home-no-match-reset" class="mt-3 px-3 py-1.5 text-xs rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors" data-i18n="home.clearSearch">Clear search</button>
         </div>
       </div>
     </div>

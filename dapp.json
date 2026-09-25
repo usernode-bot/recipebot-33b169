@@ -451,6 +451,76 @@
       "name": "Version history opens for a v2 recipe",
       "path": "/?s=900002&ui=versions",
       "expectText": "Swapped chicken for tofu"
+    },
+    {
+      "name": "World-tour recipes render in the community feed",
+      "path": "/",
+      "expectText": "Staging Demo Cacio e Pepe"
+    },
+    {
+      "name": "World-tour recipes carry varied cuisines",
+      "path": "/",
+      "expectText": "Staging Demo Mapo Tofu"
+    },
+    {
+      "name": "World-tour recipes show on a later feed page",
+      "path": "/",
+      "expectText": "Staging Demo Miso Ginger Salmon"
+    },
+    {
+      "name": "Cuisine-tinted chips use the sage family",
+      "path": "/?q=risotto",
+      "expectText": "bg-sage-50"
+    },
+    {
+      "name": "Cuisine-tinted chips use the chili family",
+      "path": "/",
+      "expectText": "bg-chili-50"
+    },
+    {
+      "name": "Cuisine-tinted chips use the plum family",
+      "path": "/",
+      "expectText": "bg-plum-50"
+    },
+    {
+      "name": "Cuisine-tinted chips use the aegean family",
+      "path": "/",
+      "expectText": "bg-aegean-50"
+    },
+    {
+      "name": "Cuisine-tinted chips use the lemongrass family",
+      "path": "/",
+      "expectText": "bg-lemongrass-50"
+    },
+    {
+      "name": "Cuisine-tinted chips use the moss family",
+      "path": "/",
+      "expectText": "bg-moss-50"
+    },
+    {
+      "name": "Search deep link shows no-match state",
+      "path": "/?q=zzzznope",
+      "expectText": "No recipes match your search"
+    },
+    {
+      "name": "No-match state offers to clear the search",
+      "path": "/?q=zzzznope",
+      "expectText": "Clear search"
+    },
+    {
+      "name": "Search deep link filters the homepage",
+      "path": "/?q=tagine",
+      "expectText": "Staging Demo Vegetable Tagine"
+    },
+    {
+      "name": "Search deep link hides non-matching recipes",
+      "path": "/?q=tagine",
+      "expectText": "Cacio e Pepe"
+    },
+    {
+      "name": "World-tour recipe deep link renders",
+      "path": "/?s=910001",
+      "expectText": "Staging Demo Cacio e Pepe"
     }
   ],
   "visibility": {
