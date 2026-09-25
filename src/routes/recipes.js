@@ -36,6 +36,18 @@ function recipeRoutes(config) {
   const ownerClause = (col) =>
     config.isStaging ? `${col} IN ($1, 0)` : `${col} = $1`;
 
+  // Whether the requester may edit this shared recipe's underlying
+  // conversation. Deliberately the SAME predicate the PUT /api/recipes/:id
+  // route authorizes with: the shared row must be the requester's own AND its
+  // conversation must exist and be owned by them (both clauses use ownerClause,
+  // which adds the seeded demo rows in staging — see CLAUDE.md). Expressing it
+  // as one conjunction here means the Edit button the client renders and the
+  // check the server enforces can never disagree.
+  const canEditExpr = (col) =>
+    `${ownerClause(col)} AND EXISTS (SELECT 1 FROM conversations c
+                                     WHERE c.id = s.conversation_id
+                                       AND ${ownerClause('c.user_id')})`;
+
   // The requester's created recipes (latest recipe per conversation),
   // newest recipe activity first (issue #40). `created_at` here is the
   // LATEST recipe message's timestamp, not the conversation's — i.e. when
@@ -269,7 +281,8 @@ function recipeRoutes(config) {
                 ${SOCIAL_COUNTS},
                 EXISTS (SELECT 1 FROM recipe_favorites f
                         WHERE f.shared_recipe_id = s.id AND f.user_id = $1) AS is_favorited,
-                (s.user_id = $1) AS is_mine
+                (s.user_id = $1) AS is_mine,
+                ${canEditExpr('s.user_id')} AS can_edit
          FROM shared_recipes s
          ${RATING_AGG}
          ${where}
@@ -518,7 +531,8 @@ function recipeRoutes(config) {
                 my.rating AS my_rating,
                 ${SOCIAL_COUNTS},
                 TRUE AS is_favorited,
-                (s.user_id = $1) AS is_mine
+                (s.user_id = $1) AS is_mine,
+                ${canEditExpr('s.user_id')} AS can_edit
          FROM recipe_favorites f
          JOIN shared_recipes s ON s.id = f.shared_recipe_id
          ${RATING_AGG}

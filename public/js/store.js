@@ -93,6 +93,12 @@ const Store = {
       id: item.id,
       username: item.username,
       is_mine: item.is_mine,
+      // Ownership of the recipe's underlying conversation. can_edit is the
+      // server's own predicate (ownerClause in src/routes/recipes.js) exposed
+      // on the feed row, so the Edit button and the PUT that backs it can
+      // never disagree; conversation_id is what the editor saves into.
+      can_edit: item.can_edit,
+      conversation_id: item.conversation_id,
       avg_rating: item.avg_rating,
       rating_count: item.rating_count,
       current_version: item.current_version || 1,

@@ -346,6 +346,26 @@ async function seedStagingDemo(pool) {
     log.info('db', 'Seeded staging manual-edit demo conversation');
   }
 
+  // Published ("finished") copy of the editable demo conversation, owned by
+  // the demo sentinel like every other seeded row. Opening it read-only from
+  // the community feed (/?s=900060) must still offer Edit for the tester,
+  // because staging treats the demo rows as the tester's own (ownerClause in
+  // the route modules). Without a shared row here the feed route that renders
+  // the Edit button had no seeded coverage at all.
+  await pool.query(
+    `INSERT INTO shared_recipes (id, user_id, username, conversation_id, recipe_data)
+     VALUES (900060, $1, 'staging-demo-user', 900009, $2)
+     ON CONFLICT (id) DO NOTHING`,
+    [DEMO_USER_ID, JSON.stringify(DEMO_RECIPE_EDITABLE)]
+  );
+  await pool.query(
+    `INSERT INTO shared_recipe_versions (shared_recipe_id, version, recipe_data, note, user_id, username)
+     VALUES (900060, 1, $1, NULL, $2, 'staging-demo-user')
+     ON CONFLICT (shared_recipe_id, version) DO NOTHING`,
+    [JSON.stringify(DEMO_RECIPE_EDITABLE), DEMO_USER_ID]
+  );
+  log.info('db', 'Seeded staging published editable recipe');
+
   // Failed-fix-up demo: a conversation whose last reply ended with a failed
   // "Fixing recipe format..." step, so reloaded history shows the ✕ and
   // warning icons (silent-failure fix) instead of misleading checkmarks.
@@ -552,6 +572,10 @@ async function seedStagingDemo(pool) {
   await pool.query(
     `UPDATE shared_recipes SET tags = $2::text[] WHERE id = $1`,
     [900002, DEMO_RECIPE_2.tags]
+  );
+  await pool.query(
+    `UPDATE shared_recipes SET tags = $2::text[] WHERE id = $1`,
+    [900060, DEMO_RECIPE_EDITABLE.tags]
   );
 
   // Remix lineage: a third shared recipe forked from 900001 so the

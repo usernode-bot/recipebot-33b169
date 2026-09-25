@@ -293,13 +293,32 @@ const Recipe = {
     return `<button id="fork-btn" title="${this.escapeHtml(t('recipe.forkTitle'))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.fork')}</button>`;
   },
 
-  // Manual editor entry. Owner-only by construction: it lives on the recipe
-  // of an owned conversation (App.currentConversationId), and signed-in is
-  // implied by having one (anonymous visitors never load conversations). Not
-  // offered while an AI proposal is pending — that diff owns the panel until
-  // it is resolved; the route itself enforces ownership server-side too.
+  // The conversation id the signed-in user may hand-edit, or null. Two ways
+  // in, both ownership-checked by the server:
+  //   * an owned conversation is open (App.currentConversationId), or
+  //   * a published recipe the user owns is open read-only (?s=<id>), which
+  //     exposes its underlying conversation via can_edit.
+  // Named as one predicate so the button, the editor and the ?ui=edit deep
+  // link can never disagree about what is editable. The version banner is the
+  // one exception: an older version of a shared recipe has no conversation
+  // state to write into, so it is not editable (the PUT appends to the
+  // conversation's latest recipe, not to a historical snapshot).
+  editableConversationId() {
+    if (App.isAnonymous) return null;
+    if (App.viewingVersion) return null;
+    if (App.currentConversationId) return App.currentConversationId;
+    const vs = App.viewingShared;
+    if (vs?.can_edit && vs.conversation_id) return vs.conversation_id;
+    return null;
+  },
+
+  // Manual editor entry. Owner-only: editableConversationId() is the same
+  // ownership predicate the PUT route authorizes with, so the button appears
+  // exactly when the server would accept the save — including on a recipe the
+  // user published and is now reading from the community feed. Not offered
+  // while an AI proposal is pending; that diff owns the panel until resolved.
   renderEditControl() {
-    if (!App.currentConversationId || App.isAnonymous) return '';
+    if (!this.editableConversationId()) return '';
     if (App.pendingRecipe || this.diffMode) return '';
     return `<button id="edit-btn" title="${this.escapeHtml(t('edit.btnTitle'))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('edit.btn')}</button>`;
   },
@@ -1112,7 +1131,7 @@ const Recipe = {
       btn.disabled = true;
       btn.textContent = t('edit.saving');
       try {
-        const res = await fetch(`/api/recipes/${App.currentConversationId}`, {
+        const res = await fetch(`/api/recipes/${this.editableConversationId()}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ recipe }),
@@ -1129,6 +1148,15 @@ const Recipe = {
         this.servingScale = 1.0;
         this._editorOpen = false;
         this._editorOriginal = null;
+        // Edited from the read-only shared view (an owned recipe opened from
+        // the community feed): the save went to the recipe's conversation, so
+        // keep the shared-view copy in step or a later re-render would paint
+        // the pre-edit snapshot back over it. The PUBLISHED copy is a
+        // snapshot and is deliberately left alone until it is updated from
+        // the conversation screen.
+        if (!App.currentConversationId && App.viewingShared) {
+          App.viewingShared.currentData = data.recipe;
+        }
         UI.toast(t('edit.saved'));
         this.display(data.recipe);
         Store.refresh();

@@ -477,8 +477,12 @@ function openUiState(name) {
       if (typeof Recipe !== 'undefined' && hasRecipe) Recipe.openExportMenu();
       break;
     case 'edit':
-      if (typeof Recipe !== 'undefined' && hasRecipe && !App.isAnonymous &&
-          App.currentConversationId && !App.pendingRecipe) {
+      // Gated on Recipe.editableConversationId() — the same ownership
+      // predicate the Edit button and the server use — so the deep link works
+      // on an owned conversation AND on an owned recipe opened read-only from
+      // the community feed (?s=<id>).
+      if (typeof Recipe !== 'undefined' && hasRecipe && !App.pendingRecipe &&
+          Recipe.editableConversationId()) {
         Recipe.openEditor(App.currentRecipe);
       }
       break;
