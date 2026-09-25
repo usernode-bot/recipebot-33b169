@@ -6,6 +6,10 @@ const Recipe = {
   ingredientSummaryOpen: false,
   checkedIngredients: new Set(),
   activeSteps: new Set(),
+  // Whether the recipe on screen is starred by the requester. Set from the
+  // messages response (own conversation) or App.viewingShared (shared recipe)
+  // before display(), so the star renders in the right state.
+  _isFavorited: false,
 
   handleRecipeEvent(recipeData) {
     if (App.currentRecipe) {
@@ -26,6 +30,8 @@ const Recipe = {
     const empty = document.getElementById('recipe-empty');
     const display = document.getElementById('recipe-display');
 
+    // The star reflects whatever target is on screen right now.
+    this.syncFavoriteState();
     if (!this.diffMode) this.saveUIState(display);
 
     empty.classList.add('hidden');
@@ -139,6 +145,7 @@ const Recipe = {
 
         <div class="flex flex-wrap gap-2 pt-1">
           <button id="cook-btn" class="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors">${t('recipe.cookMode')}</button>
+          ${this.renderFavoriteControl()}
           ${this.renderMadeItControl()}
           ${this.renderForkControl()}
           ${this.renderShareControls()}
@@ -282,6 +289,21 @@ const Recipe = {
   // Fork button for the recipe view. Hidden in the unsaved-fork state
   // (no conversation and not viewing a shared recipe) — forking an
   // untouched fork would do nothing useful.
+  // Favorite / unfavorite the recipe on screen. Shows only when there is a
+  // concrete target (an own conversation or a published shared recipe) and
+  // never for anonymous visitors — starring is an account action.
+  renderFavoriteControl() {
+    if (App.isAnonymous) return '';
+    if (!App.currentConversationId && !App.viewingShared?.id) return '';
+    const filled = !!this._isFavorited;
+    const label = filled ? t('card.unfavorite') : t('card.favorite');
+    const heart = filled
+      ? '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>'
+      : '<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 20 20"><path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"/></svg>';
+    return `<button id="recipe-favorite-btn" title="${this.escapeHtml(label)}" aria-label="${this.escapeHtml(label)}" aria-pressed="${filled}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors inline-flex items-center gap-1.5 ${
+      filled ? 'text-pink-500' : 'text-zinc-500 dark:text-zinc-400 hover:text-pink-500'}">${heart}<span>${label}</span></button>`;
+  },
+
   renderForkControl() {
     if (!App.currentConversationId && !App.viewingShared) return '';
     return `<button id="fork-btn" title="${this.escapeHtml(t('recipe.forkTitle'))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.fork')}</button>`;
@@ -369,6 +391,38 @@ const Recipe = {
       cancelBtn.addEventListener('click', onCancel);
       closeBtn.addEventListener('click', onCancel);
     });
+  },
+
+  // Derive the star state for whatever recipe is on screen. Owned
+  // conversations carry it from /api/conversations/:id/messages; a shared
+  // recipe carries it on App.viewingShared (from the feed or /api/favorites).
+  syncFavoriteState() {
+    if (App.viewingShared) this._isFavorited = !!App.viewingShared.is_favorited;
+    else this._isFavorited = !!App.currentFavorited;
+  },
+
+  async toggleFavorite() {
+    if (App.isAnonymous) return App.promptSignIn(t('signin.saveBox'));
+    const convId = App.currentConversationId;
+    const sharedId = App.viewingShared?.id;
+    if (!convId && !sharedId) return;
+    const wasFavorited = this._isFavorited;
+    const url = convId
+      ? `/api/conversations/${convId}/favorite`
+      : `/api/shared-recipes/${sharedId}/favorite`;
+    try {
+      const res = await fetch(url, { method: wasFavorited ? 'DELETE' : 'PUT' });
+      if (!res.ok) throw new Error();
+      this._isFavorited = !wasFavorited;
+      if (App.viewingShared) App.viewingShared.is_favorited = this._isFavorited;
+      else App.currentFavorited = this._isFavorited;
+      // Keep the homepage band, the box, and the favorites screen in sync.
+      if (typeof Store !== 'undefined') Store.refresh();
+      if (typeof Home !== 'undefined' && App.currentView === 'home') Home.refresh();
+      if (App.currentRecipe) this.display(App.currentRecipe);
+    } catch {
+      UI.toast(t('recipe.favoriteFailed'));
+    }
   },
 
   async markMadeIt() {
@@ -601,7 +655,7 @@ const Recipe = {
       versions.forEach((v) => {
         const isCurrent = v.version === vs.current_version;
         const row = document.createElement('div');
-        row.className = 'flex items-start justify-between gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50';
+        row.className = 'flex items-start justify-between gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-card-light dark:bg-zinc-900/50';
         const date = v.created_at ? new Date(v.created_at).toLocaleDateString(I18N.lang) : '';
         row.innerHTML = `
           <div class="min-w-0">
@@ -676,6 +730,8 @@ const Recipe = {
         UI.toast(t('recipe.shareFailed'));
       }
     });
+
+    display.querySelector('#recipe-favorite-btn')?.addEventListener('click', () => this.toggleFavorite());
 
     display.querySelector('#made-it-btn')?.addEventListener('click', () => this.markMadeIt());
 

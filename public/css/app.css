@@ -344,22 +344,22 @@ h1, h2, h3, .font-display {
 
 .status-line .status-icon.status-icon-error,
 :is(.dark .status-line .status-icon.status-icon-error) {
-  color: #ef4444;
+  color: #C9563B;
 }
 
 .status-line.status-line-error,
 :is(.dark .status-line.status-line-error) {
-  color: #ef4444;
+  color: #C9563B;
 }
 
 .status-line .status-icon.status-icon-warning,
 :is(.dark .status-line .status-icon.status-icon-warning) {
-  color: #d97706;
+  color: #C9A227;
 }
 
 .status-line.status-line-warning,
 :is(.dark .status-line.status-line-warning) {
-  color: #d97706;
+  color: #C9A227;
 }
 
 /* Elapsed-time counter on the active step line — appears after ~15s so a long

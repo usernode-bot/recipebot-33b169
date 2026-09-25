@@ -72,11 +72,11 @@ app.get('*', (req, res) => {
       return res.type('html').send(INDEX_HTML);
     }
     return res.status(401).send(`<!doctype html><meta charset=utf-8><title>Open in Usernode</title>
-<body style="font-family:system-ui;background:#09090b;color:#e4e4e7;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0">
+<body style="font-family:Inter,system-ui,sans-serif;background:#FAF6EE;color:#1F2B47;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0">
   <div style="max-width:24rem;padding:2rem;text-align:center">
-    <h1 style="font-size:1.25rem;margin:0 0 0.5rem">Open this app inside Usernode</h1>
-    <p style="color:#a1a1aa;font-size:0.9rem;margin:0 0 1.25rem">This page is served via the platform; direct visits aren't authenticated.</p>
-    <a href="${PLATFORM_ORIGIN}/#app/recipebot-33b169/full" style="display:inline-block;padding:0.5rem 1rem;background:#7c3aed;color:white;border-radius:0.5rem;text-decoration:none;font-size:0.9rem">Open in Usernode</a>
+    <h1 style="font-family:Fraunces,Georgia,serif;font-size:1.35rem;margin:0 0 0.5rem">Open this app inside Usernode</h1>
+    <p style="color:#5A6378;font-size:0.9rem;margin:0 0 1.25rem">This page is served via the platform; direct visits aren't authenticated.</p>
+    <a href="${PLATFORM_ORIGIN}/#app/recipebot-33b169/full" style="display:inline-block;padding:0.5rem 1rem;background:#b85a24;color:#fff;border-radius:0.6rem;text-decoration:none;font-size:0.9rem">Open in Usernode</a>
   </div>
 </body>`);
   }

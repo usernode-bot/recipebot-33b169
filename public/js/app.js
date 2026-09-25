@@ -9,6 +9,10 @@ window.App = {
   currentConversationId: null,
   currentRecipe: null,
   pendingRecipe: null,
+  // Whether the currently open own conversation's recipe is starred by the
+  // requester, mirrored from the messages response so the recipe star renders
+  // in the right state.
+  currentFavorited: false,
   // Set while viewing a shared recipe read-only ({ id, username, avg_rating,
   // rating_count, current_version, currentData }); chatting from that state
   // auto-forks the recipe.
@@ -201,7 +205,7 @@ window.Router = {
   MAX_AGE_MS: 30_000,
   // `coll` addresses an open collection so a refresh (or signing in from a
   // public collection) comes back to it instead of the box.
-  ROUTE_KEYS: ['c', 's', 'coll', 'cook', 'ing', 'mac', 'ch'],
+  ROUTE_KEYS: ['c', 's', 'coll', 'fav', 'cook', 'ing', 'mac', 'ch'],
 
   // Hash params win over query params when both carry the same key.
   read() {
@@ -486,6 +490,20 @@ function openUiState(name) {
 async function restoreRoute(route) {
   if (typeof Store === 'undefined') return App.showView('home');
 
+  // The favorites screen lives on the homepage too (it replaces the box).
+  // Personal, so an anonymous deep link clears it and lands on the box.
+  if (route.fav && !route.c && !route.s) {
+    App.showView('home');
+    if (App.isAnonymous) {
+      console.warn('[route] favorites deep link needs an account — showing home');
+      HashParams.set('fav', null);
+    } else if (typeof Home !== 'undefined') {
+      const opened = await Home.openFavorites();
+      if (!opened) HashParams.set('fav', null);
+    }
+    return;
+  }
+
   // A collection lives on the homepage (it replaces the box), so it's
   // resolved before the recipe routes and needs no panel setup. Home.refresh
   // runs first so the detail can fall back to a populated box on a 404.
@@ -571,9 +589,13 @@ function setupHomeButton() {
     HashParams.set('c', null);
     HashParams.set('s', null);
     HashParams.set('coll', null);
+    HashParams.set('fav', null);
     HashParams.set('cook', null);
     App.setSignInPath?.(null);
-    if (typeof Home !== 'undefined') Home.activeCollection = null;
+    if (typeof Home !== 'undefined') {
+      Home.activeCollection = null;
+      Home.activeFavorites = false;
+    }
     App.showView('home');
   });
 }

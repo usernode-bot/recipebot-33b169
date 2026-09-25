@@ -296,6 +296,8 @@ const Chat = {
       if (!res.ok) return false;
       const data = await res.json();
       this.messages = data.messages || data;
+      // Star state for the recipe panel's favorite control.
+      App.currentFavorited = !!data.is_favorited;
 
       const pr = data.pendingReply;
       const isProcessing = pr?.status === 'processing';

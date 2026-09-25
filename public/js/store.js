@@ -31,6 +31,7 @@ const Store = {
   async selectConversation(id, opts) {
     App.currentConversationId = id;
     App.currentRecipe = null;
+    App.currentFavorited = false;
     App.pendingRecipe = null;
     App.viewingShared = null;
     App.viewingVersion = null;
@@ -87,6 +88,7 @@ const Store = {
       id: item.id,
       username: item.username,
       is_mine: item.is_mine,
+      is_favorited: !!item.is_favorited,
       avg_rating: item.avg_rating,
       rating_count: item.rating_count,
       current_version: item.current_version || 1,

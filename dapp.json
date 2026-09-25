@@ -451,6 +451,50 @@
       "name": "Version history opens for a v2 recipe",
       "path": "/?s=900002&ui=versions",
       "expectText": "Swapped chicken for tofu"
+    },
+    {
+      "id": "favorites.screen",
+      "name": "Favorites screen opens with seeded stars",
+      "path": "/?fav=1&demo=1",
+      "expectSelector": "#favorites-list",
+      "visual": true,
+      "impact": [
+        "public/js/home.js",
+        "public/js/recipe.js",
+        "public/js/app.js",
+        "public/css/app.css",
+        "src/routes/recipes.js"
+      ]
+    },
+    {
+      "name": "Favorites screen lists a seeded starred recipe",
+      "path": "/?fav=1&demo=1",
+      "expectText": "Staging Demo Chicken Stir Fry"
+    },
+    {
+      "name": "Favorites back control is a real link",
+      "path": "/?fav=1&demo=1",
+      "expectSelector": "a#favorites-back[href]"
+    },
+    {
+      "name": "Unseeded favorites route shows the empty state",
+      "path": "/?fav=1",
+      "expectText": "No favorites yet"
+    },
+    {
+      "name": "Recipe panel offers a favorite control",
+      "path": "/?c=900003",
+      "expectSelector": "#recipe-favorite-btn"
+    },
+    {
+      "name": "Shared recipe offers a favorite control",
+      "path": "/?s=900001",
+      "expectSelector": "#recipe-favorite-btn"
+    },
+    {
+      "name": "Favorites header links to the dedicated screen",
+      "path": "/?demo=1",
+      "expectSelector": "a#home-favorites-see-all[href]"
     }
   ],
   "visibility": {

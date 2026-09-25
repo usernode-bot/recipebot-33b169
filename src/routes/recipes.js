@@ -34,6 +34,11 @@ function recipeRoutes(config) {
   const ownerClause = (col) =>
     config.isStaging ? `${col} IN ($1, 0)` : `${col} = $1`;
 
+  // Staging-only request-time demo injection: ?demo=1 merges the seeded demo
+  // identity's favorites into a read. Gated on config.isStaging so production
+  // is never affected, and never keyed on the visitor's own identity.
+  const demoFavorites = (req) => config.isStaging && req.query.demo === '1';
+
   // The requester's created recipes (latest recipe per conversation),
   // newest recipe activity first (issue #40). `created_at` here is the
   // LATEST recipe message's timestamp, not the conversation's — i.e. when
@@ -43,13 +48,19 @@ function recipeRoutes(config) {
   // share a timestamp (seeded rows do).
   router.get('/api/recipes', async (req, res) => {
     try {
+      // ?demo=1 merges the staging demo identity's favorites so a tester's
+      // own view isn't empty in a preview. Never seeded for the visitor.
+      const favScope = demoFavorites(req) ? '$1, 0' : '$1';
       const { rows } = await pool.query(
         `SELECT * FROM (
          SELECT DISTINCT ON (c.id)
            m.id, m.recipe_data AS data, m.conversation_id, m.created_at,
            c.title AS conversation_title,
            EXISTS (SELECT 1 FROM recipe_favorites f
-                   WHERE f.conversation_id = c.id AND f.user_id = $1) AS is_favorited,
+                   WHERE f.conversation_id = c.id AND f.user_id IN (${favScope})) AS is_favorited,
+           (SELECT f.created_at FROM recipe_favorites f
+            WHERE f.conversation_id = c.id AND f.user_id IN (${favScope})
+            ORDER BY f.created_at DESC LIMIT 1) AS favorited_at,
            EXISTS (SELECT 1 FROM shared_recipes s
                    WHERE s.conversation_id = c.id) AS is_shared,
            EXISTS (SELECT 1 FROM shared_recipes s
@@ -417,11 +428,11 @@ function recipeRoutes(config) {
       if (!shared.length) return res.status(404).json({ error: 'Recipe not found' });
 
       await pool.query(
-        `INSERT INTO recipe_favorites (user_id, shared_recipe_id)
-         VALUES ($1, $2)
+        `INSERT INTO recipe_favorites (user_id, username, shared_recipe_id)
+         VALUES ($1, $2, $3)
          ON CONFLICT (user_id, shared_recipe_id) WHERE shared_recipe_id IS NOT NULL
          DO NOTHING`,
-        [req.user.id, sharedId]
+        [req.user.id, req.user.username || 'unknown', sharedId]
       );
       res.json({ ok: true });
     } catch (err) {
@@ -447,9 +458,13 @@ function recipeRoutes(config) {
   // The requester's favorited shared recipes (homepage favorites section).
   router.get('/api/favorites', async (req, res) => {
     try {
+      // Plain route stays requester-scoped (the honest production shape);
+      // ?demo=1 merges the staging demo identity's stars so reviewers see a
+      // populated screen. See the staging mock data convention.
+      const favScope = demoFavorites(req) ? '$1, 0' : '$1';
       const { rows } = await pool.query(
         `SELECT s.id, s.user_id, s.username, s.conversation_id, s.recipe_data AS data,
-                s.created_at, s.share_slug, s.tags,
+                s.created_at, s.share_slug, s.tags, f.created_at AS favorited_at,
                 s.forked_from_shared_id, s.forked_from_version, s.forked_from_username,
                 COALESCE((SELECT MAX(v.version) FROM shared_recipe_versions v
                           WHERE v.shared_recipe_id = s.id), 1)::int AS current_version,
@@ -462,8 +477,8 @@ function recipeRoutes(config) {
          FROM recipe_favorites f
          JOIN shared_recipes s ON s.id = f.shared_recipe_id
          ${RATING_AGG}
-         WHERE f.user_id = $1 AND f.shared_recipe_id IS NOT NULL
-         ORDER BY f.created_at DESC`,
+         WHERE f.user_id IN (${favScope}) AND f.shared_recipe_id IS NOT NULL
+         ORDER BY f.created_at DESC, f.id DESC`,
         [req.user.id]
       );
       res.json(rows);

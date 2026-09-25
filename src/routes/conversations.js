@@ -55,11 +55,11 @@ function conversationRoutes(config) {
       if (!conv.length) return res.status(404).json({ error: 'Conversation not found' });
 
       await pool.query(
-        `INSERT INTO recipe_favorites (user_id, conversation_id)
-         VALUES ($1, $2)
+        `INSERT INTO recipe_favorites (user_id, username, conversation_id)
+         VALUES ($1, $2, $3)
          ON CONFLICT (user_id, conversation_id) WHERE conversation_id IS NOT NULL
          DO NOTHING`,
-        [req.user.id, convId]
+        [req.user.id, req.user.username || 'unknown', convId]
       );
       res.json({ ok: true });
     } catch (err) {
@@ -113,6 +113,18 @@ function conversationRoutes(config) {
         [convId]
       );
 
+      // Lets the recipe panel render its star without a second round trip.
+      // Requester-scoped, with the same staging-only ?demo=1 merge the other
+      // favorites reads use.
+      const DEMO_FAV = config.isStaging && req.query.demo === '1';
+      const { rows: favRows } = await pool.query(
+        `SELECT 1 FROM recipe_favorites
+         WHERE conversation_id = $1 AND user_id IN (${DEMO_FAV ? '$2, 0' : '$2'})
+         LIMIT 1`,
+        [convId, req.user.id]
+      );
+      const isFavorited = favRows.length > 0;
+
       // The NEWEST reply in the conversation, whatever its status — only it
       // can ask the user to accept/reject. Filtering by status here (as this
       // used to) let an older undecided reply become "the" pending reply again
@@ -140,6 +152,7 @@ function conversationRoutes(config) {
         messages: rows,
         preferences: conv[0].preferences || {},
         ui_state: conv[0].ui_state || {},
+        is_favorited: isFavorited,
         pendingReply,
       });
     } catch (err) {

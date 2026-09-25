@@ -158,6 +158,9 @@
             800: '#6B5A12',
             900: '#4A3D0E',
           },
+          // Warm card surface: a soft off-white for cards on the paper page,
+          // instead of pure white (which reads cold next to #FAF6EE).
+          card: { light: '#FFFDF8' },
           // Warm olive success family (made-it, timers, diff-added blocks).
           green: {
             50:  '#EFF3E1',
@@ -170,6 +173,17 @@
           orange: { 50: '#FBEFE4', 400: '#E07A3F', 500: '#b85a24', 600: '#96461A', 950: '#38200F' },
           // Favorited hearts: warm terracotta.
           pink: { 400: '#D96A4E', 500: '#C9563B' },
+          // Brick red for destructive and error affordances — warm, so it
+          // sits on paper instead of clashing. Anchored on --un-action-danger.
+          red: {
+            50:  '#FBEDE8',
+            100: '#F7DED5',
+            400: '#D96A4E',
+            500: '#C9563B',
+            600: '#A8422C',
+            900: '#4A1D14',
+            950: '#33130D',
+          },
           // Macro pills (fat) — muted plum that sits on paper.
           violet: { 50: '#F2EDF4', 400: '#9D86B4', 500: '#8A72A3', 600: '#755E8E', 950: '#2A2138' },
         },
@@ -222,7 +236,7 @@
 <body class="bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 h-screen overflow-hidden flex flex-col">
 
   <!-- Header -->
-  <header class="flex items-center justify-between px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
+  <header class="flex items-center justify-between px-4 py-2 border-b border-brass-500/40 dark:border-brass-500/30 shrink-0">
     <div class="flex items-center gap-3">
       <!-- Back to the homepage recipe list; hidden on the homepage itself (see App.showView) -->
       <!-- A real link so cmd/ctrl/middle-click opens home in a new tab (issue #45);
@@ -366,6 +380,8 @@
         </div>
         <!-- Collection detail (opened from a collection card; hides the box sections) -->
         <div id="collection-view" class="hidden"></div>
+        <!-- Your favorites (opened from the box's favorites header; hides the box sections) -->
+        <div id="favorites-view" class="hidden"></div>
 
         <!-- ── Band 1: your box ─────────────────────────────────────
              Drafts → favorites → your recipes → collections (issue #40):
@@ -396,6 +412,7 @@
               <svg class="w-4 h-4 text-pink-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
               <span data-i18n="home.favorites">Your favorites</span>
               <span class="home-count text-xs font-normal text-zinc-400 dark:text-zinc-500 tabular-nums"></span>
+              <a id="home-favorites-see-all" href="__USERNODE_PLATFORM_ORIGIN__/#app/recipebot-33b169/full?path=/?fav=1" class="ml-auto text-xs font-normal text-blue-500 hover:text-blue-400 transition-colors" data-i18n="home.favoritesSeeAll">See all</a>
             </h2>
             <div id="home-favorites-list" class="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"></div>
           </section>

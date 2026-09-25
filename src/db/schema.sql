@@ -121,6 +121,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS recipe_favorites_shared
 CREATE UNIQUE INDEX IF NOT EXISTS recipe_favorites_conv
   ON recipe_favorites (user_id, conversation_id) WHERE conversation_id IS NOT NULL;
 
+-- The star's actor handle, denormalized from req.user like the other public
+-- social tables (made_it_marks, recipe_comments, shared_recipes). user_id is
+-- the identity the reads are scoped to; username is carried for display.
+ALTER TABLE recipe_favorites ADD COLUMN IF NOT EXISTS username VARCHAR(255);
+
 -- Remix lineage: set at fork time on the conversation, copied onto the
 -- published snapshot at publish time. Bare integers + denormalized
 -- username on purpose — no FK, so originals stay deletable and a deleted

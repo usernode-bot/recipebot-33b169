@@ -20,6 +20,9 @@ const Home = {
   tagFilter: new Set(),
   // When set, the homepage shows this collection's detail instead of the box.
   activeCollection: null,
+  // When true, the homepage shows the dedicated "Your favorites" screen
+  // instead of the box (mirrors the collection detail pattern).
+  activeFavorites: false,
   // Drafts are collapsed past this many rows until "Show all" is clicked.
   DRAFT_PREVIEW: 3,
   draftsExpanded: false,
@@ -71,10 +74,14 @@ const Home = {
         return;
       }
 
+      // ?demo=1 is a staging-only preview flag (see the platform's staging mock
+      // data convention). Forward it to the two favorites reads so the demo
+      // identity's stars merge in; the plain route stays requester-scoped.
+      const demo = this._demoParam();
       const [sharedRes, mineRes, favRes, convRes, collRes, pubCollRes] = await Promise.all([
         fetch('/api/shared-recipes'),
-        fetch('/api/recipes'),
-        fetch('/api/favorites'),
+        fetch(`/api/recipes${demo}`),
+        fetch(`/api/favorites${demo}`),
         fetch('/api/conversations'),
         fetch('/api/collections'),
         fetch('/api/collections/public'),
@@ -110,17 +117,23 @@ const Home = {
     const emptyEl = document.getElementById('home-empty');
     const noMatchEl = document.getElementById('home-no-match');
     const detailEl = document.getElementById('collection-view');
+    const favViewEl = document.getElementById('favorites-view');
     const toolbar = document.getElementById('home-toolbar');
     if (!favSection || !mineSection || !commSection) return;
 
-    // Collection detail replaces the box until closed. Blanking the two
-    // bands covers every section inside them.
-    const inDetail = !!this.activeCollection;
-    detailEl?.classList.toggle('hidden', !inDetail);
+    // Collection detail (or the favorites screen) replaces the box until
+    // closed. Blanking the two bands covers every section inside them.
+    const inDetail = !!this.activeCollection || this.activeFavorites;
+    detailEl?.classList.toggle('hidden', !(inDetail && this.activeCollection));
+    favViewEl?.classList.toggle('hidden', !(inDetail && this.activeFavorites));
     for (const el of [bandMine, bandComm, emptyEl, noMatchEl, toolbar]) {
       if (el) el.style.display = inDetail ? 'none' : '';
     }
-    if (inDetail) {
+    if (this.activeFavorites) {
+      this.renderFavoritesDetail(favViewEl);
+      return;
+    }
+    if (this.activeCollection) {
       this.renderCollectionDetail(detailEl);
       return;
     }
@@ -166,6 +179,8 @@ const Home = {
     favOwn.forEach((r) => favList.appendChild(this.ownCard(r)));
     favShared.forEach((s) => favList.appendChild(this.sharedCard(s, { favoritesSection: true })));
     favSection.classList.toggle('hidden', favOwn.length + favShared.length === 0);
+    document.getElementById('home-favorites-see-all')
+      ?.classList.toggle('hidden', favOwn.length + favShared.length === 0);
     this._setCount('home-favorites', favOwn.length + favShared.length);
 
     const mineList = document.getElementById('home-mine-list');
@@ -276,7 +291,7 @@ const Home = {
   // page scrolls sideways on a phone (issue #31).
   _cardShell() {
     const el = document.createElement('div');
-    el.className = 'min-w-0 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4 flex flex-col gap-2 shadow-[0_1px_3px_rgba(31,43,71,0.06)]';
+    el.className = 'min-w-0 rounded-md border border-zinc-200 dark:border-zinc-700 bg-card-light dark:bg-zinc-900 p-4 flex flex-col gap-2 shadow-[0_1px_3px_rgba(31,43,71,0.06)]';
     return el;
   },
 
@@ -438,7 +453,7 @@ const Home = {
     const el = document.createElement('div');
     const dated = this._shortDate(c.last_activity_at || c.created_at);
     const updatedBit = dated ? ` · ${t('card.updated', { d: this.esc(dated) })}` : '';
-    el.className = 'min-w-0 flex items-center gap-2 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2';
+    el.className = 'min-w-0 flex items-center gap-2 rounded-md border border-zinc-200 dark:border-zinc-700 bg-card-light dark:bg-zinc-900 px-3 py-2';
     el.innerHTML = `
       <div class="min-w-0 flex-1">
         <p class="text-sm truncate">${this.esc(c.title || t('card.newConversation'))}</p>
@@ -670,6 +685,85 @@ const Home = {
     HashParams.set('coll', null);
     App.setSignInPath?.(null);
     this.render();
+  },
+
+  // Staging-only demo passthrough: the query flag reaches the favorites reads
+  // so the seeded demo identity's stars merge in. Read from the live URL
+  // (hash wins over query, matching how the app routes).
+  _demoParam() {
+    const q = new URLSearchParams(location.search);
+    return (HashParams.get().demo || q.get('demo')) === '1' ? '?demo=1' : '';
+  },
+
+  // ── Your favorites (dedicated screen) ─────────────────────────────
+
+  // Resolves true when the screen actually opened (it always does for a
+  // signed-in visitor; the boot restore path clears `fav` when it didn't).
+  async openFavorites() {
+    if (App.isAnonymous) return false;
+    this.activeCollection = null;
+    this.activeFavorites = true;
+    // Addressable as `#fav=1` so a refresh reopens it.
+    HashParams.set('fav', '1');
+    await this.refresh();
+    return true;
+  },
+
+  closeFavorites() {
+    this.activeFavorites = false;
+    HashParams.set('fav', null);
+    this.render();
+  },
+
+  // The requester's starred recipes, newest starred first: own-conversation
+  // stars (from /api/recipes, where is_favorited) then shared stars (from
+  // /api/favorites). Cards are the homepage's, unchanged.
+  _favoriteRows() {
+    const own = this.mine
+      .filter((r) => r.is_favorited)
+      .map((r) => ({ kind: 'own', stamp: r.favorited_at || r.created_at, row: r }));
+    const shared = this.favorites
+      .map((s) => ({ kind: 'shared', stamp: s.favorited_at || s.created_at, row: s }));
+    return [...own, ...shared].sort((a, b) =>
+      (Date.parse(b.stamp) || 0) - (Date.parse(a.stamp) || 0));
+  },
+
+  renderFavoritesDetail(container) {
+    if (!container) return;
+    container.innerHTML = '';
+
+    const head = document.createElement('div');
+    head.className = 'space-y-2 mb-5';
+    head.innerHTML = `
+      <a id="favorites-back" href="${App.deepLinkUrl(null)}" class="inline-block text-sm text-blue-500 hover:text-blue-400 transition-colors">${t('fav.back')}</a>
+      <div class="min-w-0">
+        <h2 class="text-xl font-bold">${t('home.favorites')}</h2>
+        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-1">${t('fav.subtitle')}</p>
+      </div>`;
+    container.appendChild(head);
+    head.querySelector('#favorites-back').addEventListener('click', (e) => {
+      if (App.wantsNewTab(e)) return;
+      e.preventDefault();
+      this.closeFavorites();
+    });
+
+    const rows = this._favoriteRows();
+    if (!rows.length) {
+      const empty = document.createElement('p');
+      empty.className = 'text-sm text-zinc-400 dark:text-zinc-600';
+      empty.textContent = t('fav.empty');
+      container.appendChild(empty);
+    } else {
+      const grid = document.createElement('div');
+      grid.id = 'favorites-list';
+      grid.className = 'grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3';
+      rows.forEach(({ kind, row }) => {
+        grid.appendChild(kind === 'own'
+          ? this.ownCard(row)
+          : this.sharedCard(row, { favoritesSection: true }));
+      });
+      container.appendChild(grid);
+    }
   },
 
   renderCollectionDetail(container) {
@@ -951,7 +1045,7 @@ const Home = {
     }
     this.collections.forEach((c) => {
       const row = document.createElement('button');
-      row.className = 'w-full text-left px-3 py-2.5 text-sm rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 hover:border-blue-400 dark:hover:border-blue-600 transition-colors flex justify-between items-center gap-2';
+      row.className = 'w-full text-left px-3 py-2.5 text-sm rounded-lg bg-card-light dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 hover:border-blue-400 dark:hover:border-blue-600 transition-colors flex justify-between items-center gap-2';
       row.innerHTML = `<span class="truncate">${this.esc(c.name)}</span>
         <span class="text-xs text-zinc-400 shrink-0">${c.is_shared && c.member_count ? `${tn('card.members', c.member_count)} · ` : ''}${tn('card.recipes', c.item_count)}</span>`;
       row.addEventListener('click', () => addTo(c.id));
@@ -1099,6 +1193,13 @@ const Home = {
   },
 };
 
+// "See all" on the favorites header opens the dedicated screen. A real
+// anchor so cmd/ctrl/middle-click opens a new tab; a plain click stays in-app.
+document.getElementById('home-favorites-see-all')?.addEventListener('click', (e) => {
+  if (App.wantsNewTab(e)) return;
+  e.preventDefault();
+  Home.openFavorites();
+});
 document.getElementById('home-search')?.addEventListener('input', (e) => {
   Home.searchQuery = e.target.value;
   Home.render();

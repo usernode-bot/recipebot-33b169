@@ -455,13 +455,13 @@ async function seedStagingDemo(pool) {
   // own view is coherent. Own-conversation favorites are the dual-target
   // form of recipe_favorites; the partial unique index keeps this idempotent.
   await pool.query(
-    `INSERT INTO recipe_favorites (user_id, conversation_id)
-     VALUES ($1, 900003), ($1, 900007)
+    `INSERT INTO recipe_favorites (user_id, username, conversation_id)
+     VALUES ($1, 'staging-demo-user', 900003), ($1, 'staging-demo-user', 900007)
      ON CONFLICT (user_id, conversation_id) WHERE conversation_id IS NOT NULL
      DO NOTHING`,
     [DEMO_USER_ID]
   );
-  log.info('db', 'Seeded staging own-recipe favorites');
+  log.info('db', 'Seeded staging favorites');
 
   // Social features: seed the community feed with two shared recipes from
   // two distinct fake creators, plus ratings so aggregates visibly render.
@@ -547,6 +547,18 @@ async function seedStagingDemo(pool) {
      VALUES (900005, 1, $1, NULL, 900005, 'staging-demo-remixer')
      ON CONFLICT (shared_recipe_id, version) DO NOTHING`,
     [JSON.stringify(DEMO_REMIX)]
+  );
+
+  // Shared-recipe favorites for the same fake identity (seeded after the
+  // rows they reference, so a fresh staging DB has no FK violation), so "Your favorites"
+  // shows both card types (own-conversation and community) under ?demo=1.
+  // Owned by the demo identity, never by whoever opens the preview.
+  await pool.query(
+    `INSERT INTO recipe_favorites (user_id, username, shared_recipe_id)
+     VALUES ($1, 'staging-demo-user', 900001), ($1, 'staging-demo-user', 900005)
+     ON CONFLICT (user_id, shared_recipe_id) WHERE shared_recipe_id IS NOT NULL
+     DO NOTHING`,
+    [DEMO_USER_ID]
   );
 
   // Collections — one concept, three states the UI must render (issue #34):
