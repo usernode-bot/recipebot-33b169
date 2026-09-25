@@ -39,6 +39,7 @@ I18N.register('es', {
   'home.emptyTitle': 'Aún no hay recetas',
   'home.emptySubtitle': 'Inicia una conversación para crear una receta y luego compártela con la comunidad.',
   'home.noMatch': 'Ninguna receta coincide con tu búsqueda',
+  'home.clearSearch': 'Borrar la búsqueda',
 
   'card.yourRecipe': 'Tu receta',
   'card.remix': 'Remix',

@@ -39,6 +39,7 @@ I18N.register('id', {
   'home.emptyTitle': 'Belum ada resep',
   'home.emptySubtitle': 'Mulai percakapan untuk membuat resep, lalu bagikan ke komunitas.',
   'home.noMatch': 'Tidak ada resep yang cocok dengan pencarianmu',
+  'home.clearSearch': 'Hapus pencarian',
 
   'card.yourRecipe': 'Resepmu',
   'card.remix': 'Remix',
