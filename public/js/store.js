@@ -34,6 +34,10 @@ const Store = {
     App.pendingRecipe = null;
     App.viewingShared = null;
     App.viewingVersion = null;
+    if (typeof Recipe !== 'undefined') {
+      Recipe._editorOpen = false;
+      Recipe._editorOriginal = null;
+    }
     App.showView('chat');
     HashParams.set('s', null);
     HashParams.set('c', id);
@@ -83,10 +87,18 @@ const Store = {
     App.pendingRecipe = null;
     App.currentRecipe = item.data;
     App.viewingVersion = null;
+    Recipe._editorOpen = false;
+    Recipe._editorOriginal = null;
     App.viewingShared = {
       id: item.id,
       username: item.username,
       is_mine: item.is_mine,
+      // Ownership of the recipe's underlying conversation. can_edit is the
+      // server's own predicate (ownerClause in src/routes/recipes.js) exposed
+      // on the feed row, so the Edit button and the PUT that backs it can
+      // never disagree; conversation_id is what the editor saves into.
+      can_edit: item.can_edit,
+      conversation_id: item.conversation_id,
       avg_rating: item.avg_rating,
       rating_count: item.rating_count,
       current_version: item.current_version || 1,
@@ -123,6 +135,8 @@ const Store = {
     App.showView('chat');
     App.currentConversationId = null;
     App.currentRecipe = recipeData;
+    Recipe._editorOpen = false;
+    Recipe._editorOriginal = null;
     App.viewingShared = meta ? {
       username: meta.username,
       id: meta.id || null,
@@ -157,6 +171,8 @@ const Store = {
       App.currentConversationId = null;
       App.currentRecipe = null;
       App.pendingRecipe = null;
+      Recipe._editorOpen = false;
+      Recipe._editorOriginal = null;
       HashParams.clear();
       if (typeof Chat !== 'undefined') Chat.clear();
       document.getElementById('recipe-display')?.classList.add('hidden');

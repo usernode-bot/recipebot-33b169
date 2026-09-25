@@ -173,6 +173,66 @@
       "expectSelector": "#cook-btn"
     },
     {
+      "name": "Editable demo recipe renders with an Edit button",
+      "path": "/?c=900009",
+      "expectSelector": "#edit-btn"
+    },
+    {
+      "name": "Editable demo recipe shows its title",
+      "path": "/?c=900009",
+      "expectText": "Staging Demo Editable Stir Fry"
+    },
+    {
+      "name": "Edit deep link opens the manual editor",
+      "path": "/?c=900009&ui=edit",
+      "expectSelector": "#recipe-editor #edit-title"
+    },
+    {
+      "name": "Editor pre-fills the recipe title",
+      "path": "/?c=900009&ui=edit",
+      "expectSelector": "#edit-title[value=\"Staging Demo Editable Stir Fry\"]"
+    },
+    {
+      "name": "Editor exposes a Save control",
+      "path": "/?c=900009&ui=edit",
+      "expectSelector": "#edit-save"
+    },
+    {
+      "name": "Editor exposes ingredient rows",
+      "path": "/?c=900009&ui=edit",
+      "expectSelector": "#recipe-editor .edit-ing"
+    },
+    {
+      "name": "Editor is not shown for another user's shared recipe",
+      "path": "/?s=900002",
+      "expectSelector": "#cook-btn"
+    },
+    {
+      "name": "Shared recipe view offers no Edit button",
+      "path": "/?s=900002",
+      "expectSelector": "body:not(:has(#edit-btn))"
+    },
+    {
+      "name": "Published own recipe offers an Edit button in the feed view",
+      "path": "/?s=900060",
+      "expectSelector": "#edit-btn"
+    },
+    {
+      "name": "Published own recipe shows its title",
+      "path": "/?s=900060",
+      "expectText": "Staging Demo Editable Stir Fry"
+    },
+    {
+      "name": "Edit deep link opens the editor from a published own recipe",
+      "path": "/?s=900060&ui=edit",
+      "expectSelector": "#recipe-editor #edit-title"
+    },
+    {
+      "name": "Editor opens with a working Save control from the feed view",
+      "path": "/?s=900060&ui=edit",
+      "expectSelector": "#edit-save"
+    },
+    {
       "name": "Failed fix-up shows error status line",
       "path": "/?c=900005",
       "expectSelector": ".status-line-error"

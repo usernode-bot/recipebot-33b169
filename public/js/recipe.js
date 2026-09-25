@@ -26,6 +26,11 @@ const Recipe = {
     const empty = document.getElementById('recipe-empty');
     const display = document.getElementById('recipe-display');
 
+    // The editor owns the panel until it is left — nothing else may
+    // repaint over it (a background Store.refresh, an i18n switch, ...).
+    if (this._editorOpen) return;
+    this._editorOpen = false;
+
     if (!this.diffMode) this.saveUIState(display);
 
     empty.classList.add('hidden');
@@ -141,6 +146,7 @@ const Recipe = {
           <button id="cook-btn" class="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors">${t('recipe.cookMode')}</button>
           ${this.renderMadeItControl()}
           ${this.renderForkControl()}
+          ${this.renderEditControl()}
           ${this.renderShareControls()}
           ${this.renderCollectionControl()}
           ${this.renderShareLinkControl()}
@@ -285,6 +291,36 @@ const Recipe = {
   renderForkControl() {
     if (!App.currentConversationId && !App.viewingShared) return '';
     return `<button id="fork-btn" title="${this.escapeHtml(t('recipe.forkTitle'))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.fork')}</button>`;
+  },
+
+  // The conversation id the signed-in user may hand-edit, or null. Two ways
+  // in, both ownership-checked by the server:
+  //   * an owned conversation is open (App.currentConversationId), or
+  //   * a published recipe the user owns is open read-only (?s=<id>), which
+  //     exposes its underlying conversation via can_edit.
+  // Named as one predicate so the button, the editor and the ?ui=edit deep
+  // link can never disagree about what is editable. The version banner is the
+  // one exception: an older version of a shared recipe has no conversation
+  // state to write into, so it is not editable (the PUT appends to the
+  // conversation's latest recipe, not to a historical snapshot).
+  editableConversationId() {
+    if (App.isAnonymous) return null;
+    if (App.viewingVersion) return null;
+    if (App.currentConversationId) return App.currentConversationId;
+    const vs = App.viewingShared;
+    if (vs?.can_edit && vs.conversation_id) return vs.conversation_id;
+    return null;
+  },
+
+  // Manual editor entry. Owner-only: editableConversationId() is the same
+  // ownership predicate the PUT route authorizes with, so the button appears
+  // exactly when the server would accept the save — including on a recipe the
+  // user published and is now reading from the community feed. Not offered
+  // while an AI proposal is pending; that diff owns the panel until resolved.
+  renderEditControl() {
+    if (!this.editableConversationId()) return '';
+    if (App.pendingRecipe || this.diffMode) return '';
+    return `<button id="edit-btn" title="${this.escapeHtml(t('edit.btnTitle'))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('edit.btn')}</button>`;
   },
 
   // "Made it" for an owned conversation or a published recipe.
@@ -679,6 +715,15 @@ const Recipe = {
 
     display.querySelector('#made-it-btn')?.addEventListener('click', () => this.markMadeIt());
 
+    display.querySelector('#edit-btn')?.addEventListener('click', () => {
+      if (App.isAnonymous) return App.promptSignIn(t('edit.signIn'));
+      if (App.pendingRecipe || Recipe.diffMode) {
+        UI.toast(t('edit.conflict'));
+        return;
+      }
+      Recipe.openEditor(App.currentRecipe);
+    });
+
     display.querySelector('#add-collection-btn')?.addEventListener('click', () => {
       if (App.isAnonymous) return App.promptSignIn(t('signin.saveBox'));
       if (typeof Home === 'undefined') return;
@@ -839,6 +884,304 @@ const Recipe = {
     input.dispatchEvent(new Event('input', { bubbles: true }));
   },
 
+  // ── Manual recipe editor (owner-only) ─────────────────────────
+  //
+  // Replaces the recipe panel with a full-field form. Scope follows what a
+  // person can sensibly hand-edit: title, description, servings, prep/cook
+  // times, notes, each step's title/description/temperature and each
+  // ingredient's name/grams/volume. The model-owned fields (tags,
+  // provenance, per-macro values) are preserved server-side; the editor
+  // scales macros pro-rata when a grams value changes so per-serving
+  // macros stay honest without asking the user for nutrition tables.
+  openEditor(recipe) {
+    const display = document.getElementById('recipe-display');
+    if (!display) return;
+    this.saveUIState(display);
+    this._editorOpen = true;
+    this._editorOriginal = JSON.parse(JSON.stringify(recipe));
+
+    const d = (val) => (val === null || val === undefined ? '' : String(val));
+    const isTemp = (step) => step.temperature_f !== null && step.temperature_f !== undefined && step.temperature_f !== '';
+
+    let html = `
+      <div class="space-y-4" id="recipe-editor">
+        <div class="flex items-center justify-between gap-2">
+          <h2 class="text-lg font-bold tracking-tight">${this.escapeHtml(t('edit.title'))}</h2>
+        </div>
+
+        <div class="space-y-3">
+          <div>
+            <label for="edit-title" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">${this.escapeHtml(t('edit.titleLabel'))}</label>
+            <input id="edit-title" type="text" maxlength="120" value="${this.escapeHtml(recipe.title || '')}"
+              class="w-full rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label for="edit-description" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">${this.escapeHtml(t('edit.descriptionLabel'))}</label>
+            <textarea id="edit-description" rows="2" maxlength="500"
+              class="w-full rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500">${this.escapeHtml(recipe.description || '')}</textarea>
+          </div>
+          <div class="flex flex-wrap gap-3">
+            <div>
+              <label for="edit-servings" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">${this.escapeHtml(t('edit.servingsLabel'))}</label>
+              <input id="edit-servings" type="number" min="1" max="50" value="${d(recipe.default_servings)}"
+                class="w-20 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label for="edit-prep" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">${this.escapeHtml(t('edit.prepLabel'))}</label>
+              <input id="edit-prep" type="text" maxlength="40" value="${this.escapeHtml(recipe.prep_time || '')}" placeholder="${this.escapeHtml(t('edit.addOptional'))}"
+                class="w-32 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label for="edit-cook" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">${this.escapeHtml(t('edit.cookLabel'))}</label>
+              <input id="edit-cook" type="text" maxlength="40" value="${this.escapeHtml(recipe.cook_time || '')}" placeholder="${this.escapeHtml(t('edit.addOptional'))}"
+                class="w-32 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+          </div>
+          <div>
+            <label for="edit-notes" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">${this.escapeHtml(t('edit.notesLabel'))} <span class="text-zinc-400">${this.escapeHtml(t('edit.addOptional'))}</span></label>
+            <textarea id="edit-notes" rows="2" maxlength="1000" placeholder="${this.escapeHtml(t('edit.addOptional'))}"
+              class="w-full rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500">${this.escapeHtml(recipe.notes || '')}</textarea>
+          </div>
+        </div>
+
+        <p class="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">${this.escapeHtml(t('edit.stepsLabel'))}</p>
+        <div id="edit-steps" class="space-y-3">`;
+
+    (recipe.steps || []).forEach((step, si) => {
+      html += `
+        <div class="edit-step p-3 rounded-xl bg-zinc-100/70 dark:bg-zinc-900/50" data-si="${si}">
+          <div class="flex gap-2 mb-2">
+            <span class="shrink-0 w-6 h-6 rounded-full bg-blue-600 dark:bg-blue-400 text-white dark:text-zinc-950 flex items-center justify-center text-xs font-bold mt-1.5">${si + 1}</span>
+            <input type="text" class="edit-step-title flex-1 min-w-0 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" maxlength="60" value="${this.escapeHtml(step.title || '')}" placeholder="${this.escapeHtml(t('edit.stepTitle'))}">
+            <input type="number" class="edit-step-temp w-20 shrink-0 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="1000" step="1" value="${isTemp(step) ? step.temperature_f : ''}" placeholder="${this.escapeHtml(t('edit.temp'))}" title="${this.escapeHtml(t('edit.temp'))}">
+            <button type="button" class="edit-step-remove shrink-0 self-start p-1.5 rounded-lg text-zinc-300 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors" title="${this.escapeHtml(t('edit.remove'))}" aria-label="${this.escapeHtml(t('edit.remove'))}">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+          </div>
+          <textarea rows="2" class="edit-step-desc w-full rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 py-2 text-sm placeholder-zinc-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="${this.escapeHtml(t('edit.stepDesc'))}">${this.escapeHtml(step.description || '')}</textarea>
+          <p class="text-xs font-medium text-zinc-400 dark:text-zinc-500 mt-2 mb-1">${this.escapeHtml(t('edit.ingredients'))}</p>
+          <div class="edit-ings space-y-1.5">`;
+      (step.ingredients || []).forEach((ing) => {
+        html += this._editorIngRow(ing);
+      });
+      html += `
+          </div>
+          <button type="button" class="edit-ing-add mt-1 text-xs text-blue-500 hover:text-blue-400 transition-colors">${this.escapeHtml(t('edit.addIngredient'))}</button>
+        </div>`;
+    });
+
+    html += `
+        </div>
+        <button id="edit-add-step" class="text-sm text-blue-500 hover:text-blue-400 transition-colors">${this.escapeHtml(t('edit.addStep'))}</button>
+
+        <p id="edit-error" class="hidden text-sm text-red-500"></p>
+        <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+          <button id="edit-cancel" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">${this.escapeHtml(t('common.cancel'))}</button>
+          <button id="edit-save" class="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors">${this.escapeHtml(t('edit.save'))}</button>
+        </div>
+      </div>`;
+
+    display.innerHTML = html;
+    document.getElementById('recipe-empty').classList.add('hidden');
+    this._bindEditor(recipe);
+  },
+
+  // Leave the editor without saving. Cancelling returns to the recipe the
+  // panel was showing when the editor opened (the live currentRecipe, not
+  // the pre-edit snapshot — a server refresh may have landed meanwhile).
+  closeEditor() {
+    this._editorOpen = false;
+    this._editorOriginal = null;
+    if (App.currentRecipe) {
+      this.display(App.currentRecipe);
+    } else {
+      const display = document.getElementById('recipe-display');
+      display?.classList.add('hidden');
+      document.getElementById('recipe-empty')?.classList.remove('hidden');
+    }
+  },
+
+  _editorIngRow(ing) {
+    return `
+      <div class="edit-ing flex gap-1.5">
+        <input type="text" class="edit-ing-name flex-1 min-w-0 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value="${this.escapeHtml(ing.name || '')}" placeholder="${this.escapeHtml(t('edit.ingName'))}">
+        <input type="number" class="edit-ing-grams w-20 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="100000" step="0.1" value="${ing.grams ?? 0}" title="${this.escapeHtml(t('edit.grams'))}" aria-label="${this.escapeHtml(t('edit.grams'))}">
+        <button type="button" class="edit-ing-remove shrink-0 px-1.5 rounded-lg text-zinc-300 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors" title="${this.escapeHtml(t('edit.remove'))}" aria-label="${this.escapeHtml(t('edit.remove'))}">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>`;
+  },
+
+  _bindEditor(originalRecipe) {
+    const display = document.getElementById('recipe-display');
+    const setErr = (msg) => {
+      const el = display.querySelector('#edit-error');
+      if (el) { el.textContent = msg; el.classList.remove('hidden'); }
+    };
+
+    const collect = () => {
+      const recipe = {
+        version: originalRecipe.version || 1,
+        title: display.querySelector('#edit-title').value.trim(),
+        description: display.querySelector('#edit-description').value.trim(),
+        default_servings: parseInt(display.querySelector('#edit-servings').value, 10),
+        prep_time: display.querySelector('#edit-prep').value.trim(),
+        cook_time: display.querySelector('#edit-cook').value.trim(),
+        notes: display.querySelector('#edit-notes').value.trim(),
+        steps: [],
+      };
+      display.querySelectorAll('.edit-step').forEach((stepEl, si) => {
+        const src = (originalRecipe.steps || [])[si] || {};
+        const tempVal = stepEl.querySelector('.edit-step-temp').value;
+        const ings = [];
+        stepEl.querySelectorAll('.edit-ing').forEach((row) => {
+          const ii = Array.from(stepEl.querySelectorAll('.edit-ing')).indexOf(row);
+          const srcIng = (src.ingredients || [])[ii] || {};
+          const name = row.querySelector('.edit-ing-name').value.trim();
+          const grams = parseFloat(row.querySelector('.edit-ing-grams').value) || 0;
+          // Macros scale pro-rata with grams when this row edits an
+          // existing ingredient of the same step; new rows carry zeros.
+          const baseIng = srcIng.name === name ? srcIng : null;
+          const scale = (baseIng && baseIng.grams > 0) ? grams / baseIng.grams : null;
+          const macros = {};
+          for (const k of ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g']) {
+            macros[k] = (scale !== null && baseIng.macros && typeof baseIng.macros[k] === 'number')
+              ? Math.round(baseIng.macros[k] * scale * 10) / 10
+              : 0;
+          }
+          ings.push({
+            name,
+            grams,
+            // The editor has no unit field; an edited ingredient keeps the
+            // base recipe's unit with amount zeroed (the recipe view reads
+            // grams), a new row carries a neutral valid unit.
+            volume: baseIng
+              ? { amount: 0, unit: baseIng.volume?.unit || '' }
+              : { amount: 0, unit: 'cup' },
+            macros,
+            from_step: !!srcIng.from_step,
+          });
+        });
+        recipe.steps.push({
+          title: stepEl.querySelector('.edit-step-title').value.trim(),
+          description: stepEl.querySelector('.edit-step-desc').value.trim(),
+          temperature_f: tempVal === '' ? null : parseFloat(tempVal),
+          ingredients: ings,
+        });
+      });
+      return recipe;
+    };
+
+    const markInvalid = (detail) => {
+      display.querySelectorAll('.edit-step-title, #edit-title').forEach((el) => el.classList.remove('border-red-400', 'dark:border-red-600'));
+      let first = null;
+      const stepErr = detail.find((e) => e.includes('steps['));
+      if (stepErr) {
+        const m = stepErr.match(/steps\[(\d+)\]/);
+        // A volume.unit error is a client-side construction gap (the editor
+        // never had a unit field), so it maps to the failing ingredient's
+        // name row rather than the step title.
+        if (stepErr.includes('volume.unit') && m) {
+          const im = stepErr.match(/ingredients\[(\d+)\]/);
+          if (im) {
+            first = display.querySelectorAll('.edit-step')[parseInt(m[1])]
+              ?.querySelectorAll('.edit-ing')[parseInt(im[1])]?.querySelector('.edit-ing-name');
+          }
+        }
+        if (!first && m) {
+          first = display.querySelectorAll('.edit-step')[parseInt(m[1])]?.querySelector('.edit-step-title');
+        }
+      }
+      if (!first) first = display.querySelector('#edit-title');
+      first?.classList.add('border-red-400', 'dark:border-red-600');
+    };
+
+    display.querySelector('#edit-add-step')?.addEventListener('click', () => {
+      const wrap = display.querySelector('#edit-steps');
+      const si = wrap.querySelectorAll('.edit-step').length;
+      const div = document.createElement('div');
+      div.className = 'edit-step p-3 rounded-xl bg-zinc-100/70 dark:bg-zinc-900/50';
+      div.dataset.si = si;
+      div.innerHTML = `
+        <div class="flex gap-2 mb-2">
+          <span class="shrink-0 w-6 h-6 rounded-full bg-blue-600 dark:bg-blue-400 text-white dark:text-zinc-950 flex items-center justify-center text-xs font-bold mt-1.5">${si + 1}</span>
+          <input type="text" class="edit-step-title flex-1 min-w-0 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" maxlength="60" placeholder="${this.escapeHtml(t('edit.stepTitle'))}">
+          <input type="number" class="edit-step-temp w-20 shrink-0 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" max="1000" step="1" placeholder="${this.escapeHtml(t('edit.temp'))}">
+          <button type="button" class="edit-step-remove shrink-0 self-start p-1.5 rounded-lg text-zinc-300 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors" title="${this.escapeHtml(t('edit.remove'))}" aria-label="${this.escapeHtml(t('edit.remove'))}">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <textarea rows="2" class="edit-step-desc w-full rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-2.5 py-2 text-sm placeholder-zinc-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="${this.escapeHtml(t('edit.stepDesc'))}"></textarea>
+        <p class="text-xs font-medium text-zinc-400 dark:text-zinc-500 mt-2 mb-1">${this.escapeHtml(t('edit.ingredients'))}</p>
+        <div class="edit-ings space-y-1.5"></div>
+        <button type="button" class="edit-ing-add mt-1 text-xs text-blue-500 hover:text-blue-400 transition-colors">${this.escapeHtml(t('edit.addIngredient'))}</button>`;
+      wrap.appendChild(div);
+      this._bindEditorRow(div);
+      div.querySelector('.edit-step-title')?.focus();
+    });
+
+    display.querySelectorAll('.edit-step').forEach((row) => this._bindEditorRow(row));
+
+    display.querySelector('#edit-cancel')?.addEventListener('click', () => this.closeEditor());
+
+    display.querySelector('#edit-save')?.addEventListener('click', async () => {
+      const btn = display.querySelector('#edit-save');
+      const recipe = collect();
+      if (!recipe.title) return setErr(t('edit.invalid'));
+      btn.disabled = true;
+      btn.textContent = t('edit.saving');
+      try {
+        const res = await fetch(`/api/recipes/${this.editableConversationId()}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recipe }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          const err = new Error(data?.error || 'save failed');
+          err.details = data?.details || [];
+          throw err;
+        }
+
+        App.currentRecipe = data.recipe;
+        this.currentServings = data.recipe.default_servings;
+        this.servingScale = 1.0;
+        this._editorOpen = false;
+        this._editorOriginal = null;
+        // Edited from the read-only shared view (an owned recipe opened from
+        // the community feed): the save went to the recipe's conversation, so
+        // keep the shared-view copy in step or a later re-render would paint
+        // the pre-edit snapshot back over it. The PUBLISHED copy is a
+        // snapshot and is deliberately left alone until it is updated from
+        // the conversation screen.
+        if (!App.currentConversationId && App.viewingShared) {
+          App.viewingShared.currentData = data.recipe;
+        }
+        UI.toast(t('edit.saved'));
+        this.display(data.recipe);
+        Store.refresh();
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = t('edit.save');
+        if (err.details && err.details.length) markInvalid(err.details);
+        setErr(t('edit.invalid'));
+      }
+    });
+  },
+
+  _bindEditorRow(row) {
+    row.querySelector('.edit-step-remove')?.addEventListener('click', () => row.remove());
+    row.querySelector('.edit-ing-add')?.addEventListener('click', () => {
+      const wrap = row.querySelector('.edit-ings');
+      const div = document.createElement('div');
+      div.innerHTML = this._editorIngRow({});
+      const el = div.firstElementChild;
+      wrap.appendChild(el);
+      el.querySelector('.edit-ing-name')?.focus();
+    });
+    row.querySelector('.edit-ing-remove')?.addEventListener('click', () => row.remove());
+  },
+
   // ── Diff View ────────────────────────────────────────────────
 
   showDiff(oldRecipe, newRecipe) {
@@ -927,6 +1270,10 @@ const Recipe = {
       display.querySelector('#diff-reject')?.setAttribute('disabled', 'disabled');
       return true;
     };
+
+    // The editor must never survive an accept: it was built from the base
+    // recipe, so saving after an AI edit would clobber the newer proposal.
+    if (this._editorOpen) this.closeEditor();
 
     display.querySelector('#diff-accept')?.addEventListener('click', () => {
       if (!claimDecision()) return;
