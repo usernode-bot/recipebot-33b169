@@ -363,4 +363,21 @@ I18N.register('en', {
   'signin.commentCollection': 'Sign in to comment on collections',
   'social.collectionComments': 'Comments ({n})',
   'social.addCollectionComment': 'Add a comment…',
+
+  // ── Shopping list ──
+  "shop.title": "Shopping list",
+  "shop.empty": "Your shopping list is empty. Add a recipe with + List.",
+  "shop.progress": "{checked} of {total} checked",
+  "shop.clearChecked": "Clear checked",
+  "shop.addList": "+ List",
+  "shop.cat_produce": "Produce",
+  "shop.cat_dairy": "Dairy",
+  "shop.cat_meat": "Meat",
+  "shop.cat_pantry": "Pantry",
+  "shop.cat_other": "Other",
+  "home.shoppingList": "+ Shopping list",
+  "tip.addToList": "Add this recipe's ingredients to your shopping list",
+  "signin.addList": "Sign in to build your shopping list",
+  "toast.addedToList": "Added to your shopping list",
+  "toast.addToListFailed": "Could not add to the shopping list",
 });

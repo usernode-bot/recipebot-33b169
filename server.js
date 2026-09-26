@@ -10,6 +10,7 @@ const { conversationRoutes } = require('./src/routes/conversations');
 const { recipeRoutes } = require('./src/routes/recipes');
 const { chatRoutes } = require('./src/routes/chat');
 const { collectionRoutes } = require('./src/routes/collections');
+const { shoppingListRoutes } = require('./src/routes/shopping-list');
 const { publicRoutes } = require('./src/routes/public');
 const log = require('./src/services/logger');
 
@@ -30,7 +31,12 @@ const app = express();
 
 app.use(express.json());
 
+// 503 once shutdown starts so anything polling readiness sees the container
+// leaving rotation rather than a connection reset (platform convention).
+let shuttingDown = false;
+
 app.get('/health', (_req, res) => {
+  if (shuttingDown) return res.status(503).json({ status: 'shutting-down' });
   res.json({ status: 'ok' });
 });
 
@@ -44,6 +50,7 @@ app.use(conversationRoutes(config));
 app.use(recipeRoutes(config));
 app.use(chatRoutes(config));
 app.use(collectionRoutes(config));
+app.use(shoppingListRoutes(config));
 
 // The static handler must never serve a file that renderTemplate owns, or it
 // hands out the unrendered template — placeholder text where the platform
@@ -90,9 +97,33 @@ app.get('*', (req, res) => {
 async function start() {
   await migrate(config);
 
-  app.listen(config.port, () => {
+  // Capture the listener: the shutdown handler needs it to stop accepting
+  // connections (platform graceful-shutdown convention).
+  const server = app.listen(config.port, () => {
     log.info('server', `Listening on :${config.port}`);
   });
+
+  // Stop accepting connections, drain in-flight requests under a hard
+  // deadline, close the pool, exit. Idempotent: a repeat signal is a no-op.
+  const DRAIN_MS = 3000;
+  async function shutdown(signal) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    log.info('server', `${signal} received, draining`);
+    server.close(() => {});
+    server.closeIdleConnections?.();
+    const t = setTimeout(() => server.closeAllConnections?.(), DRAIN_MS);
+    t.unref?.();
+    try {
+      const { getPool } = require('./src/db/pool');
+      await getPool(config).end();
+    } catch (e) {
+      log.error('server', 'pool.end failed', { message: e.message });
+    }
+    process.exit(0);
+  }
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 start().catch((err) => {

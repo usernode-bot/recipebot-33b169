@@ -282,6 +282,31 @@ CREATE TABLE IF NOT EXISTS collection_comments (
 
 CREATE INDEX IF NOT EXISTS collection_comments_coll ON collection_comments (collection_id);
 
+-- Per-user shopping list. Rows are SNAPSHOT copies of recipe ingredients
+-- taken at add time (like collection_items.recipe_snapshot): a save is a
+-- copy, so a deleted source recipe leaves the list untouched and the screen
+-- renders from its own columns only (no joins to the source tables).
+-- conversation_id is a bare integer on purpose: conversations is
+-- staging:private and a public table must not FK into a private one.
+CREATE TABLE IF NOT EXISTS shopping_list_items (
+  id               SERIAL PRIMARY KEY,
+  user_id          INTEGER NOT NULL,
+  username         VARCHAR(255) NOT NULL,
+  shared_recipe_id INTEGER REFERENCES shared_recipes(id) ON DELETE SET NULL,
+  conversation_id  INTEGER,
+  recipe_title     TEXT,
+  category         VARCHAR(20) NOT NULL DEFAULT 'other'
+                   CHECK (category IN ('produce','dairy','meat','pantry','other')),
+  name             TEXT NOT NULL,
+  grams            DOUBLE PRECISION NOT NULL DEFAULT 0,
+  volume_amount    DOUBLE PRECISION NOT NULL DEFAULT 0,
+  volume_unit      VARCHAR(30) NOT NULL DEFAULT '',
+  checked          BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS shopping_list_items_user ON shopping_list_items (user_id, category);
+
 -- The in-app feedback widget was removed (platform-level feedback covers
 -- it now); drop its table, which nothing else used.
 DROP TABLE IF EXISTS feedback;

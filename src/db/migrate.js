@@ -629,6 +629,34 @@ async function seedStagingDemo(pool) {
   );
   log.info('db', 'Seeded staging collections, members, lineage, made-it and comments');
 
+  // Shopping list demo (spec: staged against an otherwise empty staging DB).
+  // Existence-checked because the table has no natural key. Quantities are
+  // the merged form of the two demo stir fries plus two fake-source rows, so
+  // /?list=1 renders a populated, merged, partially-checked screen. Runs
+  // after the shared-recipe seed so shared_recipe_id = 900001 satisfies the
+  // shopping_list_items FK.
+  const { rows: listRows } = await pool.query(
+    'SELECT 1 FROM shopping_list_items WHERE user_id = $1 LIMIT 1',
+    [DEMO_USER_ID]
+  );
+  if (listRows.length === 0) {
+    await pool.query(
+      `INSERT INTO shopping_list_items
+       (user_id, username, shared_recipe_id, conversation_id, recipe_title,
+        category, name, grams, volume_amount, volume_unit, checked)
+       VALUES
+       ($1, $2, 900001, 900001, 'Staging Demo Chicken Stir Fry', 'produce', 'broccoli florets', 300, 3, 'cup', false),
+       ($1, $2, 900001, 900001, 'Staging Demo Chicken Stir Fry', 'pantry', 'soy sauce', 32, 2, 'tbsp', false),
+       ($1, $2, 900001, 900001, 'Staging Demo Chicken Stir Fry', 'meat', 'chicken breast, boneless skinless', 500, 0, '', true),
+       ($1, $2, 900001, 900001, 'Staging Demo Chicken Stir Fry', 'pantry', 'extra-firm tofu', 400, 0, '', false),
+       ($1, $2, 900001, 900001, 'Staging Demo Chicken Stir Fry', 'pantry', 'salt', 6, 1, 'tsp', false),
+       ($1, $2, NULL, NULL, 'Staging demo weekly shopping', 'dairy', 'whole milk', 480, 2, 'cup', false),
+       ($1, $2, NULL, NULL, 'Staging demo weekly shopping', 'produce', 'cherry tomatoes', 300, 1, 'pint', false)`,
+      [DEMO_USER_ID, 'staging-demo-user']
+    );
+    log.info('db', 'Seeded staging demo shopping list');
+  }
+
   // Demo AI-usage row for the user-menu "AI usage today" meter (llm_usage is
   // staging:private, so staging starts empty). Seeded fresh for *today*
   // (UTC) each boot so it never goes stale; the upsert SETs fixed values

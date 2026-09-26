@@ -143,6 +143,7 @@ const Recipe = {
           ${this.renderForkControl()}
           ${this.renderShareControls()}
           ${this.renderCollectionControl()}
+          ${this.renderListControl()}
           ${this.renderShareLinkControl()}
           <div>
             <button id="export-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.export')}</button>
@@ -297,6 +298,14 @@ const Recipe = {
   renderCollectionControl() {
     if (!App.currentConversationId && !App.viewingShared?.id) return '';
     return `<button id="add-collection-btn" title="${this.escapeHtml(t('recipe.addCollectionTitle'))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.addCollection')}</button>`;
+  },
+
+  // Add to the shopping list. The panel sends the CURRENT servings/scale so
+  // the list matches what the user is about to cook; the card buttons send
+  // nothing (base recipe). Deleted sources are fine: list rows are snapshots.
+  renderListControl() {
+    if (!App.currentConversationId && !App.viewingShared?.id) return '';
+    return `<button id="add-list-btn" title="${this.escapeHtml(t('tip.addToList'))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('shop.addList')}</button>`;
   },
 
   // Copy the public share link (published recipes only).
@@ -686,6 +695,28 @@ const Recipe = {
         ? { conversationId: App.currentConversationId }
         : App.viewingShared?.id ? { sharedRecipeId: App.viewingShared.id } : null;
       if (target) Home.openCollectionPicker(target);
+    });
+
+    display.querySelector('#add-list-btn')?.addEventListener('click', async () => {
+      if (App.isAnonymous) return App.promptSignIn(t('signin.addList'));
+      const target = App.currentConversationId
+        ? { conversationId: App.currentConversationId }
+        : { sharedRecipeId: App.viewingShared.id };
+      try {
+        const res = await fetch('/api/shopping-list', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...target,
+            servings: this.currentServings,
+            scale: this.servingScale,
+          }),
+        });
+        if (!res.ok) throw new Error();
+        UI.toast(t('toast.addedToList'));
+      } catch {
+        UI.toast(t('toast.addToListFailed'));
+      }
     });
 
     display.querySelector('#copy-link-btn')?.addEventListener('click', () => {

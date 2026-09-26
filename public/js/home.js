@@ -20,6 +20,10 @@ const Home = {
   tagFilter: new Set(),
   // When set, the homepage shows this collection's detail instead of the box.
   activeCollection: null,
+  // When set, the homepage shows the shopping list detail instead of the box
+  // (rendering is delegated to ShoppingList; this flag keeps Home.render
+  // from painting the box underneath it).
+  activeShoppingList: false,
   // Drafts are collapsed past this many rows until "Show all" is clicked.
   DRAFT_PREVIEW: 3,
   draftsExpanded: false,
@@ -110,16 +114,19 @@ const Home = {
     const emptyEl = document.getElementById('home-empty');
     const noMatchEl = document.getElementById('home-no-match');
     const detailEl = document.getElementById('collection-view');
+    const shopEl = document.getElementById('shopping-view');
     const toolbar = document.getElementById('home-toolbar');
     if (!favSection || !mineSection || !commSection) return;
 
-    // Collection detail replaces the box until closed. Blanking the two
-    // bands covers every section inside them.
-    const inDetail = !!this.activeCollection;
-    detailEl?.classList.toggle('hidden', !inDetail);
+    // A detail (collection or shopping list) replaces the box until closed.
+    // Blanking the two bands covers every section inside them.
+    const inDetail = !!this.activeCollection || !!this.activeShoppingList;
+    detailEl?.classList.toggle('hidden', !this.activeCollection);
+    shopEl?.classList.toggle('hidden', !this.activeShoppingList);
     for (const el of [bandMine, bandComm, emptyEl, noMatchEl, toolbar]) {
       if (el) el.style.display = inDetail ? 'none' : '';
     }
+    if (this.activeShoppingList) return; // ShoppingList owns #shopping-view
     if (inDetail) {
       this.renderCollectionDetail(detailEl);
       return;
@@ -369,6 +376,31 @@ const Home = {
     return btn;
   },
 
+  // "+ List" button for card action rows: adds the recipe's ingredients to
+  // the shopping list. Own cards and collection copies target their
+  // conversation; community cards target the shared recipe.
+  listAddBtn(target) {
+    const btn = document.createElement('button');
+    btn.className = 'list-add-btn ' + this._actionClasses(false);
+    btn.textContent = t('shop.addList');
+    btn.title = t('tip.addToList');
+    btn.addEventListener('click', async () => {
+      if (App.isAnonymous) return App.promptSignIn(t('signin.addList'));
+      try {
+        const res = await fetch('/api/shopping-list', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(target),
+        });
+        if (!res.ok) throw new Error();
+        UI.toast(t('toast.addedToList'));
+      } catch {
+        UI.toast(t('toast.addToListFailed'));
+      }
+    });
+    return btn;
+  },
+
   // Card for one of the requester's own conversations (from /api/recipes).
   ownCard(r) {
     const recipe = r.data || {};
@@ -426,6 +458,7 @@ const Home = {
     collectBtn.addEventListener('click', () =>
       this.openCollectionPicker({ conversationId: r.conversation_id }));
     actions.appendChild(collectBtn);
+    actions.appendChild(this.listAddBtn({ conversationId: r.conversation_id }));
     actions.appendChild(this._deleteBtn(r.conversation_id));
     el.appendChild(actions);
     return el;
@@ -517,6 +550,7 @@ const Home = {
       this.openCollectionPicker({ sharedRecipeId: s.id });
     });
     actions.appendChild(collectBtn);
+    actions.appendChild(this.listAddBtn({ sharedRecipeId: s.id }));
     if (s.share_slug) {
       const linkBtn = this._actionBtn(t('common.link'));
       linkBtn.title = t('tip.copyShareLink');
@@ -895,6 +929,11 @@ const Home = {
         this.refresh();
       });
       actions.appendChild(removeBtn);
+      // Conversation-backed copies add by conversation; snapshot-only and
+      // shared-target copies add by their shared recipe id.
+      actions.appendChild(this.listAddBtn(
+        item.conversation_id ? { conversationId: item.conversation_id }
+          : { sharedRecipeId: item.shared_recipe_id }));
     }
     el.appendChild(actions);
     return el;

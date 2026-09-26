@@ -363,9 +363,14 @@
           <button id="new-conversation-btn" class="shrink-0 rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-sm font-medium text-white transition-colors" data-i18n="home.newRecipe">
             + New recipe
           </button>
+          <button id="shopping-list-btn" class="hidden shrink-0 rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-sm font-medium text-white transition-colors un-pressable" data-i18n="home.shoppingList">
+            + Shopping list
+          </button>
         </div>
         <!-- Collection detail (opened from a collection card; hides the box sections) -->
         <div id="collection-view" class="hidden"></div>
+        <!-- Shopping list detail (opened from the toolbar button; hides the box sections) -->
+        <div id="shopping-view" class="hidden"></div>
 
         <!-- ── Band 1: your box ─────────────────────────────────────
              Drafts → favorites → your recipes → collections (issue #40):
@@ -673,6 +678,7 @@
   <script src="/js/comments.js"></script>
   <script src="/js/recipe.js"></script>
   <script src="/js/home.js"></script>
+  <script src="/js/shopping-list.js"></script>
   <script src="/js/cooking-mode.js"></script>
   <script src="/js/shortcuts.js"></script>
 </body>

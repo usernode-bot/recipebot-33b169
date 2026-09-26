@@ -329,4 +329,21 @@ I18N.register('id', {
   'signin.commentCollection': 'Masuk untuk mengomentari koleksi',
   'social.collectionComments': 'Komentar ({n})',
   'social.addCollectionComment': 'Tulis komentar…',
+
+  // ── Shopping list ──
+  "shop.title": "Daftar belanja",
+  "shop.empty": "Daftar belanjamu masih kosong. Tambahkan resep dengan + Daftar.",
+  "shop.progress": "{checked} dari {total} dicentang",
+  "shop.clearChecked": "Hapus yang dicentang",
+  "shop.addList": "+ Daftar",
+  "shop.cat_produce": "Sayur & buah",
+  "shop.cat_dairy": "Susu & telur",
+  "shop.cat_meat": "Daging",
+  "shop.cat_pantry": "Bahan dapur",
+  "shop.cat_other": "Lainnya",
+  "home.shoppingList": "+ Daftar belanja",
+  "tip.addToList": "Tambahkan bahan resep ini ke daftar belanjamu",
+  "signin.addList": "Masuk untuk menyusun daftar belanjamu",
+  "toast.addedToList": "Ditambahkan ke daftar belanjamu",
+  "toast.addToListFailed": "Gagal menambahkan ke daftar belanja",
 });

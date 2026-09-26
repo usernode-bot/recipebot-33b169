@@ -451,6 +451,60 @@
       "name": "Version history opens for a v2 recipe",
       "path": "/?s=900002&ui=versions",
       "expectText": "Swapped chicken for tofu"
+    },
+    {
+      "name": "Shopping list button renders",
+      "path": "/",
+      "expectSelector": "#shopping-list-btn"
+    },
+    {
+      "name": "Shopping list screen renders",
+      "path": "/?list=1",
+      "expectText": "Produce"
+    },
+    {
+      "name": "Shopping list shows the seeded merged item",
+      "path": "/?list=1",
+      "expectText": "broccoli florets"
+    },
+    {
+      "name": "Shopping list merges duplicate units",
+      "path": "/?list=1",
+      "expectText": "3 cup"
+    },
+    {
+      "name": "Shopping list shows a checked counter",
+      "path": "/?list=1",
+      "expectText": "1 of 7"
+    },
+    {
+      "name": "Shopping list offers Clear checked",
+      "path": "/?list=1",
+      "expectSelector": "#clear-checked"
+    },
+    {
+      "name": "Recipe card offers add to list",
+      "path": "/",
+      "expectSelector": ".list-add-btn"
+    },
+    {
+      "name": "Recipe panel offers add to list",
+      "path": "/?c=900003",
+      "expectText": "+ List"
+    },
+    {
+      "id": "shopping-list.screen",
+      "name": "Shopping list screen renders grouped seeded items",
+      "path": "/?list=1",
+      "expectText": "Produce",
+      "visual": true,
+      "impact": [
+        "public/js/shopping-list.js",
+        "public/js/home.js",
+        "public/index.html",
+        "src/routes/shopping-list.js",
+        "src/db/schema.sql"
+      ]
     }
   ],
   "visibility": {

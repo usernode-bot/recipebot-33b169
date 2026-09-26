@@ -201,7 +201,7 @@ window.Router = {
   MAX_AGE_MS: 30_000,
   // `coll` addresses an open collection so a refresh (or signing in from a
   // public collection) comes back to it instead of the box.
-  ROUTE_KEYS: ['c', 's', 'coll', 'cook', 'ing', 'mac', 'ch'],
+  ROUTE_KEYS: ['c', 's', 'coll', 'cook', 'ing', 'mac', 'ch', 'list'],
 
   // Hash params win over query params when both carry the same key.
   read() {
@@ -374,6 +374,14 @@ document.addEventListener('visibilitychange', () => {
       input.dataset.i18nPlaceholder = 'chat.signInPlaceholder';
     }
     if (sendBtn) sendBtn.disabled = true;
+  } else {
+    const shoppingBtn = document.getElementById('shopping-list-btn');
+    if (shoppingBtn) {
+      shoppingBtn.classList.remove('hidden');
+      shoppingBtn.addEventListener('click', async () => {
+        if (typeof ShoppingList !== 'undefined') await ShoppingList.open();
+      });
+    }
   }
 
   // Resolve the platform-level language preference (async; corrects the
@@ -489,6 +497,15 @@ async function restoreRoute(route) {
   // A collection lives on the homepage (it replaces the box), so it's
   // resolved before the recipe routes and needs no panel setup. Home.refresh
   // runs first so the detail can fall back to a populated box on a 404.
+  if (route.list === '1') {
+    App.showView('home');
+    if (typeof ShoppingList !== 'undefined') {
+      const opened = await ShoppingList.open();
+      if (!opened) HashParams.set('list', null);
+    }
+    return;
+  }
+
   if (route.coll && !route.c && !route.s) {
     App.showView('home');
     if (typeof Home !== 'undefined') {
@@ -572,6 +589,8 @@ function setupHomeButton() {
     HashParams.set('s', null);
     HashParams.set('coll', null);
     HashParams.set('cook', null);
+    HashParams.set('list', null);
+    if (typeof ShoppingList !== 'undefined') ShoppingList.active = false;
     App.setSignInPath?.(null);
     if (typeof Home !== 'undefined') Home.activeCollection = null;
     App.showView('home');

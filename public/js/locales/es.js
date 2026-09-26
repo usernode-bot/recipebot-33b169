@@ -329,4 +329,21 @@ I18N.register('es', {
   'signin.commentCollection': 'Inicia sesión para comentar colecciones',
   'social.collectionComments': 'Comentarios ({n})',
   'social.addCollectionComment': 'Añade un comentario…',
+
+  // ── Shopping list ──
+  "shop.title": "Lista de la compra",
+  "shop.empty": "Tu lista de la compra est\u00e1 vac\u00eda. A\u00f1ade una receta con + Lista.",
+  "shop.progress": "{checked} de {total} marcados",
+  "shop.clearChecked": "Borrar marcados",
+  "shop.addList": "+ Lista",
+  "shop.cat_produce": "Frutas y verduras",
+  "shop.cat_dairy": "L\u00e1cteos",
+  "shop.cat_meat": "Carne",
+  "shop.cat_pantry": "Despensa",
+  "shop.cat_other": "Otros",
+  "home.shoppingList": "+ Lista de la compra",
+  "tip.addToList": "A\u00f1ade los ingredientes de esta receta a tu lista de la compra",
+  "signin.addList": "Inicia sesi\u00f3n para crear tu lista de la compra",
+  "toast.addedToList": "A\u00f1adido a tu lista de la compra",
+  "toast.addToListFailed": "No se pudo a\u00f1adir a la lista de la compra",
 });
