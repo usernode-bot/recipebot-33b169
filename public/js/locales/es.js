@@ -329,4 +329,13 @@ I18N.register('es', {
   'signin.commentCollection': 'Inicia sesión para comentar colecciones',
   'social.collectionComments': 'Comentarios ({n})',
   'social.addCollectionComment': 'Añade un comentario…',
+  'home.cookbook': 'Recetario',
+  'home.cookbookTitle': 'Tu recetario',
+  'home.cookbookEmpty': 'Aún no has cocinado nada del feed. Abre una receta y toca \u2611 La hice para empezar tu recetario.',
+  'cookbook.cookedShared': 'Cocinada',
+  'cookbook.cookedOwn': 'Cocinada por ti',
+  'cookbook.forked': 'Bifurcada',
+  'cookbook.madeOn': 'hecha el {d}',
+  'cookbook.forkedOn': 'bifurcada el {d}',
+  'cookbook.forkedFromDeleted': 'la receta original ya no existe',
 });

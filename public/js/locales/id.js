@@ -329,4 +329,13 @@ I18N.register('id', {
   'signin.commentCollection': 'Masuk untuk mengomentari koleksi',
   'social.collectionComments': 'Komentar ({n})',
   'social.addCollectionComment': 'Tulis komentar…',
+  'home.cookbook': 'Buku masak',
+  'home.cookbookTitle': 'Buku masakmu',
+  'home.cookbookEmpty': 'Kamu belum memasak apa pun dari feed. Buka resep dan ketuk \u2611 Sudah dibuat untuk mulai buku masakmu.',
+  'cookbook.cookedShared': 'Dimasak',
+  'cookbook.cookedOwn': 'Masakanmu sendiri',
+  'cookbook.forked': 'Fork',
+  'cookbook.madeOn': 'dibuat {d}',
+  'cookbook.forkedOn': 'di-fork {d}',
+  'cookbook.forkedFromDeleted': 'resep aslinya sudah hilang',
 });

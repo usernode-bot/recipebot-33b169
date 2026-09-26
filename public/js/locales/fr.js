@@ -329,4 +329,13 @@ I18N.register('fr', {
   'signin.commentCollection': 'Connectez-vous pour commenter les collections',
   'social.collectionComments': 'Commentaires ({n})',
   'social.addCollectionComment': 'Ajouter un commentaire…',
+  'home.cookbook': 'Livre de recettes',
+  'home.cookbookTitle': 'Votre livre de recettes',
+  'home.cookbookEmpty': "Vous n'avez encore rien cuisiné du fil. Ouvrez une recette et touchez \u2611 Je l'ai faite pour commencer votre livre.",
+  'cookbook.cookedShared': 'Cuisinée',
+  'cookbook.cookedOwn': 'Cuisinée par vous',
+  'cookbook.forked': 'Dérivée',
+  'cookbook.madeOn': 'faite le {d}',
+  'cookbook.forkedOn': 'dérivée le {d}',
+  'cookbook.forkedFromDeleted': "la recette d'origine a disparu",
 });

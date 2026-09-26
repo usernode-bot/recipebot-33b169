@@ -363,4 +363,13 @@ I18N.register('en', {
   'signin.commentCollection': 'Sign in to comment on collections',
   'social.collectionComments': 'Comments ({n})',
   'social.addCollectionComment': 'Add a comment…',
+  'home.cookbook': 'Cookbook',
+  'home.cookbookTitle': 'Your Cookbook',
+  'home.cookbookEmpty': "You haven't cooked anything from the feed yet. Open a recipe and tap \u2611 Made it to start your Cookbook.",
+  'cookbook.cookedShared': 'Cooked',
+  'cookbook.cookedOwn': 'Cooked yours',
+  'cookbook.forked': 'Forked',
+  'cookbook.madeOn': 'made on {d}',
+  'cookbook.forkedOn': 'forked on {d}',
+  'cookbook.forkedFromDeleted': 'the original shared recipe is gone',
 });

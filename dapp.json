@@ -308,6 +308,51 @@
       "expectText": "Staging demo — Draft: birthday cake ideas"
     },
     {
+      "name": "Cookbook tab button renders",
+      "path": "/",
+      "expectSelector": "#cookbook-tab-btn"
+    },
+    {
+      "name": "Cookbook deep link opens the tab",
+      "path": "/?cookbook=1",
+      "expectText": "Your Cookbook"
+    },
+    {
+      "name": "Cookbook shows a cooked shared recipe",
+      "path": "/?cookbook=1",
+      "expectText": "Cooked"
+    },
+    {
+      "name": "Cookbook shows a cooked own recipe",
+      "path": "/?cookbook=1",
+      "expectText": "Cooked yours"
+    },
+    {
+      "name": "Cookbook shows a forked recipe",
+      "path": "/?cookbook=1",
+      "expectText": "Forked"
+    },
+    {
+      "name": "Cookbook credits the fork source",
+      "path": "/?cookbook=1",
+      "expectText": "staging-demo-chef"
+    },
+    {
+      "name": "Cookbook shows the cooked demo recipe title",
+      "path": "/?cookbook=1",
+      "expectText": "Staging Demo Tofu Stir Fry"
+    },
+    {
+      "name": "Cookbook rows reuse the card shell",
+      "path": "/?cookbook=1",
+      "expectSelector": "#cookbook-view .rounded-md.border"
+    },
+    {
+      "name": "Cookbook offers a way back to the box",
+      "path": "/?cookbook=1",
+      "expectSelector": "a#cookbook-back[href]"
+    },
+    {
       "name": "Drafts lead the your-box band",
       "path": "/",
       "expectSelector": "#home-band-mine > section:first-of-type#home-convs"
