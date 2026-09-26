@@ -246,6 +246,7 @@ I18N.register('id', {
   'recipe.downloadMd': 'Unduh Markdown',
   'recipe.copyMd': 'Salin Markdown',
   'recipe.downloadJson': 'Unduh JSON',
+  'recipe.print': 'Cetak',
   'recipe.importJson': 'Impor JSON',
   'recipe.notesLabel': 'Catatan:',
   'recipe.madeIt': '☑ Sudah dibuat',
