@@ -363,4 +363,10 @@ I18N.register('en', {
   'signin.commentCollection': 'Sign in to comment on collections',
   'social.collectionComments': 'Comments ({n})',
   'social.addCollectionComment': 'Add a comment…',
+
+  // ── Cookbook (the Made-it / forked shelf) ──
+  'home.cookbook': 'Cookbook',
+  'cookbook.subtitle': 'Recipes you marked Made it, plus the remixes you forked. The search above narrows this list by name.',
+  'cookbook.entryCopy': 'Everything you marked Made it, plus the remixes you forked.',
+  'cookbook.empty': 'Nothing in your cookbook yet. Cook a recipe and tap Made it, or fork one to remix it.',
 });

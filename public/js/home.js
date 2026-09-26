@@ -18,6 +18,11 @@ const Home = {
   publicCollections: [],
   searchQuery: '',
   tagFilter: new Set(),
+  // Cookbook: the recipes this cook marked Made it, or forked. Not a
+  // route of its own — it replaces the box the way a collection does,
+  // and the toolbar search (already live above it) narrows it by name.
+  cookbookOpen: false,
+  cookbook: [],
   // When set, the homepage shows this collection's detail instead of the box.
   activeCollection: null,
   // Drafts are collapsed past this many rows until "Show all" is clicked.
@@ -71,13 +76,14 @@ const Home = {
         return;
       }
 
-      const [sharedRes, mineRes, favRes, convRes, collRes, pubCollRes] = await Promise.all([
+      const [sharedRes, mineRes, favRes, convRes, collRes, pubCollRes, cookRes] = await Promise.all([
         fetch('/api/shared-recipes'),
         fetch('/api/recipes'),
         fetch('/api/favorites'),
         fetch('/api/conversations'),
         fetch('/api/collections'),
         fetch('/api/collections/public'),
+        this.cookbookOpen ? fetch('/api/cookbook') : Promise.resolve({ ok: false }),
       ]);
       this.shared = sharedRes.ok ? await sharedRes.json() : [];
       this.mine = mineRes.ok ? await mineRes.json() : [];
@@ -85,6 +91,7 @@ const Home = {
       this.conversations = convRes.ok ? await convRes.json() : [];
       this.collections = collRes.ok ? await collRes.json() : [];
       this.publicCollections = pubCollRes.ok ? await pubCollRes.json() : [];
+      if (this.cookbookOpen) this.cookbook = cookRes.ok ? await cookRes.json() : [];
       if (this.activeCollection) {
         await this.reloadActiveCollection();
       }
@@ -110,6 +117,7 @@ const Home = {
     const emptyEl = document.getElementById('home-empty');
     const noMatchEl = document.getElementById('home-no-match');
     const detailEl = document.getElementById('collection-view');
+    const cookbookEl = document.getElementById('cookbook-view');
     const toolbar = document.getElementById('home-toolbar');
     if (!favSection || !mineSection || !commSection) return;
 
@@ -120,13 +128,23 @@ const Home = {
     for (const el of [bandMine, bandComm, emptyEl, noMatchEl, toolbar]) {
       if (el) el.style.display = inDetail ? 'none' : '';
     }
+    document.getElementById('home-cookbook-entry')
+      ?.classList.toggle('hidden', inDetail);
+    const inCookbook = this.cookbookOpen && !inDetail;
+    cookbookEl?.classList.toggle('hidden', !inCookbook);
     if (inDetail) {
       this.renderCollectionDetail(detailEl);
+      return;
+    }
+    if (inCookbook) {
+      this.renderCookbook(cookbookEl);
       return;
     }
 
     // Anonymous visitors get the community band only, with a lead-in.
     if (bandMine) bandMine.style.display = App.isAnonymous ? 'none' : '';
+    document.getElementById('home-cookbook-entry')
+      ?.classList.toggle('hidden', App.isAnonymous);
     document.getElementById('home-anon-lead')
       ?.classList.toggle('hidden', !App.isAnonymous);
 
@@ -566,6 +584,95 @@ const Home = {
       row.appendChild(stars);
     }
     return row;
+  },
+
+  // ── Cookbook ──────────────────────────────────────────────────────
+
+  async openCookbook() {
+    if (App.isAnonymous) return App.promptSignIn(t('signin.madeIt'));
+    this.cookbookOpen = true;
+    this.activeCollection = null;
+    HashParams.set('book', '1');
+    await this.refresh();
+  },
+
+  closeCookbook() {
+    this.cookbookOpen = false;
+    HashParams.set('book', null);
+    this.render();
+  },
+
+  // Feed rows, not cards: one line per recipe, title + provenance +
+  // View. Same primitives as the drafts rows so the two lists read as
+  // one system.
+  cookbookRow(r) {
+    const el = document.createElement('div');
+    el.className = 'min-w-0 flex items-center gap-2 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2';
+    const dated = this._shortDate(r.created_at);
+    const updatedBit = dated ? ' · ' + t('card.updated', { d: this.esc(dated) }) : '';
+    const title = r.data?.title || t('common.untitled');
+    const from = r.forked_from_username
+      ? ' · ' + t('card.forkedFrom', { name: this.esc(r.forked_from_username) })
+      : r.is_mine ? ' · ' + t('card.byYou')
+      : ' · ' + t('card.by', { name: this.esc(r.username) });
+    el.innerHTML = `
+      <div class="min-w-0 flex-1">
+        <p class="text-sm truncate">${this.esc(title)}</p>
+        <p class="text-xs text-zinc-400 dark:text-zinc-500">${t('card.yourRecipe')}${from}${updatedBit}</p>
+      </div>`;
+    const path = r.shared_id ? '/?s=' + r.shared_id : '/?c=' + r.conversation_id;
+    const open = () => {
+      if (r.shared_id) {
+        const shared = this.shared.find((s2) => s2.id === r.shared_id);
+        if (shared) return this.viewShared(shared);
+        if (typeof Store !== 'undefined') {
+          Store.openShared({ id: r.shared_id, data: r.data, username: r.username, is_mine: r.is_mine, current_version: r.current_version });
+        }
+      } else if (r.conversation_id && typeof Store !== 'undefined') {
+        Store.selectConversation(r.conversation_id);
+      }
+    };
+    const viewBtn = this._actionLink(t('common.view'), true, path, open);
+    viewBtn.classList.add('shrink-0');
+    el.appendChild(viewBtn);
+    return el;
+  },
+
+  renderCookbook(container) {
+    if (!container) return;
+    container.innerHTML = '';
+    const head = document.createElement('div');
+    head.className = 'space-y-2 mb-5';
+    const q = this.searchQuery.trim().toLowerCase();
+    const rows = this.cookbook.filter((r) =>
+      !q || (r.data?.title || '').toLowerCase().includes(q));
+    head.innerHTML = `
+      <a id="cookbook-back" href="${App.deepLinkUrl(null)}" class="inline-block text-sm text-blue-500 hover:text-blue-400 transition-colors">${t('coll.back')}</a>
+      <div class="flex items-start justify-between gap-3 flex-wrap">
+        <div class="min-w-0">
+          <h2 class="text-xl font-bold">${this.esc(t('home.cookbook'))}</h2>
+          <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-1">${t('cookbook.subtitle')}</p>
+        </div>
+      </div>`;
+    container.appendChild(head);
+    head.querySelector('#cookbook-back').addEventListener('click', (e) => {
+      if (App.wantsNewTab(e)) return;
+      e.preventDefault();
+      this.closeCookbook();
+    });
+
+    if (!rows.length) {
+      const empty = document.createElement('p');
+      empty.className = 'text-sm text-zinc-400 dark:text-zinc-600';
+      empty.textContent = q ? t('home.noMatch') : t('cookbook.empty');
+      container.appendChild(empty);
+    } else {
+      const list = document.createElement('div');
+      list.id = 'cookbook-list';
+      list.className = 'space-y-2';
+      rows.forEach((r) => list.appendChild(this.cookbookRow(r)));
+      container.appendChild(list);
+    }
   },
 
   // ── Collections ───────────────────────────────────────────────────
@@ -1102,6 +1209,9 @@ const Home = {
 document.getElementById('home-search')?.addEventListener('input', (e) => {
   Home.searchQuery = e.target.value;
   Home.render();
+});
+document.getElementById('open-cookbook-btn')?.addEventListener('click', () => {
+  Home.openCookbook();
 });
 document.getElementById('new-collection-btn')?.addEventListener('click', () => {
   Home.openNewCollection();

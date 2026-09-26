@@ -473,6 +473,96 @@ function recipeRoutes(config) {
     }
   });
 
+  // ── Cookbook: everything this cook has actually cooked ───────────
+  // Every recipe the requester marked Made it, plus the forked remixes
+  // they created (Conversations with a fork lineage). One row shape:
+  // shared recipes and own conversations render through the same feed
+  // card components as the homepage bands.
+  router.get('/api/cookbook', async (req, res) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT * FROM (
+           -- Marked Made it: a published snapshot, or an own recipe.
+           SELECT s.id AS shared_id, NULL::int AS conversation_id,
+                  s.recipe_data AS data, s.created_at, s.updated_at,
+                  s.share_slug, s.tags,
+                  s.forked_from_shared_id, s.forked_from_version,
+                  s.forked_from_username, s.username,
+                  COALESCE((SELECT MAX(v.version) FROM shared_recipe_versions v
+                            WHERE v.shared_recipe_id = s.id), 1)::int AS current_version,
+                  COALESCE(agg.avg_rating, 0)::float AS avg_rating,
+                  COALESCE(agg.rating_count, 0)::int AS rating_count,
+                  my.rating AS my_rating,
+                  ${SOCIAL_COUNTS},
+                  TRUE AS is_favorited,
+                  (s.user_id = $1) AS is_mine
+           FROM (
+             SELECT DISTINCT mm.shared_recipe_id
+             FROM made_it_marks mm
+             WHERE mm.user_id = $1 AND mm.shared_recipe_id IS NOT NULL
+           ) cooked
+           JOIN shared_recipes s ON s.id = cooked.shared_recipe_id
+           ${RATING_AGG}
+
+           UNION ALL
+
+           -- Marked Made it on an own conversation with no published copy.
+           (SELECT NULL AS shared_id, c.id AS conversation_id,
+                  m.recipe_data AS data, m.created_at, m.created_at,
+                  NULL AS share_slug, NULL::text[] AS tags,
+                  NULL AS forked_from_shared_id, NULL AS forked_from_version,
+                  c.forked_from_username, $2 AS username,
+                  NULL::int AS current_version, NULL::float AS avg_rating,
+                  NULL::int AS rating_count, NULL AS my_rating,
+                  NULL::int AS made_count, NULL::int AS comment_count,
+                  NULL::int AS remix_count, FALSE AS is_favorited,
+                  TRUE AS is_mine
+           FROM made_it_marks mm
+           JOIN conversations c ON c.id = mm.conversation_id
+           CROSS JOIN LATERAL (
+             SELECT recipe_data, created_at FROM messages
+             WHERE conversation_id = c.id AND recipe_data IS NOT NULL
+             ORDER BY created_at DESC LIMIT 1
+           ) m
+           WHERE mm.user_id = $1 AND mm.shared_recipe_id IS NULL
+           )
+
+           UNION ALL
+
+           -- Forked remixes: the conversation carries the lineage.
+           (SELECT s.id AS shared_id, c.id AS conversation_id,
+                  COALESCE(m.recipe_data, s.recipe_data) AS data,
+                  COALESCE(m.created_at, s.created_at), COALESCE(m.created_at, s.created_at),
+                  s.share_slug, s.tags,
+                  s.forked_from_shared_id, s.forked_from_version,
+                  s.forked_from_username, s.username,
+                  COALESCE((SELECT MAX(v.version) FROM shared_recipe_versions v
+                            WHERE v.shared_recipe_id = s.id), 1)::int AS current_version,
+                  NULL::float AS avg_rating, NULL::int AS rating_count,
+                  NULL AS my_rating, NULL::int AS made_count,
+                  NULL::int AS comment_count, NULL::int AS remix_count,
+                  FALSE AS is_favorited, FALSE AS is_mine
+           FROM conversations c
+           CROSS JOIN LATERAL (
+             SELECT recipe_data, created_at FROM messages
+             WHERE conversation_id = c.id AND recipe_data IS NOT NULL
+             ORDER BY created_at DESC LIMIT 1
+           ) m
+           LEFT JOIN shared_recipes s ON s.id = c.forked_from_shared_id
+           WHERE ${ownerClause('c.user_id')} AND c.forked_from_shared_id IS NOT NULL
+           )
+         ) book
+         ORDER BY book.created_at DESC, COALESCE(book.shared_id, 0) DESC,
+                  COALESCE(book.conversation_id, 0) DESC`,
+        [req.user.id, req.user.username || 'unknown']
+      );
+      res.json(rows);
+    } catch (err) {
+      log.error('recipes', 'Cookbook list failed', { message: err.message });
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   return router;
 }
 

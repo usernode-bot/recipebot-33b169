@@ -607,6 +607,35 @@ async function seedStagingDemo(pool) {
      ON CONFLICT (id) DO NOTHING`
   );
 
+  // Forked cookbook demo (Cookbook tab): a conversation the demo user
+  // forked from shared recipe 900002, with one remix recipe message. Owned
+  // by the staging demo identity (user_id 0), which the Cookbook route's
+  // staging owner clause covers, so any staging tester sees one fork row.
+  await pool.query(
+    `INSERT INTO conversations (id, user_id, title, preferences,
+         forked_from_shared_id, forked_from_version, forked_from_username)
+     VALUES (900091, $1, $2, '{}', 900002, 2, 'staging-demo-chef')
+     ON CONFLICT (id) DO NOTHING`,
+    [DEMO_USER_ID, 'Staging Demo Forked Stir Fry']
+  );
+  const { rows: cbForkMsgs } = await pool.query(
+    'SELECT 1 FROM messages WHERE conversation_id = 900091 LIMIT 1'
+  );
+  if (cbForkMsgs.length === 0) {
+    const DEMO_FORK_RECIPE = {
+      ...DEMO_RECIPE_2,
+      title: 'Staging Demo Forked Stir Fry',
+      description: 'A fork of the staging demo tofu stir fry, seeded for the Cookbook tab.',
+    };
+    await pool.query(
+      `INSERT INTO messages (conversation_id, role, content, recipe_data, created_at) VALUES
+       (900091, 'user', 'Staging demo: fork the tofu stir fry so I can tweak it', NULL, NOW() - interval '1 day 30 min'),
+       (900091, 'assistant', 'Forked the staging demo tofu stir fry into your box.', $1, NOW() - interval '1 day 20 min')`,
+      [JSON.stringify(DEMO_FORK_RECIPE)]
+    );
+  }
+  log.info('db', 'Seeded staging cookbook fork demo');
+
   // Comments: one live, one soft-deleted (renders as "comment deleted").
   await pool.query(
     `INSERT INTO recipe_comments (id, shared_recipe_id, user_id, username, body, deleted_at) VALUES
