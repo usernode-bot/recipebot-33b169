@@ -381,21 +381,6 @@
             <div class="flex-1 h-px bg-zinc-200 dark:bg-zinc-800"></div>
           </div>
 
-          <!-- Cookbook entry: the shelf of everything you marked Made it,
-               plus the remixes you forked. Lives with your things. -->
-          <section id="home-cookbook-entry">
-            <div class="flex items-start justify-between mb-3 gap-2 flex-wrap">
-              <h2 class="text-base font-semibold flex items-center gap-2 min-w-0">
-                <svg class="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253v13"/></svg>
-                <span data-i18n="home.cookbook">Cookbook</span>
-              </h2>
-            </div>
-            <div class="flex items-center justify-between gap-2 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2">
-              <p class="text-sm text-zinc-500 dark:text-zinc-400 min-w-0 truncate" data-i18n="cookbook.entryCopy">Everything you marked Made it, plus the remixes you forked.</p>
-              <button id="open-cookbook-btn" class="shrink-0 px-3 py-1.5 text-xs rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors" data-i18n="common.browse">Browse</button>
-            </div>
-          </section>
-
           <!-- Drafts: conversations with no recipe yet. They LEAD the box
                (issue #40) but keep the compact row treatment and the
                three-row cap from issue #32, so the thing you never finished
@@ -441,6 +426,21 @@
               </div>
             </div>
             <div id="home-collections-list" class="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"></div>
+          </section>
+
+          <!-- Cookbook entry: the shelf of everything you marked Made it,
+               plus the remixes you forked. Lives with your things. -->
+          <section id="home-cookbook-entry">
+            <div class="flex items-start justify-between mb-3 gap-2 flex-wrap">
+              <h2 class="text-base font-semibold flex items-center gap-2 min-w-0">
+                <svg class="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253v13"/></svg>
+                <span data-i18n="home.cookbook">Cookbook</span>
+              </h2>
+            </div>
+            <div class="flex items-center justify-between gap-2 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2">
+              <p class="text-sm text-zinc-500 dark:text-zinc-400 min-w-0 truncate" data-i18n="cookbook.entryCopy">Everything you marked Made it, plus the remixes you forked.</p>
+              <button id="open-cookbook-btn" class="shrink-0 px-3 py-1.5 text-xs rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors" data-i18n="common.browse">Browse</button>
+            </div>
           </section>
         </section>
 
