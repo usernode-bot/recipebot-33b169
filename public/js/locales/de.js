@@ -246,6 +246,7 @@ I18N.register('de', {
   'recipe.downloadMd': 'Als Markdown herunterladen',
   'recipe.copyMd': 'Markdown kopieren',
   'recipe.downloadJson': 'Als JSON herunterladen',
+  'recipe.print': 'Drucken',
   'recipe.importJson': 'JSON importieren',
   'recipe.notesLabel': 'Hinweise:',
   'recipe.madeIt': '☑ Gemacht',
