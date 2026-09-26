@@ -606,6 +606,48 @@ async function seedStagingDemo(pool) {
        (900004, 0, 'staging-demo-user', NULL, 900001, NULL)
      ON CONFLICT (id) DO NOTHING`
   );
+  // Personal-cookbook seeds (issue: Cookbook tab): the demo user's mark on
+  // the SHARED demo recipe plus a forked conversation, so a signed-in
+  // staging tester (whose marks/forks are also read in staging, see
+  // /api/cookbook) sees three cookbook rows: the chicken stir fry (this
+  // mark), the tofu stir fry (mark 900004 on the demo conversation) and
+  // the forked ramen (the conversation below).
+  await pool.query(
+    `INSERT INTO made_it_marks (id, user_id, username, shared_recipe_id, conversation_id, note, created_at)
+     VALUES (900006, 0, 'staging-demo-user', 900001, NULL, NULL, NOW() - interval '2 days')
+     ON CONFLICT (id) DO NOTHING`
+  );
+  await pool.query(
+    `INSERT INTO conversations (id, user_id, title, preferences, created_at)
+     VALUES (900014, $1, 'Staging demo — Forked tofu ramen',
+             $2::jsonb, NOW() - interval '3 days')
+     ON CONFLICT (id) DO NOTHING`,
+    [DEMO_USER_ID, JSON.stringify({ complexity: 'normal', serving: 'normal' })]
+  );
+  const { rows: forkDemoRows } = await pool.query(
+    'SELECT 1 FROM messages WHERE conversation_id = $1 LIMIT 1',
+    [900014]
+  );
+  if (forkDemoRows.length === 0) {
+    const DEMO_FORKED_RAMEN = {
+      ...DEMO_RECIPE_2,
+      title: 'Staging Demo Forked Tofu Ramen',
+      description: 'A forked staging recipe seeded to show the personal cookbook.',
+      tags: ['noodles', 'dinner', 'fork'],
+    };
+    await pool.query(
+      `INSERT INTO messages (conversation_id, role, content, recipe_data, created_at) VALUES
+       ($1, 'user', 'Staging demo: fork this into a ramen-style bowl', NULL, NOW() - interval '3 days'),
+       ($1, 'assistant', '[Recipe: Staging Demo Forked Tofu Ramen]', $2, NOW() - interval '3 days' + interval '1 min')`,
+      [900014, JSON.stringify(DEMO_FORKED_RAMEN)]
+    );
+  }
+  await pool.query(
+    `UPDATE conversations SET forked_from_shared_id = 900001,
+        forked_from_version = 1, forked_from_username = 'staging-demo-user'
+      WHERE id = 900014`
+  );
+  log.info('db', 'Seeded staging personal-cookbook demo rows');
 
   // Comments: one live, one soft-deleted (renders as "comment deleted").
   await pool.query(

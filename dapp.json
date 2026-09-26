@@ -220,7 +220,41 @@
     {
       "name": "Cooked-count shows on feed card",
       "path": "/",
-      "expectText": "cooked 3×"
+      "expectText": "cooked 4×"
+    },
+    {
+      "name": "Cookbook section renders",
+      "path": "/",
+      "expectSelector": "#home-cookbook"
+    },
+    {
+      "name": "Cookbook search input renders",
+      "path": "/",
+      "expectSelector": "#cookbook-search"
+    },
+    {
+      "name": "Cookbook lists the seeded made-it recipe",
+      "path": "/",
+      "expectText": "Staging Demo Chicken Stir Fry"
+    },
+    {
+      "id": "cookbook.seeded-fork",
+      "name": "Cookbook lists the seeded fork",
+      "path": "/",
+      "expectText": "Staging Demo Forked Tofu Ramen",
+      "visual": true,
+      "impact": [
+        "public/index.html",
+        "public/js/home.js",
+        "src/routes/recipes.js",
+        "src/db/migrate.js",
+        "public/js/locales/en.js"
+      ]
+    },
+    {
+      "name": "Cookbook rows are cmd-clickable deep links",
+      "path": "/",
+      "expectSelector": "#home-cookbook-list a[href*=\"?path=/?c=\"]"
     },
     {
       "name": "Tag filter chips render",
