@@ -329,4 +329,13 @@ I18N.register('de', {
   'signin.commentCollection': 'Melde dich an, um Sammlungen zu kommentieren',
   'social.collectionComments': 'Kommentare ({n})',
   'social.addCollectionComment': 'Kommentar hinzufügen…',
+  'home.cookbook': 'Kochbuch',
+  'home.cookbookTitle': 'Dein Kochbuch',
+  'home.cookbookEmpty': 'Du hast noch nichts aus dem Feed gekocht. Öffne ein Rezept und tippe auf \u2611 Gekocht, um dein Kochbuch zu starten.',
+  'cookbook.cookedShared': 'Gekocht',
+  'cookbook.cookedOwn': 'Selbst gekocht',
+  'cookbook.forked': 'Abgeleitet',
+  'cookbook.madeOn': 'gemacht am {d}',
+  'cookbook.forkedOn': 'abgeleitet am {d}',
+  'cookbook.forkedFromDeleted': 'das ursprüngliche Rezept ist weg',
 });
