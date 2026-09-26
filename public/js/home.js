@@ -13,6 +13,12 @@ const Home = {
   shared: [],
   mine: [],
   favorites: [],
+  // Cookbook (the Made it / Forked tab): loaded from GET /api/cookbook —
+  // { cookedShared, cookedOwn, forked }. Kept out of the box's refresh so
+  // the tab only pays for its own query when it is the active view.
+  cookbook: { cookedShared: [], cookedOwn: [], forked: [] },
+  // When set, the homepage shows the Cookbook list instead of the box.
+  activeCookbook: false,
   conversations: [],
   collections: [],
   publicCollections: [],
@@ -47,6 +53,18 @@ const Home = {
     if (!value) return '';
     const d = new Date(value);
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(I18N.lang);
+  },
+
+  async refreshCookbook() {
+    if (App.isAnonymous) return;
+    try {
+      const res = await fetch('/api/cookbook');
+      this.cookbook = res.ok
+        ? await res.json()
+        : { cookedShared: [], cookedOwn: [], forked: [] };
+    } catch {
+      this.cookbook = { cookedShared: [], cookedOwn: [], forked: [] };
+    }
   },
 
   async refresh() {
@@ -101,6 +119,7 @@ const Home = {
   render() {
     const bandMine = document.getElementById('home-band-mine');
     const bandComm = document.getElementById('home-band-community');
+    const cookbookEl = document.getElementById('cookbook-view');
     const collSection = document.getElementById('home-collections');
     const favSection = document.getElementById('home-favorites');
     const mineSection = document.getElementById('home-mine');
@@ -112,6 +131,18 @@ const Home = {
     const detailEl = document.getElementById('collection-view');
     const toolbar = document.getElementById('home-toolbar');
     if (!favSection || !mineSection || !commSection) return;
+
+    // The Cookbook tab replaces the box until closed (same pattern as the
+    // collection detail below — one top-level view per tab).
+    const inCookbook = !!this.activeCookbook;
+    cookbookEl?.classList.toggle('hidden', !inCookbook);
+    for (const el of [bandMine, bandComm, emptyEl, noMatchEl, toolbar]) {
+      if (el) el.style.display = inCookbook ? 'none' : '';
+    }
+    if (inCookbook) {
+      this.renderCookbook(cookbookEl);
+      return;
+    }
 
     // Collection detail replaces the box until closed. Blanking the two
     // bands covers every section inside them.
@@ -900,6 +931,256 @@ const Home = {
     return el;
   },
 
+  // ── Cookbook tab (Made it / Forked) ────────────────────────────────
+
+  openCookbook() {
+    if (App.isAnonymous) return App.promptSignIn(t('signin.madeIt'));
+    this.activeCookbook = true;
+    HashParams.set('cookbook', '1');
+    this.refreshCookbook().then(() => this.render());
+  },
+
+  closeCookbook() {
+    this.activeCookbook = false;
+    HashParams.set('cookbook', null);
+    this.render();
+  },
+
+  // One Cookbook entry, rendered through the same parts the box and the
+  // community feed use (_cardShell / _kicker / _description / _metaLine /
+  // _tagChips / _heartBtn / _actionBtn / _actionLink) so the two lists read
+  // as one app. `base` is the recipe JSON; opts carries the via label, the
+  // source row and the open target.
+  cookbookCard(base, opts) {
+    const recipe = base || {};
+    const via = opts.via;
+    const el = this._cardShell();
+    el.appendChild(this._kicker(via));
+
+    const madeDate = this._shortDate(opts.date);
+    const dateBit = madeDate
+      ? ` · ${via === t('cookbook.forked')
+          ? t('cookbook.forkedOn', { d: this.esc(madeDate) })
+          : t('cookbook.madeOn', { d: this.esc(madeDate) })}`
+      : '';
+    const head = document.createElement('div');
+    head.className = 'flex items-start justify-between gap-2';
+    head.innerHTML = `
+      <div class="min-w-0">
+        <h3 class="font-semibold text-sm truncate">${this.esc(recipe.title || opts.fallbackTitle || t('common.untitled'))}</h3>
+        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${opts.subtitle || t('card.byYou')}${dateBit}</p>
+      </div>`;
+    if (!App.isAnonymous && opts.favorited != null && opts.unfavorite) {
+      const heart = this._heartBtn(opts.favorited);
+      heart.addEventListener('click', opts.unfavorite);
+      head.appendChild(heart);
+    }
+    el.appendChild(head);
+
+    if (recipe.description) el.appendChild(this._description(recipe.description));
+
+    const meta = this._metaLine(recipe);
+    const extraBits = [];
+    if (opts.remixOf) extraBits.push(t('card.remixedFrom', { name: this.esc(opts.remixOf) }));
+    if (opts.madeCount > 0) extraBits.push(t('card.cooked', { n: opts.madeCount }));
+    const line = [meta, extraBits.join(' · ')].filter(Boolean).join(' · ');
+    if (line) {
+      const metaEl = document.createElement('p');
+      metaEl.className = 'text-xs text-zinc-400 dark:text-zinc-500';
+      metaEl.innerHTML = line;
+      el.appendChild(metaEl);
+    }
+
+    const chips = this._tagChips(opts.tags || recipe.tags);
+    if (chips) el.appendChild(chips);
+
+    const actions = document.createElement('div');
+    actions.className = 'flex flex-wrap items-center gap-2 mt-auto pt-1';
+    actions.appendChild(opts.openLink || this._actionBtn(t('common.open'), true));
+    if (opts.unmake) {
+      const unmakeBtn = this._actionBtn(t('common.remove'));
+      unmakeBtn.setAttribute('aria-label', t('common.remove'));
+      unmakeBtn.addEventListener('click', opts.unmake);
+      actions.appendChild(unmakeBtn);
+    }
+    el.appendChild(actions);
+    return el;
+  },
+
+  // The tab body: header + search filter + the three via groups in one
+  // filtered list. Groups are visual (kicker + ordering) only — one list,
+  // one filter, no nested tabs.
+  renderCookbook(container) {
+    if (!container) return;
+    // Rebuilt from scratch each render: refreshCookbook resolves later and
+    // renders again, so without this the first (empty-data) header and
+    // empty state would stay stacked above the loaded list.
+    container.innerHTML = '';
+    const q = this.searchQuery.trim().toLowerCase();
+    const matches = (title, tags) => {
+      if (!q) return true;
+      if ((title || '').toLowerCase().includes(q)) return true;
+      return (tags || []).some((tag) => tag.toLowerCase().includes(q));
+    };
+
+    // One card row per source event, deduplicated by open-target so a
+    // recipe cooked AND forked shows once with both badges merged.
+    const byKey = new Map();
+    const add = (key, row) => {
+      if (byKey.has(key)) {
+        const prev = byKey.get(key);
+        prev.vias.push(row.via);
+        // Keep the newest event's date as the row's date.
+        if (Date.parse(row.date) > Date.parse(prev.date)) {
+          prev.date = row.date;
+          prev.via = row.via;
+        }
+        return;
+      }
+      byKey.set(key, { ...row, vias: [row.via] });
+    };
+
+    for (const s of this.cookbook.cookedShared || []) {
+      add(`s${s.id}`, {
+        via: t('cookbook.cookedShared'),
+        title: s.data?.title || t('common.untitled'),
+        tags: s.tags || s.data?.tags || [],
+        date: s.made_at,
+        base: s.data,
+        openPath: `/?s=${s.id}`,
+        onOpen: () => this.viewShared(s),
+        fav: s.is_favorited,
+        unfavorite: () => this.toggleSharedFavorite(s.id, s.is_favorited),
+        unmake: () => this.unmakeIt({ sharedRecipeId: s.id }),
+        subtitle: t('card.by', { name: this.esc(s.username) }),
+        remixOf: s.forked_from_username,
+        madeCount: s.made_count,
+      });
+    }
+    for (const r of this.cookbook.cookedOwn || []) {
+      add(`c${r.conversation_id}`, {
+        via: t('cookbook.cookedOwn'),
+        title: r.data?.title || r.conversation_title || t('common.untitled'),
+        tags: r.data?.tags || [],
+        date: r.made_at,
+        base: r.data,
+        openPath: `/?c=${r.conversation_id}`,
+        onOpen: () => {
+          if (typeof Store !== 'undefined') Store.selectConversation(r.conversation_id);
+        },
+        fav: r.is_favorited,
+        unfavorite: () => this.toggleConversationFavorite(r.conversation_id, r.is_favorited),
+        unmake: () => this.unmakeIt({ conversationId: r.conversation_id }),
+        subtitle: t('card.byYou'),
+        remixOf: r.forked_from_username,
+        madeCount: r.made_count,
+      });
+    }
+    for (const f of this.cookbook.forked || []) {
+      add(`c${f.conversation_id}`, {
+        via: t('cookbook.forked'),
+        title: f.own_data?.title || f.data?.title || t('common.untitled'),
+        tags: f.tags || f.own_data?.tags || f.data?.tags || [],
+        date: f.forked_at,
+        base: f.own_data || f.data,
+        openPath: `/?c=${f.conversation_id}`,
+        onOpen: () => {
+          if (typeof Store !== 'undefined') Store.selectConversation(f.conversation_id);
+        },
+        fav: null,
+        subtitle: f.source_username || f.forked_from_username
+          ? t('card.forkedFrom', { name: this.esc(f.source_username || f.forked_from_username) })
+          : t('cookbook.forkedFromDeleted'),
+        remixOf: null,
+        madeCount: null,
+      });
+    }
+
+    const rows = [...byKey.values()]
+      .filter((row) => matches(row.title, row.tags))
+      .sort((a, b) => {
+        const ta = Date.parse(a.date) || 0;
+        const tb = Date.parse(b.date) || 0;
+        return tb - ta;
+      });
+
+    const header = document.createElement('div');
+    header.className = 'space-y-2 mb-5';
+    const back = document.createElement('a');
+    back.id = 'cookbook-back';
+    back.href = App.deepLinkUrl(null);
+    back.className = 'inline-block text-sm text-blue-500 hover:text-blue-400 transition-colors';
+    back.textContent = t('coll.back');
+    // The toolbar's search box is hidden with the rest of the box, so the
+    // Cookbook tab carries its own filter input. Same styling as #home-search.
+    const search = document.createElement('input');
+    search.type = 'search';
+    search.placeholder = t('home.searchPlaceholder');
+    search.autocomplete = 'off';
+    search.setAttribute('aria-label', t('home.searchPlaceholder'));
+    search.value = this.searchQuery;
+    search.className = 'w-full rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4';
+    search.addEventListener('input', (e) => {
+      this.searchQuery = e.target.value;
+      this.render();
+    });
+    header.appendChild(search);
+    const title = document.createElement('h2');
+    title.className = 'text-xl font-bold';
+    title.setAttribute('data-i18n', 'home.cookbookTitle');
+    title.textContent = t('home.cookbookTitle');
+    header.appendChild(back);
+    header.appendChild(title);
+    container.appendChild(header);
+    back.addEventListener('click', (e) => {
+      if (App.wantsNewTab(e)) return;
+      e.preventDefault();
+      this.closeCookbook();
+    });
+
+    const grid = document.createElement('div');
+    grid.className = 'grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3';
+    container.appendChild(grid);
+
+    if (!rows.length) {
+      const empty = document.createElement('p');
+      empty.className = 'text-sm text-zinc-400 dark:text-zinc-600';
+      empty.textContent = q ? t('home.noMatch') : t('home.cookbookEmpty');
+      grid.replaceWith(empty);
+      return;
+    }
+
+    rows.forEach((row) => {
+      const card = this.cookbookCard(row.base, {
+        via: row.vias.length > 1
+          ? row.vias.join(' · ')
+          : row.via,
+        date: row.date,
+        fallbackTitle: row.title,
+        subtitle: row.subtitle,
+        remixOf: row.remixOf,
+        madeCount: row.madeCount,
+        tags: row.tags,
+        favorited: row.fav,
+        unfavorite: row.fav != null ? row.unfavorite : null,
+        unmake: row.unmake,
+        openLink: this._actionLink(t('common.open'), true, row.openPath, row.onOpen),
+      });
+      grid.appendChild(card);
+    });
+  },
+
+  async unmakeIt(target) {
+    const param = target.sharedRecipeId
+      ? `sharedRecipeId=${target.sharedRecipeId}`
+      : `conversationId=${target.conversationId}`;
+    try {
+      await fetch(`/api/made-it?${param}`, { method: 'DELETE' });
+    } catch { /* refresh below reflects server truth */ }
+    await this.refreshCookbook();
+    this.render();
+  },
+
   // Add-to-collection picker: target is { sharedRecipeId } or { conversationId }.
   // A null target is the ?ui=collectionpick screenshot state — the picker
   // renders, but there is nothing to add, so picking a row just closes it.
@@ -1102,6 +1383,9 @@ const Home = {
 document.getElementById('home-search')?.addEventListener('input', (e) => {
   Home.searchQuery = e.target.value;
   Home.render();
+});
+document.getElementById('cookbook-tab-btn')?.addEventListener('click', () => {
+  Home.openCookbook();
 });
 document.getElementById('new-collection-btn')?.addEventListener('click', () => {
   Home.openNewCollection();
