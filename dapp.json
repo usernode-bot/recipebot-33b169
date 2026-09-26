@@ -103,6 +103,11 @@
       "expectText": "Your recipes"
     },
     {
+      "name": "Cookbook tab renders seeded fork",
+      "path": "/?book=1",
+      "expectText": "Staging Demo Forked Stir Fry"
+    },
+    {
       "name": "Header back button exists (hidden on home)",
       "path": "/",
       "expectSelector": "#home-btn"
@@ -124,7 +129,7 @@
     },
     {
       "name": "Theme menu explains the System option",
-      "path": "/",
+      "path": "/?ui=theme",
       "expectText": "Match your device setting"
     },
     {

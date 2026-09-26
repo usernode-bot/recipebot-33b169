@@ -201,7 +201,7 @@ window.Router = {
   MAX_AGE_MS: 30_000,
   // `coll` addresses an open collection so a refresh (or signing in from a
   // public collection) comes back to it instead of the box.
-  ROUTE_KEYS: ['c', 's', 'coll', 'cook', 'ing', 'mac', 'ch'],
+  ROUTE_KEYS: ['c', 's', 'coll', 'book', 'cook', 'ing', 'mac', 'ch'],
 
   // Hash params win over query params when both carry the same key.
   read() {
@@ -410,7 +410,7 @@ document.addEventListener('visibilitychange', () => {
   // No route in the URL? A refresh inside the platform shell arrives with a
   // route-less iframe src, so fall back to the route the previous document
   // saved (see Router.restoreCandidate for the eligibility rules).
-  if (!route.c && !route.s && !route.coll && !joinToken) {
+  if (!route.c && !route.s && !route.coll && !route.book && !joinToken) {
     const candidate = Router.restoreCandidate();
     if (candidate) route = Router.adopt(candidate);
   }
@@ -489,6 +489,13 @@ async function restoreRoute(route) {
   // A collection lives on the homepage (it replaces the box), so it's
   // resolved before the recipe routes and needs no panel setup. Home.refresh
   // runs first so the detail can fall back to a populated box on a 404.
+  if (route.book && !route.c && !route.s && !route.coll) {
+    App.showView('home');
+    HashParams.set('book', null);
+    if (typeof Home !== 'undefined') await Home.openCookbook();
+    return;
+  }
+
   if (route.coll && !route.c && !route.s) {
     App.showView('home');
     if (typeof Home !== 'undefined') {
@@ -575,6 +582,7 @@ function setupHomeButton() {
     App.setSignInPath?.(null);
     if (typeof Home !== 'undefined') Home.activeCollection = null;
     App.showView('home');
+    if (typeof Home !== 'undefined') Home.closeCookbook?.();
   });
 }
 
