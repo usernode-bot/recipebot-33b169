@@ -34,6 +34,8 @@ I18N.register('de', {
   'home.collectionsEmpty': 'Bündle deine Rezepte in einem Regal —',
   'home.favorites': 'Deine Favoriten',
   'home.yourRecipes': 'Deine Rezepte',
+  'home.cookbook': 'Kochbuch',
+  'home.cookbookSearch': 'Dein Kochbuch durchsuchen...',
   'home.communityRecipes': 'Community-Rezepte',
   'home.communityCollections': 'Community-Sammlungen',
   'home.emptyTitle': 'Noch keine Rezepte',
@@ -41,6 +43,9 @@ I18N.register('de', {
   'home.noMatch': 'Keine Rezepte passen zu deiner Suche',
 
   'card.yourRecipe': 'Dein Rezept',
+  'card.madeIt': 'Nachgekocht',
+  'card.madeOn': 'nachgekocht am {d}',
+  'card.forkedOn': 'abgeleitet am {d}',
   'card.remix': 'Remix',
   'card.communityRecipe': 'Community-Rezept',
   'card.communityCollection': 'Community-Sammlung',

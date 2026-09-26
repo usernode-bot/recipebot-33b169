@@ -473,6 +473,99 @@ function recipeRoutes(config) {
     }
   });
 
+  // ── Personal cookbook ────────────────────────────────────────────
+  // Everything the requester personally cooked or forked: rows are
+  // derived from made_it_marks (shared recipes and own conversations) and
+  // from own conversations with remix lineage — no second copy of recipe
+  // state to keep in sync. One row per target (multiple "made it" marks
+  // collapse; latest wins), most recent activity first.
+  // Shared targets carry the full card shape the feed uses; conversation
+  // targets carry what /api/recipes rows carry. `reason` says why the row
+  // is in the cookbook ('made' or 'fork') and `reason_at` is the timestamp
+  // the UI displays for it. Optional ?q= filters by title (shared branch)
+  // or conversation/latest-recipe title (conversation branch).
+  router.get('/api/cookbook', async (req, res) => {
+    const owner = ownerClause('mm.user_id');
+    const convOwner = ownerClause('c.user_id');
+    const params = [req.user.id];
+    let sharedWhere = '';
+    let convWhere = '';
+    if (typeof req.query.q === 'string' && req.query.q.trim()) {
+      params.push(`%${req.query.q.trim()}%`);
+      const needle = `$${params.length}`;
+      sharedWhere = ` AND (s.recipe_data->>'title' ILIKE ${needle}
+         OR s.username ILIKE ${needle}
+         OR s.tags::text ILIKE ${needle})`;
+      convWhere = ` AND (c.title ILIKE ${needle}
+         OR m.recipe_data->>'title' ILIKE ${needle}
+         OR (m.recipe_data->'tags')::text ILIKE ${needle})`;
+    }
+    try {
+      const [sharedRows, convRows] = await Promise.all([
+        pool.query(
+          `SELECT DISTINCT ON (s.id)
+             s.id, s.user_id, s.username, s.conversation_id,
+             s.recipe_data AS data, s.created_at, s.share_slug, s.tags,
+             s.forked_from_shared_id, s.forked_from_version, s.forked_from_username,
+             COALESCE((SELECT MAX(v.version) FROM shared_recipe_versions v
+                       WHERE v.shared_recipe_id = s.id), 1)::int AS current_version,
+             COALESCE(agg.avg_rating, 0)::float AS avg_rating,
+             COALESCE(agg.rating_count, 0)::int AS rating_count,
+             my.rating AS my_rating,
+             ${SOCIAL_COUNTS},
+             EXISTS (SELECT 1 FROM recipe_favorites f
+                     WHERE f.shared_recipe_id = s.id AND f.user_id = $1) AS is_favorited,
+             (s.user_id = $1) AS is_mine,
+             NULL::int AS shared_id,
+             'made'::varchar AS reason,
+             mm.created_at AS reason_at,
+             NULL::varchar AS conversation_title,
+             NULL::int AS conv_id
+           FROM made_it_marks mm
+           JOIN shared_recipes s ON s.id = mm.shared_recipe_id
+           ${RATING_AGG}
+           WHERE ${owner} AND mm.conversation_id IS NULL${sharedWhere}
+           ORDER BY s.id, mm.created_at DESC`,
+          params
+        ),
+        pool.query(
+          `SELECT DISTINCT ON (c.id)
+             m.id, m.recipe_data AS data, m.conversation_id, m.created_at,
+             c.title AS conversation_title,
+             EXISTS (SELECT 1 FROM recipe_favorites f
+                     WHERE f.conversation_id = c.id AND f.user_id = $1) AS is_favorited,
+             EXISTS (SELECT 1 FROM shared_recipes s
+                     WHERE s.conversation_id = c.id) AS is_shared,
+             (SELECT COUNT(*) FROM made_it_marks mm2 WHERE mm2.conversation_id = c.id)::int AS made_count,
+             c.forked_from_shared_id, c.forked_from_username,
+             NULL::int AS shared_id,
+             CASE WHEN mm.id IS NOT NULL THEN 'made'::varchar ELSE 'fork'::varchar END AS reason,
+             COALESCE(mm.created_at, c.created_at) AS reason_at,
+             c.id AS conv_id
+           FROM messages m
+           JOIN conversations c ON c.id = m.conversation_id
+           LEFT JOIN made_it_marks mm ON mm.conversation_id = c.id AND ${owner}
+           WHERE ${convOwner} AND m.recipe_data IS NOT NULL
+             AND (c.forked_from_shared_id IS NOT NULL OR mm.id IS NOT NULL)${convWhere}
+           ORDER BY c.id, m.created_at DESC`,
+          params
+        ),
+      ]);
+      // Postgres UNION needs identical column order across both branches;
+      // two queries merged here are the safer form of the same result.
+      const rows = [...sharedRows.rows, ...convRows.rows]
+        .sort((a, b) => {
+          const ta = Date.parse(a.reason_at) || 0;
+          const tb = Date.parse(b.reason_at) || 0;
+          return tb - ta || (b.id || 0) - (a.id || 0);
+        });
+      res.json(rows);
+    } catch (err) {
+      log.error('recipes', 'Cookbook list failed', { message: err.message });
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   return router;
 }
 

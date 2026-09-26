@@ -34,6 +34,8 @@ I18N.register('id', {
   'home.collectionsEmpty': 'Kelompokkan resepmu dalam satu rak —',
   'home.favorites': 'Favoritmu',
   'home.yourRecipes': 'Resepmu',
+  'home.cookbook': 'Buku resep',
+  'home.cookbookSearch': 'Cari di buku resepmu...',
   'home.communityRecipes': 'Resep komunitas',
   'home.communityCollections': 'Koleksi komunitas',
   'home.emptyTitle': 'Belum ada resep',
@@ -41,6 +43,9 @@ I18N.register('id', {
   'home.noMatch': 'Tidak ada resep yang cocok dengan pencarianmu',
 
   'card.yourRecipe': 'Resepmu',
+  'card.madeIt': 'Sudah dibuat',
+  'card.madeOn': 'dibuat {d}',
+  'card.forkedOn': 'dibifurkasi {d}',
   'card.remix': 'Remix',
   'card.communityRecipe': 'Resep komunitas',
   'card.communityCollection': 'Koleksi komunitas',

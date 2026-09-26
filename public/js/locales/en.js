@@ -40,6 +40,8 @@ I18N.register('en', {
   'home.collectionsEmpty': 'Group your recipes into a shelf —',
   'home.favorites': 'Your favorites',
   'home.yourRecipes': 'Your recipes',
+  'home.cookbook': 'Cookbook',
+  'home.cookbookSearch': 'Search your cookbook...',
   'home.communityRecipes': 'Community recipes',
   'home.communityCollections': 'Community collections',
   'home.emptyTitle': 'No recipes yet',
@@ -48,6 +50,9 @@ I18N.register('en', {
 
   // ── Cards ──
   'card.yourRecipe': 'Your recipe',
+  'card.madeIt': 'Made it',
+  'card.madeOn': 'made it {d}',
+  'card.forkedOn': 'forked {d}',
   'card.remix': 'Remix',
   'card.communityRecipe': 'Community recipe',
   'card.communityCollection': 'Community collection',
