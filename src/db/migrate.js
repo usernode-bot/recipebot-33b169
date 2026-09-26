@@ -603,9 +603,29 @@ async function seedStagingDemo(pool) {
        (900001, 900101, 'staging-demo-cook', 900001, NULL, 'Staging demo note: came out great, added extra ginger.'),
        (900002, 900102, 'staging-demo-baker', 900001, NULL, NULL),
        (900003, 900101, 'staging-demo-cook', 900001, NULL, NULL),
-       (900004, 0, 'staging-demo-user', NULL, 900001, NULL)
+       (900004, 0, 'staging-demo-user', NULL, 900001, NULL),
+       (900005, 0, 'staging-demo-user', 900002, NULL, NULL)
      ON CONFLICT (id) DO NOTHING`
   );
+  // Cookbook seeds (the Made it / Forked tab): the demo user (sentinel 0)
+  // must see the tab populated in staging — a cooked shared recipe, a
+  // cooked own conversation, and one forked conversation. Same
+  // idempotent, fixed-id pattern as every seed above. These rows READ as
+  // demo data but do not fabricate a decision the app checks against
+  // (made-it marks and fork lineage are user actions, not computed state).
+  await pool.query(
+    `INSERT INTO conversations (id, user_id, title, preferences, forked_from_shared_id, forked_from_version, forked_from_username)
+     VALUES (900009, 0, 'Staging demo: Forked Tofu Stir Fry', '{}', 900002, 2, 'staging-demo-chef')
+     ON CONFLICT (id) DO NOTHING`
+  );
+  const FORKED_DEMO = { ...DEMO_RECIPE_2, title: 'Staging Demo Forked Tofu Stir Fry' };
+  await pool.query(
+    `INSERT INTO messages (conversation_id, role, content, recipe_data)
+     SELECT 900009, 'assistant', $1::text, $2::jsonb
+     WHERE NOT EXISTS (SELECT 1 FROM messages WHERE conversation_id = 900009)`,
+    ['[Recipe: Staging Demo Forked Tofu Stir Fry]', JSON.stringify(FORKED_DEMO)]
+  );
+  log.info('db', 'Seeded staging cookbook demo rows');
 
   // Comments: one live, one soft-deleted (renders as "comment deleted").
   await pool.query(
