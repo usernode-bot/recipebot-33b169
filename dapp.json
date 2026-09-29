@@ -81,6 +81,16 @@
       "expectSelector": "#new-conversation-btn"
     },
     {
+      "name": "No-match create-for-search button renders",
+      "path": "/",
+      "expectSelector": "#home-create-for-search-btn"
+    },
+    {
+      "name": "No-match create-for-search button is hidden without a search",
+      "path": "/",
+      "expectSelector": "#home-no-match.hidden #home-create-for-search-btn"
+    },
+    {
       "name": "Homepage renders",
       "path": "/",
       "expectSelector": "#homepage"

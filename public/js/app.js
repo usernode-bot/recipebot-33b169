@@ -683,23 +683,38 @@ function setupPreferences() {
   });
 }
 
+// Open the "new recipe" chat view, optionally with a prefill string in the
+// message box. Callers pass no argument to use the current homepage search
+// text, an empty string to force an empty box. Chat.clear() resets the input,
+// so the prefill goes in after it and before the focus call.
+App.startNewConversation = function (prefill) {
+  if (App.isAnonymous) return App.promptSignIn(t('signin.createRecipes'));
+  App.currentConversationId = null;
+  App.currentRecipe = null;
+  App.pendingRecipe = null;
+  App.viewingShared = null;
+  App.viewingVersion = null;
+  App.showView('chat');
+  // No recipe yet — the message box is the point of this screen.
+  App.setMobileTab?.('chat');
+  HashParams.clear();
+  App.setSignInPath?.(null);
+  if (typeof Chat !== 'undefined') Chat.clear();
+  const input = document.getElementById('chat-input');
+  const query =
+    prefill === undefined && typeof Home !== 'undefined'
+      ? Home.searchQuery
+      : prefill;
+  const trimmed = String(query ?? '').trim();
+  if (trimmed && input) input.value = trimmed;
+  document.getElementById('recipe-display')?.classList.add('hidden');
+  document.getElementById('recipe-empty')?.classList.remove('hidden');
+  input?.focus();
+};
+
 function setupNewConversation() {
   document.getElementById('new-conversation-btn').addEventListener('click', () => {
-    if (App.isAnonymous) return App.promptSignIn(t('signin.createRecipes'));
-    App.currentConversationId = null;
-    App.currentRecipe = null;
-    App.pendingRecipe = null;
-    App.viewingShared = null;
-    App.viewingVersion = null;
-    App.showView('chat');
-    // No recipe yet — the message box is the point of this screen.
-    App.setMobileTab?.('chat');
-    HashParams.clear();
-    App.setSignInPath?.(null);
-    if (typeof Chat !== 'undefined') Chat.clear();
-    document.getElementById('recipe-display')?.classList.add('hidden');
-    document.getElementById('recipe-empty')?.classList.remove('hidden');
-    document.getElementById('chat-input')?.focus();
+    App.startNewConversation();
   });
 }
 

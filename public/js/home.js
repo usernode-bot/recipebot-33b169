@@ -237,6 +237,13 @@ const Home = {
       favOwn.length + favShared.length + mineRest.length + bareConvs.length + shared.length;
     emptyEl?.classList.toggle('hidden', !(visible === 0 && !q && colls.length === 0));
     noMatchEl?.classList.toggle('hidden', !(visible === 0 && q));
+    // The no-match action names what was typed — the exact search text, not
+    // the lowercased match key. render() runs on every input event, so the
+    // label tracks the box as the user types (issue #51).
+    const createForSearchBtn = document.getElementById('home-create-for-search-btn');
+    if (createForSearchBtn) {
+      createForSearchBtn.textContent = t('home.createForSearch', { search: this.searchQuery.trim() });
+    }
   },
 
   // ── Tag filter chips (community feed) ─────────────────────────────
@@ -1102,6 +1109,13 @@ const Home = {
 document.getElementById('home-search')?.addEventListener('input', (e) => {
   Home.searchQuery = e.target.value;
   Home.render();
+});
+// Issue #51 — the no-match empty state offers the searched recipe as a
+// one-click action. Same flow as the toolbar "+ New recipe": the shared
+// App.startNewConversation defaults to the current search text, so the new
+// recipe page opens with it prefilled in the message box.
+document.getElementById('home-create-for-search-btn')?.addEventListener('click', () => {
+  App.startNewConversation(Home.searchQuery);
 });
 document.getElementById('new-collection-btn')?.addEventListener('click', () => {
   Home.openNewCollection();
