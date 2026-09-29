@@ -80,7 +80,7 @@ const CommentThread = {
     form.className = 'flex gap-2 mt-2';
     form.innerHTML = `
       <input type="text" maxlength="1000" placeholder="${this.esc(opts.placeholder || t('social.addComment'))}"
-        class="comment-input flex-1 min-w-0 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        class="comment-input flex-1 min-w-0 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-base sm:text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
       <button type="submit" class="px-4 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors shrink-0">${t('common.post')}</button>`;
     form.addEventListener('submit', (e) => {
       e.preventDefault();
