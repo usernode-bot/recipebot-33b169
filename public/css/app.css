@@ -126,8 +126,20 @@
 }
 
 /* ── Editorial type: Fraunces for display, Inter for body ─────────── */
+/* Fill the visible viewport, not the layout viewport: 100vh ignores the
+   on-screen keyboard on phones, so the fixed-height app locked the comment
+   form behind it. 100dvh tracks the keyboard; the 100vh line stays as the
+   fallback for older browsers. h-screen was dropped from the body tag in
+   index.html because the class selector would beat this element rule. */
 body {
+  height: 100vh;
   font-family: Inter, system-ui, -apple-system, sans-serif;
+}
+
+@supports (height: 100dvh) {
+  body {
+    height: 100dvh;
+  }
 }
 
 h1, h2, h3, .font-display {
