@@ -237,6 +237,13 @@ const Home = {
       favOwn.length + favShared.length + mineRest.length + bareConvs.length + shared.length;
     emptyEl?.classList.toggle('hidden', !(visible === 0 && !q && colls.length === 0));
     noMatchEl?.classList.toggle('hidden', !(visible === 0 && q));
+    // The no-match empty state's one action is a new recipe named for the
+    // search text (issue #51). Label is dynamic — render() owns it, not a
+    // data-i18n attribute.
+    const noMatchCreateBtn = document.getElementById('home-no-match-create-btn');
+    if (noMatchCreateBtn) {
+      noMatchCreateBtn.textContent = t('home.noMatchCreate', { q: this.searchQuery.trim() });
+    }
   },
 
   // ── Tag filter chips (community feed) ─────────────────────────────
@@ -1102,6 +1109,9 @@ const Home = {
 document.getElementById('home-search')?.addEventListener('input', (e) => {
   Home.searchQuery = e.target.value;
   Home.render();
+});
+document.getElementById('home-no-match-create-btn')?.addEventListener('click', () => {
+  App.startNewRecipe(document.getElementById('home-search')?.value.trim());
 });
 document.getElementById('new-collection-btn')?.addEventListener('click', () => {
   Home.openNewCollection();
