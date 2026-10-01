@@ -8,6 +8,7 @@ const { authMiddleware } = require('./src/middleware/auth');
 const { authRoutes } = require('./src/routes/auth');
 const { conversationRoutes } = require('./src/routes/conversations');
 const { recipeRoutes } = require('./src/routes/recipes');
+const { cookbookRoutes } = require('./src/routes/cookbook');
 const { chatRoutes } = require('./src/routes/chat');
 const { collectionRoutes } = require('./src/routes/collections');
 const { publicRoutes } = require('./src/routes/public');
@@ -42,6 +43,7 @@ app.use(publicRoutes(config));
 app.use(authRoutes(config));
 app.use(conversationRoutes(config));
 app.use(recipeRoutes(config));
+app.use(cookbookRoutes(config));
 app.use(chatRoutes(config));
 app.use(collectionRoutes(config));
 

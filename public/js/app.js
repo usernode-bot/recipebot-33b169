@@ -201,7 +201,7 @@ window.Router = {
   MAX_AGE_MS: 30_000,
   // `coll` addresses an open collection so a refresh (or signing in from a
   // public collection) comes back to it instead of the box.
-  ROUTE_KEYS: ['c', 's', 'coll', 'cook', 'ing', 'mac', 'ch'],
+  ROUTE_KEYS: ['c', 's', 'coll', 'cookbook', 'cook', 'ing', 'mac', 'ch'],
 
   // Hash params win over query params when both carry the same key.
   read() {
@@ -410,7 +410,7 @@ document.addEventListener('visibilitychange', () => {
   // No route in the URL? A refresh inside the platform shell arrives with a
   // route-less iframe src, so fall back to the route the previous document
   // saved (see Router.restoreCandidate for the eligibility rules).
-  if (!route.c && !route.s && !route.coll && !joinToken) {
+  if (!route.c && !route.s && !route.coll && !route.cookbook && !joinToken) {
     const candidate = Router.restoreCandidate();
     if (candidate) route = Router.adopt(candidate);
   }
@@ -485,6 +485,21 @@ function openUiState(name) {
 // (read-only shared recipe) when both are somehow present.
 async function restoreRoute(route) {
   if (typeof Store === 'undefined') return App.showView('home');
+
+  // The Cookbook tab lives on the homepage (same as a collection detail).
+  // Resolved before the recipe routes so /?cookbook=1&c=… keeps working if
+  // both ever end up in one URL.
+  if (route.cookbook) {
+    App.showView('home');
+    if (typeof Home !== 'undefined' && !App.isAnonymous) {
+      Home.activeCookbook = true;
+      await Home.refreshCookbook();
+    } else if (typeof Home !== 'undefined') {
+      Home.activeCookbook = false;
+    }
+    if (typeof Home !== 'undefined') Home.render();
+    return;
+  }
 
   // A collection lives on the homepage (it replaces the box), so it's
   // resolved before the recipe routes and needs no panel setup. Home.refresh
@@ -571,6 +586,7 @@ function setupHomeButton() {
     HashParams.set('c', null);
     HashParams.set('s', null);
     HashParams.set('coll', null);
+    HashParams.set('cookbook', null);
     HashParams.set('cook', null);
     App.setSignInPath?.(null);
     if (typeof Home !== 'undefined') Home.activeCollection = null;

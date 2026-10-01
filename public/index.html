@@ -360,10 +360,18 @@
         <div id="home-toolbar" class="sticky top-0 z-10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 bg-zinc-50/85 dark:bg-zinc-950/85 backdrop-blur flex flex-col sm:flex-row gap-2 sm:items-center">
           <input id="home-search" type="search" placeholder="Search recipes..." autocomplete="off" data-i18n-placeholder="home.searchPlaceholder"
             class="flex-1 min-w-0 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <button id="cookbook-tab-btn" class="shrink-0 rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 px-4 py-2 text-sm font-medium transition-colors" data-i18n="home.cookbook">
+            Cookbook
+          </button>
           <button id="new-conversation-btn" class="shrink-0 rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-sm font-medium text-white transition-colors" data-i18n="home.newRecipe">
             + New recipe
           </button>
         </div>
+        <!-- Cookbook tab (Your box / your Cookbook): recipes the user marked
+             Made it or forked, over the same data the box already owns
+             (GET /api/cookbook). Hidden by default; shown by home.js when
+             activeCookbook is set. -->
+        <div id="cookbook-view" class="hidden"></div>
         <!-- Collection detail (opened from a collection card; hides the box sections) -->
         <div id="collection-view" class="hidden"></div>
 
