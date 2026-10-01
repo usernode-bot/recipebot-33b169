@@ -5,30 +5,39 @@ const log = require('./logger');
 // PATCH validator, and the per-message model resolution in the chat route.
 const MODELS = [
   {
-    id: 'claude-sonnet-5',
-    label: 'Claude Sonnet 5',
+    id: 'claude-sonnet-5-5',
+    label: 'Sonnet 5.5',
     description: 'Best all-around quality. Recommended.',
     default: true,
   },
   {
-    id: 'claude-haiku-4-5',
-    label: 'Claude Haiku 4.5',
-    description: 'Fastest and cheapest — good for simple recipes.',
-  },
-  {
-    id: 'claude-opus-4-8',
-    label: 'Claude Opus 4.8',
+    id: 'claude-opus-5-5',
+    label: 'Opus 5.5',
     description: 'Most capable, slower and uses more of your daily AI budget.',
   },
 ];
 
 const DEFAULT_MODEL = MODELS.find((m) => m.default).id;
 
+// Ids this app used to offer (issue #74 replaced them) and the model that took
+// each one's place. A saved preference, an ANTHROPIC_MODEL env value, or a
+// stale client still naming one resolves to its successor by name, so nobody
+// is sent a model the picker no longer offers. Haiku has no successor in the
+// list and falls back to the default.
+const RETIRED_MODELS = Object.freeze({
+  'claude-sonnet-5': 'claude-sonnet-5-5',
+  'claude-opus-4-8': 'claude-opus-5-5',
+  'claude-haiku-4-5': DEFAULT_MODEL,
+});
+
 // Standard list prices in dollars per million tokens, used to estimate the
 // user's daily spend ("AI usage today" in the user menu). The platform proxy
 // does its own billing, so this is an estimate — standard (non-introductory)
-// prices are used deliberately as a conservative over-estimate.
+// prices are used deliberately as a conservative over-estimate. Retired ids
+// stay priced so a turn already in flight when the list changed still counts.
 const MODEL_PRICING = {
+  'claude-sonnet-5-5': { input: 3, output: 15 },
+  'claude-opus-5-5': { input: 4, output: 20 },
   'claude-sonnet-5': { input: 3, output: 15 },
   'claude-haiku-4-5': { input: 1, output: 5 },
   'claude-opus-4-8': { input: 5, output: 25 },
@@ -39,10 +48,10 @@ const MODEL_PRICING = {
 // token, so accumulation stays integer-exact.
 // Cache reads bill at 0.1x input rate, cache writes at 1.25x (unused today,
 // but the fields cost nothing to handle). Unknown models fall back to
-// Sonnet 5 pricing.
+// Sonnet 5.5 pricing.
 function estimateMicrocents(model, usage) {
   if (!usage) return 0;
-  const pricing = MODEL_PRICING[model] || MODEL_PRICING['claude-sonnet-5'];
+  const pricing = MODEL_PRICING[model] || MODEL_PRICING['claude-sonnet-5-5'];
   const inputMicrocentsPerTok = pricing.input * 100;
   const outputMicrocentsPerTok = pricing.output * 100;
   const cost =
@@ -55,6 +64,24 @@ function estimateMicrocents(model, usage) {
 
 function isValidModel(id) {
   return typeof id === 'string' && MODELS.some((m) => m.id === id);
+}
+
+// Map a stored or configured model id onto one the picker offers: a current
+// id as is, a retired id to its successor, anything else (missing, unknown)
+// to `fallback` (itself resolved, so a retired fallback is safe too).
+function resolveModel(id, fallback = DEFAULT_MODEL) {
+  if (isValidModel(id)) return id;
+  if (typeof id === 'string' && Object.prototype.hasOwnProperty.call(RETIRED_MODELS, id)) {
+    return RETIRED_MODELS[id];
+  }
+  if (fallback !== DEFAULT_MODEL) return resolveModel(fallback);
+  return DEFAULT_MODEL;
+}
+
+// The server-wide default: ANTHROPIC_MODEL when it names (or retired-maps to)
+// an offered model, else DEFAULT_MODEL.
+function defaultModelFor(config) {
+  return resolveModel(config && config.anthropicModel);
 }
 
 // Supported UI languages (code → English name for the prompt directive).
@@ -79,7 +106,7 @@ function resolveLocale(tag) {
 }
 
 // Haiku 4.5 (and older dated snapshots) still take the pre-4.6 thinking shape
-// `{type: 'enabled', budget_tokens}`. Sonnet 5 / Opus 4.8 reject budget_tokens
+// `{type: 'enabled', budget_tokens}`. Sonnet 5.5 / Opus 5.5 reject budget_tokens
 // and non-default sampling params with a 400 — they use adaptive thinking.
 function usesLegacyThinking(model) {
   return /haiku|-4-5-|sonnet-4-5|opus-4-5/.test(model);
@@ -720,7 +747,7 @@ function buildMessages(history) {
 }
 
 function getCreateParams(config, messages, systemPrompt, { model, forceRecipeTool } = {}) {
-  const resolvedModel = model || config.anthropicModel;
+  const resolvedModel = model || defaultModelFor(config);
   const params = {
     model: resolvedModel,
     // 16384: a full recipe re-emit (per-ingredient grams/volume/macros) plus
@@ -765,7 +792,10 @@ module.exports = {
   TOOLS,
   MODELS,
   DEFAULT_MODEL,
+  RETIRED_MODELS,
   isValidModel,
+  resolveModel,
+  defaultModelFor,
   SUPPORTED_LANGUAGES,
   resolveLocale,
   estimateMicrocents,

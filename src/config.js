@@ -27,7 +27,7 @@ function load() {
     llmProxyToken: process.env.USERNODE_LLM_PROXY_TOKEN || '',
     // Optional direct-API fallback (owner-provided secret)
     anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
-    anthropicModel: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5',
+    anthropicModel: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5',
     thinkingEnabled: process.env.THINKING_ENABLED !== 'false',
     thinkingBudget: parseInt(process.env.THINKING_BUDGET || '4096', 10),
     defaultDailyMsgLimit: parseInt(process.env.DEFAULT_DAILY_MSG_LIMIT || '50', 10),

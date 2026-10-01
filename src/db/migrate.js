@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { getPool } = require('./pool');
 const log = require('../services/logger');
+const { RETIRED_MODELS } = require('../services/llm');
 
 // Sentinel owner for staging demo rows. In staging, list endpoints include
 // this user's rows so testers see a populated homepage/recipe panel.
@@ -33,6 +34,20 @@ async function migrate(config) {
   );
   if (rowCount > 0) {
     log.info('db', `Cleaned up ${rowCount} stale pending_replies`);
+  }
+
+  // Issue #74: saved model picks of a retired model move to its successor
+  // (Sonnet 5 -> Sonnet 5.5, Opus 4.8 -> Opus 5.5, Haiku 4.5 -> default).
+  // Idempotent: only rows still naming a retired id are touched. Reads also
+  // resolve retired ids (llm.resolveModel), so this only tidies storage.
+  for (const [from, to] of Object.entries(RETIRED_MODELS)) {
+    const { rowCount: moved } = await pool.query(
+      `UPDATE user_settings
+       SET preferences = jsonb_set(preferences, '{model}', to_jsonb($2::text))
+       WHERE preferences->>'model' = $1`,
+      [from, to]
+    );
+    if (moved > 0) log.info('db', `Moved ${moved} saved model preferences from ${from} to ${to}`);
   }
 
   if (config.isStaging) {
@@ -634,7 +649,7 @@ async function seedStagingDemo(pool) {
   // staging:private, so staging starts empty). Seeded fresh for *today*
   // (UTC) each boot so it never goes stale; the upsert SETs fixed values
   // rather than accumulating, so reboots don't inflate it. 45k in / 12k out
-  // at Sonnet 5 pricing = 31,500,000 microcents ≈ $0.32.
+  // at Sonnet 5.5 pricing = 31,500,000 microcents ≈ $0.32.
   await pool.query(
     `INSERT INTO llm_usage (user_id, date, input_tokens, output_tokens, estimated_microcents)
      VALUES ($1, (NOW() AT TIME ZONE 'utc')::date, 45000, 12000, 31500000)

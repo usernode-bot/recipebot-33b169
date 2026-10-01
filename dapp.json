@@ -22,7 +22,7 @@
       "key": "ANTHROPIC_MODEL",
       "description": "Default Claude model id for recipe chat (users can pick their own in App settings)",
       "required": false,
-      "default": "claude-sonnet-5"
+      "default": "claude-sonnet-5-5"
     },
     {
       "key": "THINKING_ENABLED",
@@ -123,7 +123,7 @@
     {
       "name": "Theme menu explains the System option",
       "path": "/?ui=theme",
-      "expectText": "Match your device setting"
+      "expectSelector": "#theme-menu [data-theme-mode=\"system\"] [data-i18n=\"theme.systemHint\"]"
     },
     {
       "name": "i18n-annotated markup renders",

@@ -173,7 +173,7 @@
   function currentModel() {
     if (App.preferences && App.preferences.model) return App.preferences.model;
     if (App.llm && App.llm.model) return App.llm.model;
-    return 'claude-sonnet-5';
+    return 'claude-sonnet-5-5';
   }
 
   function renderOptions() {

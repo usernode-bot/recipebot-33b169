@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { EventEmitter } = require('events');
 const { getPool } = require('../db/pool');
-const { createMessage, streamMessage, isRetryable, isEnabled, buildSystemPrompt, getCreateParams, isValidModel, resolveLocale, estimateMicrocents, LLM_IDLE_TIMEOUT_MS, LLM_MAX_TURN_MS } = require('../services/llm');
+const { createMessage, streamMessage, isRetryable, isEnabled, buildSystemPrompt, getCreateParams, resolveModel, defaultModelFor, resolveLocale, estimateMicrocents, LLM_IDLE_TIMEOUT_MS, LLM_MAX_TURN_MS } = require('../services/llm');
 const { validate, getSchemaReminder } = require('../services/recipe-validator');
 const { fetchWebpage, MAX_CONTENT_LENGTH } = require('../services/web');
 const { webSearch, init: initSearch } = require('../services/search');
@@ -239,14 +239,14 @@ function chatRoutes(config) {
 
       // Per-user model choice (saved via the settings modal); falls back to
       // the server default for missing rows or stale/unknown saved ids.
-      let userModel = config.anthropicModel;
+      let userModel = defaultModelFor(config);
       try {
         const { rows: settingsRows } = await pool.query(
           'SELECT preferences FROM user_settings WHERE user_id = $1',
           [req.user.id]
         );
         const savedModel = settingsRows.length ? (settingsRows[0].preferences || {}).model : null;
-        if (isValidModel(savedModel)) userModel = savedModel;
+        if (savedModel) userModel = resolveModel(savedModel, userModel);
       } catch (err) {
         log.warn('chat', 'Failed to load user model preference', { message: err.message });
       }
@@ -470,14 +470,14 @@ function chatRoutes(config) {
       ).catch((err) =>
         log.warn('chat', 'Failed to supersede older replies', { message: err.message }));
 
-      let userModel = config.anthropicModel;
+      let userModel = defaultModelFor(config);
       try {
         const { rows: settingsRows } = await pool.query(
           'SELECT preferences FROM user_settings WHERE user_id = $1',
           [req.user.id]
         );
         const savedModel = settingsRows.length ? (settingsRows[0].preferences || {}).model : null;
-        if (isValidModel(savedModel)) userModel = savedModel;
+        if (savedModel) userModel = resolveModel(savedModel, userModel);
       } catch (err) {
         log.warn('chat', 'Failed to load user model preference', { message: err.message });
       }
