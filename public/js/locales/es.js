@@ -247,6 +247,8 @@ I18N.register('es', {
   'recipe.copyMd': 'Copiar Markdown',
   'recipe.downloadJson': 'Descargar JSON',
   'recipe.importJson': 'Importar JSON',
+  'recipe.playlistLabel': 'Cocinar con:',
+  'recipe.playlistTitle': 'Abrir una playlist de YouTube acorde en una pestaña nueva',
   'recipe.notesLabel': 'Notas:',
   'recipe.madeIt': '☑ La hice',
   'recipe.madeItTitle': 'Marca que cocinaste esto (nota opcional)',
