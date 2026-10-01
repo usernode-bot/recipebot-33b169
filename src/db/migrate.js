@@ -95,6 +95,7 @@ const DEMO_RECIPE = {
   prep_time: '15 min',
   cook_time: '10 min',
   tags: ['chinese', 'dinner', 'one-pot'],
+  playlist: { title: 'Wok sizzle & lo-fi beats', query: 'lofi cooking beats playlist' },
   notes: 'Staging demo data — works with tofu instead of chicken.',
   steps: [
     {

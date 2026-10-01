@@ -247,6 +247,8 @@ I18N.register('id', {
   'recipe.copyMd': 'Salin Markdown',
   'recipe.downloadJson': 'Unduh JSON',
   'recipe.importJson': 'Impor JSON',
+  'recipe.playlistLabel': 'Masak dengan:',
+  'recipe.playlistTitle': 'Buka playlist YouTube yang cocok di tab baru',
   'recipe.notesLabel': 'Catatan:',
   'recipe.madeIt': '☑ Sudah dibuat',
   'recipe.madeItTitle': 'Tandai bahwa kamu memasak ini (catatan opsional)',

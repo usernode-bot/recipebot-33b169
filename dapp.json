@@ -122,7 +122,7 @@
     },
     {
       "name": "Theme menu explains the System option",
-      "path": "/",
+      "path": "/?ui=theme",
       "expectSelector": "#theme-menu [data-theme-mode=\"system\"] [data-i18n=\"theme.systemHint\"]"
     },
     {
@@ -244,6 +244,21 @@
       "name": "Shared recipe deep link shows author byline",
       "path": "/?s=900001",
       "expectText": "staging-demo-user"
+    },
+    {
+      "name": "Playlist suggestion renders on a shared recipe",
+      "path": "/?s=900001",
+      "expectSelector": "#playlist-link"
+    },
+    {
+      "name": "Playlist suggestion shows the seeded vibe",
+      "path": "/?s=900001",
+      "expectText": "Cook to: Wok sizzle & lo-fi beats"
+    },
+    {
+      "name": "Playlist suggestion renders in cooking mode",
+      "path": "/?c=900003&cook=1",
+      "expectSelector": "#cooking-overlay #playlist-link"
     },
     {
       "name": "Cooking mode deep link renders",

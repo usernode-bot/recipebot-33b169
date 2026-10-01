@@ -555,6 +555,8 @@ The user confirms tags when they publish, so propose your best guess.
 
 If the recipe produces naturally countable items (tacos, cookies, mozzarella sticks, pancakes, etc.), include serving_item with count (items per serving) and name (plural item name). Omit serving_item for recipes like soups, stews, bowls, or anything not naturally counted.
 
+Also include a "playlist" object with every recipe: a cooking-music vibe matched to the dish. "title" is a short human vibe label written in the same language as the rest of the recipe (e.g. "Cozy Italian dinner jazz"). "query" is English YouTube search terms that find a fitting music playlist — end it in "playlist" and reflect the cuisine, course, and mood (e.g. "italian dinner jazz playlist", "thai street food cooking playlist"). The app turns "query" into a YouTube search link; NEVER invent a specific YouTube URL or playlist ID. When modifying an existing recipe, carry its playlist forward unchanged unless the user asks to change it.
+
 Use common US volume units (tsp, tbsp, cup, etc.). Provide accurate macro estimates for every ingredient.
 
 IMPORTANT: In step descriptions, NEVER include specific amounts or measurements for ingredients. Write "the water" not "60ml of water", "the flour" not "2 cups of flour", "the garlic" not "3 cloves of garlic". The ingredient list next to each step already shows the exact amounts, and those amounts update when the user changes servings — hardcoded amounts in descriptions would become wrong.
@@ -601,6 +603,15 @@ const TOOLS = [
             name: { type: 'string', description: 'Plural name of the item, e.g. "mozzarella sticks", "tacos", "cookies"' },
           },
           required: ['count', 'name'],
+        },
+        playlist: {
+          type: 'object',
+          description: 'A cooking-music vibe matched to the dish, shown as a "Cook to:" YouTube link. title: short vibe label in the recipe\'s language (e.g. "Cozy Italian dinner jazz"). query: English YouTube search terms ending in "playlist" (e.g. "italian dinner jazz playlist") — never a YouTube URL or playlist ID. Carry forward unchanged when modifying a recipe.',
+          properties: {
+            title: { type: 'string', description: 'Short music-vibe label, e.g. "Cozy Italian dinner jazz"' },
+            query: { type: 'string', description: 'English YouTube search terms, e.g. "italian dinner jazz playlist"' },
+          },
+          required: ['title', 'query'],
         },
         steps: {
           type: 'array',

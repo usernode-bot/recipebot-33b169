@@ -97,6 +97,7 @@ const CookingMode = {
       <div class="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
         <div class="flex items-center gap-3">
           <h2 class="text-lg font-semibold">${this.escapeHtml(recipe.title)}</h2>
+          ${typeof Recipe !== 'undefined' ? Recipe.playlistHtml(recipe, { compact: true }) : ''}
           <div id="cm-timers" class="flex flex-wrap gap-2"></div>
         </div>
         <div class="flex items-center gap-2">
