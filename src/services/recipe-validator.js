@@ -86,7 +86,23 @@ function validate(recipe) {
     errors.push('prep_time must be a string');
   }
 
-  // tags / provenance are optional additions — type-checked only when
+  // playlist is an optional addition — validated only when present so
+  // recipes generated before it existed stay valid and a missing playlist
+  // never triggers the fix-up retry loop (same pattern as tags/provenance).
+  if (recipe.playlist !== undefined && recipe.playlist !== null) {
+    if (typeof recipe.playlist !== 'object' || Array.isArray(recipe.playlist)) {
+      errors.push('playlist must be an object when present');
+    } else {
+      for (const key of ['title', 'query']) {
+        const v = recipe.playlist[key];
+        if (typeof v !== 'string' || !v.trim()) {
+          errors.push(`playlist.${key} must be a non-empty string`);
+        } else if (v.length > 120) {
+          errors.push(`playlist.${key} must be at most 120 characters`);
+        }
+      }
+    }
+  }
   // present so recipes generated before they existed stay valid, and a
   // missing tags array never triggers the fix-up retry loop.
   if (recipe.tags !== undefined && !Array.isArray(recipe.tags)) {
@@ -115,6 +131,7 @@ function getSchemaReminder() {
   "cook_time": "string",
   "notes": "string",
   "serving_item": { "count": number > 0, "name": "string" }  (optional, for countable items like tacos, cookies),
+  "playlist": { "title": "string", "query": "string" }  (optional, cooking-music vibe: query = English YouTube search terms ending in "playlist"),
   "steps": [  (required, non-empty)
     {
       "title": "string (required, 1-3 word step title)",

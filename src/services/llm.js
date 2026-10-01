@@ -5,30 +5,39 @@ const log = require('./logger');
 // PATCH validator, and the per-message model resolution in the chat route.
 const MODELS = [
   {
-    id: 'claude-sonnet-5',
-    label: 'Claude Sonnet 5',
+    id: 'claude-sonnet-5-5',
+    label: 'Sonnet 5.5',
     description: 'Best all-around quality. Recommended.',
     default: true,
   },
   {
-    id: 'claude-haiku-4-5',
-    label: 'Claude Haiku 4.5',
-    description: 'Fastest and cheapest — good for simple recipes.',
-  },
-  {
-    id: 'claude-opus-4-8',
-    label: 'Claude Opus 4.8',
+    id: 'claude-opus-5-5',
+    label: 'Opus 5.5',
     description: 'Most capable, slower and uses more of your daily AI budget.',
   },
 ];
 
 const DEFAULT_MODEL = MODELS.find((m) => m.default).id;
 
+// Ids this app used to offer (issue #74 replaced them) and the model that took
+// each one's place. A saved preference, an ANTHROPIC_MODEL env value, or a
+// stale client still naming one resolves to its successor by name, so nobody
+// is sent a model the picker no longer offers. Haiku has no successor in the
+// list and falls back to the default.
+const RETIRED_MODELS = Object.freeze({
+  'claude-sonnet-5': 'claude-sonnet-5-5',
+  'claude-opus-4-8': 'claude-opus-5-5',
+  'claude-haiku-4-5': DEFAULT_MODEL,
+});
+
 // Standard list prices in dollars per million tokens, used to estimate the
 // user's daily spend ("AI usage today" in the user menu). The platform proxy
 // does its own billing, so this is an estimate — standard (non-introductory)
-// prices are used deliberately as a conservative over-estimate.
+// prices are used deliberately as a conservative over-estimate. Retired ids
+// stay priced so a turn already in flight when the list changed still counts.
 const MODEL_PRICING = {
+  'claude-sonnet-5-5': { input: 3, output: 15 },
+  'claude-opus-5-5': { input: 4, output: 20 },
   'claude-sonnet-5': { input: 3, output: 15 },
   'claude-haiku-4-5': { input: 1, output: 5 },
   'claude-opus-4-8': { input: 5, output: 25 },
@@ -39,10 +48,10 @@ const MODEL_PRICING = {
 // token, so accumulation stays integer-exact.
 // Cache reads bill at 0.1x input rate, cache writes at 1.25x (unused today,
 // but the fields cost nothing to handle). Unknown models fall back to
-// Sonnet 5 pricing.
+// Sonnet 5.5 pricing.
 function estimateMicrocents(model, usage) {
   if (!usage) return 0;
-  const pricing = MODEL_PRICING[model] || MODEL_PRICING['claude-sonnet-5'];
+  const pricing = MODEL_PRICING[model] || MODEL_PRICING['claude-sonnet-5-5'];
   const inputMicrocentsPerTok = pricing.input * 100;
   const outputMicrocentsPerTok = pricing.output * 100;
   const cost =
@@ -55,6 +64,24 @@ function estimateMicrocents(model, usage) {
 
 function isValidModel(id) {
   return typeof id === 'string' && MODELS.some((m) => m.id === id);
+}
+
+// Map a stored or configured model id onto one the picker offers: a current
+// id as is, a retired id to its successor, anything else (missing, unknown)
+// to `fallback` (itself resolved, so a retired fallback is safe too).
+function resolveModel(id, fallback = DEFAULT_MODEL) {
+  if (isValidModel(id)) return id;
+  if (typeof id === 'string' && Object.prototype.hasOwnProperty.call(RETIRED_MODELS, id)) {
+    return RETIRED_MODELS[id];
+  }
+  if (fallback !== DEFAULT_MODEL) return resolveModel(fallback);
+  return DEFAULT_MODEL;
+}
+
+// The server-wide default: ANTHROPIC_MODEL when it names (or retired-maps to)
+// an offered model, else DEFAULT_MODEL.
+function defaultModelFor(config) {
+  return resolveModel(config && config.anthropicModel);
 }
 
 // Supported UI languages (code → English name for the prompt directive).
@@ -79,7 +106,7 @@ function resolveLocale(tag) {
 }
 
 // Haiku 4.5 (and older dated snapshots) still take the pre-4.6 thinking shape
-// `{type: 'enabled', budget_tokens}`. Sonnet 5 / Opus 4.8 reject budget_tokens
+// `{type: 'enabled', budget_tokens}`. Sonnet 5.5 / Opus 5.5 reject budget_tokens
 // and non-default sampling params with a 400 — they use adaptive thinking.
 function usesLegacyThinking(model) {
   return /haiku|-4-5-|sonnet-4-5|opus-4-5/.test(model);
@@ -528,6 +555,8 @@ The user confirms tags when they publish, so propose your best guess.
 
 If the recipe produces naturally countable items (tacos, cookies, mozzarella sticks, pancakes, etc.), include serving_item with count (items per serving) and name (plural item name). Omit serving_item for recipes like soups, stews, bowls, or anything not naturally counted.
 
+Also include a "playlist" object with every recipe: a cooking-music vibe matched to the dish. "title" is a short human vibe label written in the same language as the rest of the recipe (e.g. "Cozy Italian dinner jazz"). "query" is English YouTube search terms that find a fitting music playlist — end it in "playlist" and reflect the cuisine, course, and mood (e.g. "italian dinner jazz playlist", "thai street food cooking playlist"). The app turns "query" into a YouTube search link; NEVER invent a specific YouTube URL or playlist ID. When modifying an existing recipe, carry its playlist forward unchanged unless the user asks to change it.
+
 Use common US volume units (tsp, tbsp, cup, etc.). Provide accurate macro estimates for every ingredient.
 
 IMPORTANT: In step descriptions, NEVER include specific amounts or measurements for ingredients. Write "the water" not "60ml of water", "the flour" not "2 cups of flour", "the garlic" not "3 cloves of garlic". The ingredient list next to each step already shows the exact amounts, and those amounts update when the user changes servings — hardcoded amounts in descriptions would become wrong.
@@ -574,6 +603,15 @@ const TOOLS = [
             name: { type: 'string', description: 'Plural name of the item, e.g. "mozzarella sticks", "tacos", "cookies"' },
           },
           required: ['count', 'name'],
+        },
+        playlist: {
+          type: 'object',
+          description: 'A cooking-music vibe matched to the dish, shown as a "Cook to:" YouTube link. title: short vibe label in the recipe\'s language (e.g. "Cozy Italian dinner jazz"). query: English YouTube search terms ending in "playlist" (e.g. "italian dinner jazz playlist") — never a YouTube URL or playlist ID. Carry forward unchanged when modifying a recipe.',
+          properties: {
+            title: { type: 'string', description: 'Short music-vibe label, e.g. "Cozy Italian dinner jazz"' },
+            query: { type: 'string', description: 'English YouTube search terms, e.g. "italian dinner jazz playlist"' },
+          },
+          required: ['title', 'query'],
         },
         steps: {
           type: 'array',
@@ -709,7 +747,7 @@ function buildMessages(history) {
 }
 
 function getCreateParams(config, messages, systemPrompt, { model, forceRecipeTool } = {}) {
-  const resolvedModel = model || config.anthropicModel;
+  const resolvedModel = model || defaultModelFor(config);
   const params = {
     model: resolvedModel,
     // 16384: a full recipe re-emit (per-ingredient grams/volume/macros) plus
@@ -754,7 +792,10 @@ module.exports = {
   TOOLS,
   MODELS,
   DEFAULT_MODEL,
+  RETIRED_MODELS,
   isValidModel,
+  resolveModel,
+  defaultModelFor,
   SUPPORTED_LANGUAGES,
   resolveLocale,
   estimateMicrocents,

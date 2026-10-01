@@ -98,6 +98,7 @@ const Recipe = {
           ${bylineHtml}
           ${recipe.description ? `<p class="text-zinc-500 dark:text-zinc-400 text-sm mt-1.5 leading-relaxed">${this.renderInline(recipe.description)}</p>` : ''}
           ${tagChipsHtml}
+          ${this.playlistHtml(recipe)}
         </div>
 
         <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
@@ -178,6 +179,35 @@ const Recipe = {
     if (App.viewingShared?.id && !App.currentConversationId) {
       this.loadSocialSection(App.viewingShared.id);
     }
+  },
+
+  // ── "Cook to:" playlist suggestion (top-level playlist field) ──
+  // Rendered as a quiet pill like the tag chips; absent or malformed →
+  // nothing (a best-effort recipe from the fix-up path can carry a
+  // half-formed field). The link is a YouTube SEARCH built from the query,
+  // never a model-invented URL, so it always lands on real playlists.
+  hasPlaylist(recipe) {
+    const p = recipe?.playlist;
+    return !!(p && typeof p.title === 'string' && p.title.trim() &&
+      typeof p.query === 'string' && p.query.trim());
+  },
+
+  playlistUrl(p) {
+    return `https://www.youtube.com/results?search_query=${encodeURIComponent(p.query)}`;
+  },
+
+  playlistHtml(recipe, { compact = false } = {}) {
+    if (!this.hasPlaylist(recipe)) return '';
+    const url = this.playlistUrl(recipe.playlist);
+    return `
+      <a id="playlist-link" href="${url}" target="_blank" rel="noopener noreferrer"
+         class="inline-flex items-center gap-1.5 ${compact ? '' : 'mt-2'} px-2 py-0.5 text-[11px] rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+         title="${this.escapeHtml(t('recipe.playlistTitle'))}">
+        <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm12-2a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        <span>${t('recipe.playlistLabel')} ${this.escapeHtml(recipe.playlist.title)}</span>
+      </a>`;
   },
 
   saveUIState(display) {
@@ -1022,6 +1052,13 @@ const Recipe = {
     if (recipe.cook_time) md += ` | **${t('export.cook')}:** ${recipe.cook_time}`;
     md += `\n\n`;
     md += `**${t('export.macros')}:** ${Math.round(macros.calories)} cal | ${Math.round(macros.protein_g)}g ${t('export.protein')} | ${Math.round(macros.carbs_g)}g ${t('export.carbs')} | ${Math.round(macros.fat_g)}g ${t('export.fat')}\n\n`;
+
+    if (this.hasPlaylist(recipe)) {
+      // Strip markdown link syntax from the model-generated title so it can't
+      // break the [title](url) pair.
+      const safeTitle = recipe.playlist.title.replace(/[[\]()]/g, '');
+      md += `**${t('recipe.playlistLabel')}** [${safeTitle}](${this.playlistUrl(recipe.playlist)})\n\n`;
+    }
 
     md += `## ${t('export.ingredients')}\n\n`;
     recipe.steps.forEach((step, i) => {
