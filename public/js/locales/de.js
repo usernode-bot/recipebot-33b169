@@ -39,6 +39,7 @@ I18N.register('de', {
   'home.emptyTitle': 'Noch keine Rezepte',
   'home.emptySubtitle': 'Starte eine Unterhaltung, um ein Rezept zu erstellen, und teile es dann mit der Community.',
   'home.noMatch': 'Keine Rezepte passen zu deiner Suche',
+  'home.clearSearch': 'Suche löschen',
 
   'card.yourRecipe': 'Dein Rezept',
   'card.remix': 'Remix',

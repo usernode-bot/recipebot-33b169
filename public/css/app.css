@@ -135,7 +135,9 @@ h1, h2, h3, .font-display {
   letter-spacing: -0.01em;
 }
 
-/* Brass kicker — the small uppercase label above editorial cards. */
+/* Brass kicker — the small uppercase label above editorial cards.
+   Issue #63 adds cuisine tints; the base class stays brass so any card
+   without a cuisine tag (collections, saved copies) keeps its label. */
 .kicker {
   font-family: Inter, system-ui, sans-serif;
   font-size: 0.625rem;
@@ -144,6 +146,18 @@ h1, h2, h3, .font-display {
   text-transform: uppercase;
   color: #C9A227;
 }
+.kicker-sage      { color: #4F6A2B; }
+.kicker-chili     { color: #B54A2C; }
+.kicker-plum      { color: #634776; }
+.kicker-aegean    { color: #2D5768; }
+.kicker-lemongrass{ color: #8A6D17; }
+.kicker-moss      { color: #54632F; }
+.dark .kicker-sage       { color: #B9D7B1; }
+.dark .kicker-chili      { color: #EFB79F; }
+.dark .kicker-plum       { color: #D0BCCB; }
+.dark .kicker-aegean     { color: #A8D2DB; }
+.dark .kicker-lemongrass { color: #EFE1B3; }
+.dark .kicker-moss       { color: #B9D7B1; }
 
 /* Chat panel states */
 @media (min-width: 1024px) {

@@ -45,6 +45,7 @@ I18N.register('en', {
   'home.emptyTitle': 'No recipes yet',
   'home.emptySubtitle': 'Start a conversation to create a recipe, then share it to the community feed.',
   'home.noMatch': 'No recipes match your search',
+  'home.clearSearch': 'Clear search',
 
   // ── Cards ──
   'card.yourRecipe': 'Your recipe',

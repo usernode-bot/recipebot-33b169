@@ -51,6 +51,14 @@ const Home = {
 
   async refresh() {
     try {
+      // ?q= / #q= — screenshot-state deep link: open the homepage with the
+      // search already applied (empty state / no-match included). Pure UI
+      // state, no DB writes, so it works in every environment (issue #63).
+      if (!this.searchQuery) {
+        const params = HashParams.get();
+        const q = params.q || new URLSearchParams(location.search).get('q');
+        if (q) this.searchQuery = q;
+      }
       // Anonymous browse mode reads only the GET-only /api/public/ surface;
       // the personal box sections stay empty and hidden.
       if (App.isAnonymous) {
@@ -237,6 +245,15 @@ const Home = {
       favOwn.length + favShared.length + mineRest.length + bareConvs.length + shared.length;
     emptyEl?.classList.toggle('hidden', !(visible === 0 && !q && colls.length === 0));
     noMatchEl?.classList.toggle('hidden', !(visible === 0 && q));
+    // Make the no-match state actionable: reset the query from the state's
+    // own link instead of asking a stuck visitor to find the input.
+    const noMatchReset = document.getElementById('home-no-match-reset');
+    if (noMatchReset) noMatchReset.onclick = () => {
+      this.searchQuery = '';
+      const input = document.getElementById('home-search');
+      if (input) input.value = '';
+      this.render();
+    };
   },
 
   // ── Tag filter chips (community feed) ─────────────────────────────
@@ -252,10 +269,12 @@ const Home = {
     top.forEach(([tag]) => {
       const active = this.tagFilter.has(tag);
       const chip = document.createElement('button');
+      // Active keeps the paprika family (one accent for state); resting
+      // chips carry the tag's own cuisine hue (issue #63).
       chip.className = `px-2.5 py-1 text-xs rounded-full border transition-colors ${
         active
           ? 'bg-blue-100 dark:bg-blue-900/40 border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300'
-          : 'border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500'
+          : this._chipTint(tag)
       }`;
       chip.textContent = active ? `${tag} ✕` : tag;
       chip.addEventListener('click', () => {
@@ -288,11 +307,29 @@ const Home = {
     return el;
   },
 
-  _kicker(text) {
+  _kicker(text, tags) {
     const el = document.createElement('p');
-    el.className = 'kicker';
+    // Cuisine tint (issue #63): the card's kicker carries the hue its
+    // recipe is tagged with, instead of one brass color for everything.
+    el.className = `kicker ${this._kickerTint(tags)}`;
     el.textContent = text;
     return el;
+  },
+
+  // Whole-literal Tailwind names only: the runtime compiler reads these
+  // straight out of this map, never out of assembled strings.
+  _kickerTint(tags) {
+    if (this._tagMatches(tags, ['italian', 'pasta', 'rice'])) return 'kicker-sage';
+    if (this._tagMatches(tags, ['chinese', 'spicy', 'grill', 'fish'])) return 'kicker-chili';
+    if (this._tagMatches(tags, ['indian'])) return 'kicker-plum';
+    if (this._tagMatches(tags, ['greek', 'middle-eastern', 'cold', 'lunch'])) return 'kicker-aegean';
+    if (this._tagMatches(tags, ['thai', 'moroccan'])) return 'kicker-lemongrass';
+    if (this._tagMatches(tags, ['french', 'american'])) return 'kicker-moss';
+    return '';
+  },
+
+  _tagMatches(tags, names) {
+    return (tags || []).some((t) => names.includes(String(t).toLowerCase()));
   },
 
   _heartBtn(filled) {
@@ -318,11 +355,25 @@ const Home = {
     wrap.className = 'flex flex-wrap gap-1';
     tags.slice(0, 5).forEach((t) => {
       const chip = document.createElement('span');
-      chip.className = 'px-2 py-0.5 text-[11px] rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400';
+      // Cuisine-tinted chips (issue #63), whole-literal classes only.
+      chip.className = `px-2 py-0.5 text-[11px] rounded-full ${this._chipTint(t)}`;
       chip.textContent = t;
       wrap.appendChild(chip);
     });
     return wrap;
+  },
+
+  // One hue per cuisine family, applied consistently across kickers,
+  // chips and filter chips. Falls back to the default chip family.
+  _chipTint(tag) {
+    const name = String(tag).toLowerCase();
+    if (['italian', 'pasta', 'rice'].includes(name)) return 'bg-sage-50 dark:bg-sage-950/40 text-sage-600 dark:text-sage-400';
+    if (['chinese', 'spicy', 'grill', 'fish'].includes(name)) return 'bg-chili-50 dark:bg-chili-950/40 text-chili-600 dark:text-chili-400';
+    if (['indian'].includes(name)) return 'bg-plum-50 dark:bg-plum-950/40 text-plum-600 dark:text-plum-400';
+    if (['greek', 'middle-eastern', 'cold', 'lunch'].includes(name)) return 'bg-aegean-50 dark:bg-aegean-950/40 text-aegean-600 dark:text-aegean-400';
+    if (['thai', 'moroccan'].includes(name)) return 'bg-lemongrass-50 dark:bg-lemongrass-950/40 text-lemongrass-600 dark:text-lemongrass-500';
+    if (['french', 'american'].includes(name)) return 'bg-moss-50 dark:bg-moss-950/40 text-moss-600 dark:text-moss-400';
+    return 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400';
   },
 
   _actionClasses(primary) {
@@ -373,7 +424,7 @@ const Home = {
   ownCard(r) {
     const recipe = r.data || {};
     const el = this._cardShell();
-    el.appendChild(this._kicker(t('card.yourRecipe')));
+    el.appendChild(this._kicker(t('card.yourRecipe'), recipe.tags));
 
     const madeBit = r.made_count > 0 ? ` · ${t('card.made', { n: r.made_count })}` : '';
     const remixBit = r.forked_from_username
@@ -457,7 +508,7 @@ const Home = {
   sharedCard(s, opts) {
     const recipe = s.data || {};
     const el = this._cardShell();
-    el.appendChild(this._kicker(s.forked_from_username ? t('card.remix') : t('card.communityRecipe')));
+    el.appendChild(this._kicker(s.forked_from_username ? t('card.remix') : t('card.communityRecipe'), s.tags || (s.data && s.data.tags)));
 
     const remixBit = s.forked_from_username
       ? ` · ${t('card.remixedFrom', { name: this.esc(s.forked_from_username) })}` : '';
@@ -588,7 +639,7 @@ const Home = {
 
   collectionCard(c) {
     const el = this._cardShell();
-    el.appendChild(this._kicker(this.collectionKind(c)));
+    el.appendChild(this._kicker(this.collectionKind(c), null));
     const bits = this._collectionMeta(c);
     if (!c.is_owner) bits.push(t('card.by', { name: this.esc(c.username) }));
     const meta = document.createElement('div');
@@ -609,7 +660,7 @@ const Home = {
 
   publicCollectionCard(c) {
     const el = this._cardShell();
-    el.appendChild(this._kicker(t('card.communityCollection')));
+    el.appendChild(this._kicker(t('card.communityCollection'), null));
     const byline = c.is_mine ? t('card.byYou') : t('card.by', { name: this.esc(c.username) });
     const bits = [byline, tn('card.recipes', c.item_count)];
     if (c.comment_count) bits.push(tn('card.collectionComments', c.comment_count));
@@ -850,7 +901,7 @@ const Home = {
   collectionItemCard(c, item) {
     const recipe = item.data || {};
     const el = this._cardShell();
-    el.appendChild(this._kicker(item.snapshot_only ? t('card.savedCopy') : t('card.recipe')));
+    el.appendChild(this._kicker(item.snapshot_only ? t('card.savedCopy') : t('card.recipe'), null));
     const srcBit = item.snapshot_only
       ? `<span class="text-amber-500" title="${this.esc(t('card.savedCopyTitle'))}">${t('coll.savedCopyBadge')}</span>`
       : item.conversation_id ? t('coll.yourRecipe') : t('card.by', { name: this.esc(item.username) });
