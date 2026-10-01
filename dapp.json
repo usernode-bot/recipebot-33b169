@@ -286,6 +286,21 @@
       "expectSelector": "#cooking-overlay #cm-scale-controls .cm-scale-btn"
     },
     {
+      "name": "Cooking mode offers the text-size control",
+      "path": "/?c=900003&cook=1",
+      "expectSelector": "#cooking-overlay #cm-text-size-btn"
+    },
+    {
+      "name": "Cooking mode text-size control reads Normal at rest",
+      "path": "/?c=900003&cook=1",
+      "expectSelector": "#cooking-overlay:not(.cm-text-lg):not(.cm-text-xl) .cm-step-text"
+    },
+    {
+      "name": "Cooking mode text-size control offers all steps",
+      "path": "/?c=900003&cook=1",
+      "expectText": "Text size"
+    },
+    {
       "name": "Cooking mode at default scale shows base quantities",
       "path": "/?c=900003&cook=1",
       "expectText": "400g"

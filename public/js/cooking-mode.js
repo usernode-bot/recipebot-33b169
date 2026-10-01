@@ -5,10 +5,17 @@ const CookingMode = {
   wakeLock: null,
   overlay: null,
 
+  // Text size for the cook mode body (issue #81): steps, per-step
+  // ingredients, timer buttons and the ingredient summary all scale.
+  // Header controls stay compact. Persisted per device like the theme.
+  textSizeLevels: ['normal', 'large', 'xl'],
+  textSizeLevel: 'normal',
+
   enter(recipe) {
     if (!recipe?.steps?.length) return;
     this.recipe = recipe;
     this.active = true;
+    this.textSizeLevel = this.readTextSize();
     const hasRunning = this.timers.some(t => t.remaining > 0);
     if (!hasRunning) this.timers = [];
     const bar = document.getElementById('timer-bar');
@@ -62,8 +69,8 @@ const CookingMode = {
           const g = Math.round(ing.grams * scale);
           const vol = Recipe ? Recipe.formatVolume(ing.volume, scale) : '';
           ingsHtml += `
-            <span class="text-zinc-600 dark:text-zinc-400 text-lg">${this.escapeHtml(ing.name)}</span>
-            <span class="text-zinc-400 dark:text-zinc-500 tabular-nums text-base">${g}g${vol ? ` · ${vol}` : ''}</span>`;
+            <span class="cm-ing-name text-zinc-600 dark:text-zinc-400 text-lg">${this.escapeHtml(ing.name)}</span>
+            <span class="cm-ing-amt text-zinc-400 dark:text-zinc-500 tabular-nums text-base">${g}g${vol ? ` · ${vol}` : ''}</span>`;
         });
         ingsHtml += '</div>';
       }
@@ -74,10 +81,10 @@ const CookingMode = {
         timerHtml = '<div class="flex flex-wrap gap-2 mt-4">';
         durations.forEach((d, j) => {
           const timerId = `cm-timer-${i}-${j}`;
-          timerHtml += `<button class="timer-start-btn px-5 py-2.5 rounded-xl bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors text-base" data-timer-id="${timerId}" data-seconds="${d.seconds}" data-step="${i}">
+          timerHtml += `<button class="timer-start-btn cm-timer-btn px-5 py-2.5 rounded-xl bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors text-base" data-timer-id="${timerId}" data-seconds="${d.seconds}" data-step="${i}">
             ⏱ ${this.formatTime(d.seconds)}
           </button>
-          <span id="${timerId}-inline" class="hidden items-center px-4 py-2.5 rounded-xl bg-zinc-200 dark:bg-zinc-800 text-base tabular-nums"></span>`;
+          <span id="${timerId}-inline" class="cm-timer-inline hidden items-center px-4 py-2.5 rounded-xl bg-zinc-200 dark:bg-zinc-800 text-base tabular-nums"></span>`;
         });
         timerHtml += '</div>';
       }
@@ -86,7 +93,7 @@ const CookingMode = {
       stepsHtml += `
         <div class="cm-step step-card rounded-2xl p-6 md:p-8 my-4 cursor-pointer bg-zinc-100/70 dark:bg-zinc-900/50${isActive ? ' step-active' : ''}" data-step="${i}">
           <div class="text-sm font-medium text-blue-500 dark:text-blue-400 mb-3">${t('cook.stepOf', { n: i + 1, total: recipe.steps.length })}</div>
-          <p class="text-2xl md:text-3xl leading-relaxed font-light">${this.escapeHtml(step.description)}</p>
+          <p class="cm-step-text text-2xl md:text-3xl leading-relaxed font-light">${this.escapeHtml(step.description)}</p>
           ${temp ? `<div class="text-xl text-orange-500 dark:text-orange-400 mt-3">${temp}</div>` : ''}
           ${ingsHtml}
           ${timerHtml}
@@ -94,7 +101,10 @@ const CookingMode = {
     });
 
     el.innerHTML = `
-      <div class="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
+      <!-- flex-wrap: on narrow phones the controls row wraps below the
+           title instead of clipping the Servings/Scale/text-size/close
+           controls off-screen (issue #81 adds a fourth control there). -->
+      <div class="flex flex-wrap items-center justify-between gap-y-2 p-4 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
         <div class="flex items-center gap-3">
           <h2 class="text-lg font-semibold">${this.escapeHtml(recipe.title)}</h2>
           ${typeof Recipe !== 'undefined' ? Recipe.playlistHtml(recipe, { compact: true }) : ''}
@@ -102,6 +112,7 @@ const CookingMode = {
         </div>
         <div class="flex items-center gap-2">
         ${this.buildScaleControls(recipe)}
+        ${this.buildTextSizeControl()}
         <button id="cm-exit" class="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-400 hover:text-zinc-900 dark:hover:text-white">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -122,11 +133,17 @@ const CookingMode = {
       </div>
     `;
 
+    // Apply the saved size here, not only at toggle time, so it survives
+    // the re-renders triggered by Servings/Scale changes.
+    if (this.textSizeLevel === 'large') el.classList.add('cm-text-lg');
+    if (this.textSizeLevel === 'xl') el.classList.add('cm-text-xl');
+
     document.body.appendChild(el);
     this.overlay = el;
 
     el.querySelector('#cm-exit').addEventListener('click', () => this.exit());
     this.bindScaleControls(el, recipe);
+    this.bindTextSizeControl(el);
     // "Made it" from the natural moment — the end-of-cook screen. Only
     // shown when there's a target to mark (own conversation or shared).
     const madeBtn = el.querySelector('#cm-made-it');
@@ -253,6 +270,45 @@ const CookingMode = {
         Recipe.saveUIStateToServer();
         this.rerender();
       });
+    });
+  },
+
+  // "Aa" cycles the reading text through Normal → Large → Extra large.
+  // A CSS class on the overlay does the work, so no re-render: running
+  // timers and scroll position are untouched. The choice is remembered
+  // per device via localStorage (defensive like localStorage.theme).
+  readTextSize() {
+    try {
+      const stored = localStorage.cookTextSize;
+      if (this.textSizeLevels.includes(stored)) return stored;
+    } catch { /* storage blocked: session-only */ }
+    return 'normal';
+  },
+
+  saveTextSize() {
+    try { localStorage.cookTextSize = this.textSizeLevel; } catch { /* storage blocked: session-only */ }
+  },
+
+  applyTextSize(el) {
+    el.classList.toggle('cm-text-lg', this.textSizeLevel === 'large');
+    el.classList.toggle('cm-text-xl', this.textSizeLevel === 'xl');
+  },
+
+  buildTextSizeControl() {
+    const btn = 'w-7 h-7 rounded flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors text-zinc-500';
+    const group = 'rounded-lg bg-zinc-100 dark:bg-zinc-900 px-1';
+    return `
+      <div class="${group} flex items-center">
+        <button id="cm-text-size-btn" class="${btn} font-semibold" aria-label="${this.escapeHtml(t('cook.textSize'))}">Aa</button>
+      </div>`;
+  },
+
+  bindTextSizeControl(el) {
+    el.querySelector('#cm-text-size-btn')?.addEventListener('click', () => {
+      const idx = this.textSizeLevels.indexOf(this.textSizeLevel);
+      this.textSizeLevel = this.textSizeLevels[(idx + 1) % this.textSizeLevels.length];
+      this.saveTextSize();
+      this.applyTextSize(el);
     });
   },
 
