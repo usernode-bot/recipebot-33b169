@@ -13,10 +13,12 @@ const Home = {
   shared: [],
   mine: [],
   favorites: [],
+  cookbook: [],
   conversations: [],
   collections: [],
   publicCollections: [],
   searchQuery: '',
+  cookbookQuery: '',
   tagFilter: new Set(),
   // When set, the homepage shows this collection's detail instead of the box.
   activeCollection: null,
@@ -62,6 +64,7 @@ const Home = {
         this.publicCollections = pubCollRes.ok ? await pubCollRes.json() : [];
         this.mine = [];
         this.favorites = [];
+        this.cookbook = [];
         this.conversations = [];
         this.collections = [];
         if (this.activeCollection) {
@@ -71,10 +74,11 @@ const Home = {
         return;
       }
 
-      const [sharedRes, mineRes, favRes, convRes, collRes, pubCollRes] = await Promise.all([
+      const [sharedRes, mineRes, favRes, cookbookRes, convRes, collRes, pubCollRes] = await Promise.all([
         fetch('/api/shared-recipes'),
         fetch('/api/recipes'),
         fetch('/api/favorites'),
+        fetch('/api/cookbook'),
         fetch('/api/conversations'),
         fetch('/api/collections'),
         fetch('/api/collections/public'),
@@ -82,6 +86,7 @@ const Home = {
       this.shared = sharedRes.ok ? await sharedRes.json() : [];
       this.mine = mineRes.ok ? await mineRes.json() : [];
       this.favorites = favRes.ok ? await favRes.json() : [];
+      this.cookbook = cookbookRes.ok ? await cookbookRes.json() : [];
       this.conversations = convRes.ok ? await convRes.json() : [];
       this.collections = collRes.ok ? await collRes.json() : [];
       this.publicCollections = pubCollRes.ok ? await pubCollRes.json() : [];
@@ -102,6 +107,7 @@ const Home = {
     const bandMine = document.getElementById('home-band-mine');
     const bandComm = document.getElementById('home-band-community');
     const collSection = document.getElementById('home-collections');
+    const cookSection = document.getElementById('home-cookbook');
     const favSection = document.getElementById('home-favorites');
     const mineSection = document.getElementById('home-mine');
     const convSection = document.getElementById('home-convs');
@@ -151,6 +157,22 @@ const Home = {
     const favShared = this.favorites.filter((s) => matches(s.data?.title, s.tags));
     const shared = this.shared.filter((s) => matches(s.data?.title, s.tags) && tagMatch(s.tags));
 
+    // The cookbook has its OWN search box, so it narrows independently of
+    // the page-wide toolbar search.
+    const cq = this.cookbookQuery.trim().toLowerCase();
+    const cookMatches = (r) => {
+      if (!cq) return true;
+      if ((r.data?.title || r.conversation_title || '').toLowerCase().includes(cq)) return true;
+      if ((r.tags || r.data?.tags || []).some((t) => t.toLowerCase().includes(cq))) return true;
+      return (r.username || '').toLowerCase().includes(cq);
+    };
+    // `reason_at` is why the row is here (the mark, or the fork); blank it
+    // with the row's own created_at as a backstop.
+    const cookbookRows = this._byRecency(
+      this.cookbook.filter(cookMatches),
+      (r) => r.reason_at || r.created_at,
+    );
+
     // Conversations without a recipe yet (recipe-bearing ones already show
     // as cards in "Your recipes" / "Your favorites"), most recently worked
     // on first.
@@ -173,6 +195,20 @@ const Home = {
     mineRest.forEach((r) => mineList.appendChild(this.ownCard(r)));
     mineSection.classList.toggle('hidden', mineRest.length === 0);
     this._setCount('home-mine', mineRest.length);
+
+    if (cookSection && !App.isAnonymous) {
+      const cookList = document.getElementById('home-cookbook-list');
+      const cookNoMatch = document.getElementById('cookbook-no-match');
+      cookList.innerHTML = '';
+      cookbookRows.forEach((r) => {
+        cookList.appendChild(r.shared_id != null
+          ? this.sharedCard(r, { cookbook: true })
+          : this.ownCard(r, { cookbook: true }));
+      });
+      cookSection.classList.toggle('hidden', cookbookRows.length === 0 && !cq);
+      cookNoMatch?.classList.toggle('hidden', !(cookbookRows.length === 0 && cq));
+      this._setCount('home-cookbook', cookbookRows.length);
+    }
 
     // Collections (the box's organizer) — always shown when signed in, so
     // "+ New collection" is reachable from an empty box.
@@ -234,7 +270,8 @@ const Home = {
     }
 
     const visible =
-      favOwn.length + favShared.length + mineRest.length + bareConvs.length + shared.length;
+      favOwn.length + favShared.length + mineRest.length +
+      bareConvs.length + cookbookRows.length + shared.length;
     emptyEl?.classList.toggle('hidden', !(visible === 0 && !q && colls.length === 0));
     noMatchEl?.classList.toggle('hidden', !(visible === 0 && q));
   },
@@ -370,17 +407,27 @@ const Home = {
   },
 
   // Card for one of the requester's own conversations (from /api/recipes).
-  ownCard(r) {
+  // opts.cookbook (the personal Cookbook section) replaces the "Your
+  // recipe" kicker with why the row is there and dates it by that event.
+  ownCard(r, opts = {}) {
     const recipe = r.data || {};
     const el = this._cardShell();
-    el.appendChild(this._kicker(t('card.yourRecipe')));
+    el.appendChild(this._kicker(opts.cookbook
+      ? (r.reason === 'fork' ? t('common.fork') : t('card.madeIt'))
+      : t('card.yourRecipe')));
 
     const madeBit = r.made_count > 0 ? ` · ${t('card.made', { n: r.made_count })}` : '';
     const remixBit = r.forked_from_username
       ? ` · <span title="${this.esc(t('card.forkedFromTitle', { name: r.forked_from_username }))}">${t('card.forkedFrom', { name: this.esc(r.forked_from_username) })}</span>` : '';
-    // Names the recency the list is sorted by (issue #40).
-    const dated = this._shortDate(r.created_at);
-    const updatedBit = dated ? ` · ${t('card.updated', { d: this.esc(dated) })}` : '';
+    // Names the recency the list is sorted by (issue #40). Cookbook rows
+    // sort by the event that put them there instead: when you made it or
+    // forked it.
+    const dated = this._shortDate(opts.cookbook
+      ? (r.reason_at || r.created_at) : r.created_at);
+    const dateKey = !opts.cookbook
+      ? 'card.updated'
+      : (r.reason === 'fork' ? 'card.forkedOn' : 'card.madeOn');
+    const updatedBit = dated ? ` · ${t(dateKey, { d: this.esc(dated) })}` : '';
     const head = document.createElement('div');
     head.className = 'flex items-start justify-between gap-2';
     head.innerHTML = `
@@ -453,21 +500,27 @@ const Home = {
     return el;
   },
 
-  // Card for a shared recipe (community feed or favorited shared recipe).
+  // Card for a shared recipe (community feed, a favorited shared recipe,
+  // or a Cookbook row you marked "Made it").
   sharedCard(s, opts) {
     const recipe = s.data || {};
     const el = this._cardShell();
-    el.appendChild(this._kicker(s.forked_from_username ? t('card.remix') : t('card.communityRecipe')));
+    el.appendChild(this._kicker(opts?.cookbook ? t('card.madeIt')
+      : (s.forked_from_username ? t('card.remix') : t('card.communityRecipe'))));
 
     const remixBit = s.forked_from_username
       ? ` · ${t('card.remixedFrom', { name: this.esc(s.forked_from_username) })}` : '';
     const byline = s.is_mine ? t('card.byYou') : t('card.by', { name: this.esc(s.username) });
+    // Cookbook cards date by your "Made it" mark; community cards carry no
+    // date at all, so the meta line just gains the extra bits.
+    const cookbookBit = opts?.cookbook && this._shortDate(s.reason_at)
+      ? ` · ${t('card.madeOn', { d: this.esc(this._shortDate(s.reason_at)) })}` : '';
     const head = document.createElement('div');
     head.className = 'flex items-start justify-between gap-2';
     head.innerHTML = `
       <div class="min-w-0">
         <h3 class="font-semibold text-sm truncate">${this.esc(recipe.title || t('common.untitled'))}</h3>
-        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${byline}${s.current_version > 1 ? ` · v${s.current_version}` : ''}${remixBit}</p>
+        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${byline}${cookbookBit}${s.current_version > 1 ? ` · v${s.current_version}` : ''}${remixBit}</p>
       </div>`;
     if (!App.isAnonymous) {
       const heart = this._heartBtn(s.is_favorited);
@@ -1101,6 +1154,10 @@ const Home = {
 
 document.getElementById('home-search')?.addEventListener('input', (e) => {
   Home.searchQuery = e.target.value;
+  Home.render();
+});
+document.getElementById('cookbook-search')?.addEventListener('input', (e) => {
+  Home.cookbookQuery = e.target.value;
   Home.render();
 });
 document.getElementById('new-collection-btn')?.addEventListener('click', () => {

@@ -409,6 +409,25 @@
             <div id="home-mine-list" class="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"></div>
           </section>
 
+          <!-- Cookbook: what YOU personally marked "Made it" or forked.
+               The search narrows just this list, independently of the
+               page-wide search in the toolbar. The input sits in the header
+               row, outside the re-rendered list container, so typing
+               doesn't lose focus. -->
+          <section id="home-cookbook" class="hidden">
+            <div class="flex items-start justify-between mb-3 gap-2 flex-wrap">
+              <h2 class="text-base font-semibold flex items-center gap-2 min-w-0">
+                <svg class="w-4 h-4 text-blue-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                <span data-i18n="home.cookbook">Cookbook</span>
+                <span class="home-count text-xs font-normal text-zinc-400 dark:text-zinc-500 tabular-nums"></span>
+              </h2>
+              <input id="cookbook-search" type="search" placeholder="Search your cookbook..." autocomplete="off" data-i18n-placeholder="home.cookbookSearch"
+                class="w-full sm:w-56 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div id="home-cookbook-list" class="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"></div>
+            <p id="cookbook-no-match" class="hidden text-xs text-zinc-400 dark:text-zinc-500 mt-2" data-i18n="home.noMatch">No recipes match your search</p>
+          </section>
+
           <section id="home-collections">
             <div class="flex items-start justify-between mb-3 gap-2 flex-wrap">
               <h2 class="text-base font-semibold flex items-center gap-2 min-w-0">

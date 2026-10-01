@@ -34,6 +34,8 @@ I18N.register('es', {
   'home.collectionsEmpty': 'Agrupa tus recetas en un estante —',
   'home.favorites': 'Tus favoritos',
   'home.yourRecipes': 'Tus recetas',
+  'home.cookbook': 'Recetario',
+  'home.cookbookSearch': 'Buscar en tu recetario...',
   'home.communityRecipes': 'Recetas de la comunidad',
   'home.communityCollections': 'Colecciones de la comunidad',
   'home.emptyTitle': 'Aún no hay recetas',
@@ -41,6 +43,9 @@ I18N.register('es', {
   'home.noMatch': 'Ninguna receta coincide con tu búsqueda',
 
   'card.yourRecipe': 'Tu receta',
+  'card.madeIt': 'La he hecho',
+  'card.madeOn': 'la he hecho el {d}',
+  'card.forkedOn': 'bifurcada el {d}',
   'card.remix': 'Remix',
   'card.communityRecipe': 'Receta de la comunidad',
   'card.communityCollection': 'Colección de la comunidad',

@@ -250,6 +250,9 @@ CREATE TABLE IF NOT EXISTS made_it_marks (
 
 CREATE INDEX IF NOT EXISTS made_it_marks_shared ON made_it_marks (shared_recipe_id);
 CREATE INDEX IF NOT EXISTS made_it_marks_conv ON made_it_marks (conversation_id);
+-- The personal cookbook reads a user's marks newest-first; user + date is
+-- its access pattern (see GET /api/cookbook).
+CREATE INDEX IF NOT EXISTS made_it_marks_user ON made_it_marks (user_id, created_at DESC);
 
 -- Comments on published recipes. Soft delete (deleted_at) so the thread
 -- shows "comment deleted" rather than silently renumbering.
