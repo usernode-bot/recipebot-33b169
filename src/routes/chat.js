@@ -1154,4 +1154,4 @@ async function updateConversationTitle(pool, convId, title, send) {
   }
 }
 
-module.exports = { chatRoutes };
+module.exports = { chatRoutes, updateConversationTitle };

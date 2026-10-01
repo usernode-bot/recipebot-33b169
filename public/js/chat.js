@@ -1010,7 +1010,12 @@ const Chat = {
     if (App.pendingRecipe) {
       App.pendingRecipe = null;
       this.resolveDiffReply('superseded');
+      // An open editor was built from the base recipe, so it is stale the
+      // moment a new AI proposal supersedes it — same contract as the
+      // accept flow in recipe.js.
       if (typeof Recipe !== 'undefined' && App.currentRecipe) {
+        Recipe._editorOpen = false;
+        Recipe._editorOriginal = null;
         Recipe.display(App.currentRecipe);
       }
     }
