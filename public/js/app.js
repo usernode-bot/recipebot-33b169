@@ -685,23 +685,37 @@ function setupPreferences() {
 
 function setupNewConversation() {
   document.getElementById('new-conversation-btn').addEventListener('click', () => {
-    if (App.isAnonymous) return App.promptSignIn(t('signin.createRecipes'));
-    App.currentConversationId = null;
-    App.currentRecipe = null;
-    App.pendingRecipe = null;
-    App.viewingShared = null;
-    App.viewingVersion = null;
-    App.showView('chat');
-    // No recipe yet — the message box is the point of this screen.
-    App.setMobileTab?.('chat');
-    HashParams.clear();
-    App.setSignInPath?.(null);
-    if (typeof Chat !== 'undefined') Chat.clear();
-    document.getElementById('recipe-display')?.classList.add('hidden');
-    document.getElementById('recipe-empty')?.classList.remove('hidden');
-    document.getElementById('chat-input')?.focus();
+    App.startNewRecipe(document.getElementById('home-search')?.value.trim());
   });
 }
+
+// One code path for every "+ New recipe" entry point: the toolbar button
+// (bound above, also driven by the Cmd/Ctrl+N shortcut and by home.js's
+// no-match empty state). A non-empty prefill — the current homepage search
+// text — seeds the message box so "I want a recipe for X" becomes a
+// conversation about X in one click.
+App.startNewRecipe = function (prefill) {
+  if (App.isAnonymous) return App.promptSignIn(t('signin.createRecipes'));
+  App.currentConversationId = null;
+  App.currentRecipe = null;
+  App.pendingRecipe = null;
+  App.viewingShared = null;
+  App.viewingVersion = null;
+  App.showView('chat');
+  // No recipe yet — the message box is the point of this screen.
+  App.setMobileTab?.('chat');
+  HashParams.clear();
+  App.setSignInPath?.(null);
+  if (typeof Chat !== 'undefined') Chat.clear();
+  if (prefill) {
+    const input = document.getElementById('chat-input');
+    input.value = prefill;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  document.getElementById('recipe-display')?.classList.add('hidden');
+  document.getElementById('recipe-empty')?.classList.remove('hidden');
+  document.getElementById('chat-input')?.focus();
+};
 
 // Three-state theme control: System / Light / Dark, picked from a labelled
 // dropdown under the header button. The mode is stored in localStorage.theme
