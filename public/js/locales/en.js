@@ -344,6 +344,7 @@ I18N.register('en', {
   'cook.done': "You're done! Enjoy your meal.",
   'cook.allIngredients': 'All Ingredients',
   'cook.timerDone': '⏱ Done!',
+  'cook.textSize': 'Text size',
   'cook.timerResetTitle': 'Click to reset, or dismiss if done',
 
   // ── Collections, comments and homepage bands (issues #32–#35) ──
