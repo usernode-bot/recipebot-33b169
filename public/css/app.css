@@ -474,14 +474,39 @@ h1, h2, h3, .font-display {
   align-items: baseline;
 }
 
-/* Ingredient summary grid — aligns all amounts across all steps */
+/* Ingredient summary grid — aligns all amounts across all steps.
+   The <details> is a size container so the grid can switch to a narrow
+   layout whenever the recipe panel itself is narrow (phones, or a desktop
+   panel squeezed by the chat), not only at a viewport breakpoint. */
+.ing-summary {
+  container-type: inline-size;
+}
+
+/* Name column may shrink below its longest word (min 0) so a long
+   ingredient name wraps instead of pushing the grid past the panel. */
 .summary-grid {
   display: grid;
-  grid-template-columns: auto auto auto auto auto auto auto auto;
+  grid-template-columns: minmax(0, max-content) auto auto auto auto auto auto auto;
   justify-content: start;
   column-gap: 1.25rem;
   row-gap: 0;
   align-items: center;
+}
+
+.summary-grid .ingredient-label,
+.summary-grid .ing-name {
+  min-width: 0;
+}
+
+.summary-grid .ing-name {
+  overflow-wrap: anywhere;
+}
+
+/* Wide panels: the macros wrapper is transparent to the grid, so each
+   macro is its own aligned column. Hidden macros keep their columns
+   (visibility, not display) so toggling them doesn't shift the amounts. */
+.ing-macros {
+  display: contents;
 }
 
 .ing-macro {
@@ -489,12 +514,37 @@ h1, h2, h3, .font-display {
   margin-left: -0.75rem;
 }
 
-.ing-macro:first-of-type {
-  margin-left: 0.5rem;
-}
-
 .summary-grid.show-macros .ing-macro {
   visibility: visible;
+}
+
+/* Narrow panels (issue #56): eight columns plus seven 1.25rem gaps don't
+   fit a phone — even hidden, the reserved macro columns made the panel
+   scroll sideways. Keep name · amount · actions on one line and, when
+   macros are on, put them on their own line under the name. */
+@container (max-width: 34rem) {
+  .summary-grid {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    column-gap: 0.75rem;
+  }
+
+  .ing-macros {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 0.75rem;
+    padding-left: 1.5rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .summary-grid:not(.show-macros) .ing-macros,
+  .ing-macros-empty {
+    display: none;
+  }
+
+  .ing-macro {
+    margin-left: 0;
+  }
 }
 
 /* The "Macros per serving" toggle lives on the <summary> line; only show
