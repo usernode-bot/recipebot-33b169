@@ -122,7 +122,7 @@
     },
     {
       "name": "Theme menu explains the System option",
-      "path": "/",
+      "path": "/?ui=theme",
       "expectText": "Match your device setting"
     },
     {
