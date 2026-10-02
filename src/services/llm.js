@@ -1,47 +1,60 @@
 const log = require('./logger');
 
+// Standard list prices in dollars per million tokens, used to estimate the
+// user's daily spend ("AI usage today" in the user menu) and shown as static
+// cost hints in the settings picker. The platform proxy does its own billing,
+// so this is an estimate — standard (non-introductory) prices are used
+// deliberately as a conservative over-estimate. Retired ids stay priced so a
+// turn already in flight when the list changed still counts.
+const MODEL_PRICING = {
+  'claude-haiku-4-5': { input: 1, output: 5 },
+  'claude-sonnet-5-5': { input: 3, output: 15 },
+  'claude-opus-5-5': { input: 4, output: 20 },
+  'claude-sonnet-5': { input: 3, output: 15 },
+  'claude-opus-4-8': { input: 5, output: 25 },
+};
+
 // User-selectable chat models. Alias IDs only (no date suffixes) — this list
 // is the single source of truth for the settings picker, the preferences
 // PATCH validator, and the per-message model resolution in the chat route.
+// Defined after MODEL_PRICING so each entry can carry its own pricing row
+// (the picker's cost hint uses it — one copy of the numbers).
 const MODELS = [
+  {
+    id: 'claude-haiku-4-5',
+    label: 'Haiku 4.5',
+    tier: 'economy',
+    description: 'Fastest and most affordable. Good for everyday questions and quick tweaks.',
+    pricing: MODEL_PRICING['claude-haiku-4-5'],
+  },
   {
     id: 'claude-sonnet-5-5',
     label: 'Sonnet 5.5',
+    tier: 'standard',
     description: 'Best all-around quality. Recommended.',
     default: true,
+    pricing: MODEL_PRICING['claude-sonnet-5-5'],
   },
   {
     id: 'claude-opus-5-5',
     label: 'Opus 5.5',
+    tier: 'premium',
     description: 'Most capable, slower and uses more of your daily AI budget.',
+    pricing: MODEL_PRICING['claude-opus-5-5'],
   },
 ];
 
 const DEFAULT_MODEL = MODELS.find((m) => m.default).id;
 
-// Ids this app used to offer (issue #74 replaced them) and the model that took
-// each one's place. A saved preference, an ANTHROPIC_MODEL env value, or a
-// stale client still naming one resolves to its successor by name, so nobody
-// is sent a model the picker no longer offers. Haiku has no successor in the
-// list and falls back to the default.
+// Ids this app used to offer and the model that took each one's place. A
+// saved preference, an ANTHROPIC_MODEL env value, or a stale client still
+// naming one resolves to its successor by name, so nobody is sent a model
+// the picker no longer offers. (Haiku 4.5 is back in MODELS — issue #83 —
+// so saved Haiku preferences resolve to it again and it's not listed here.)
 const RETIRED_MODELS = Object.freeze({
   'claude-sonnet-5': 'claude-sonnet-5-5',
   'claude-opus-4-8': 'claude-opus-5-5',
-  'claude-haiku-4-5': DEFAULT_MODEL,
 });
-
-// Standard list prices in dollars per million tokens, used to estimate the
-// user's daily spend ("AI usage today" in the user menu). The platform proxy
-// does its own billing, so this is an estimate — standard (non-introductory)
-// prices are used deliberately as a conservative over-estimate. Retired ids
-// stay priced so a turn already in flight when the list changed still counts.
-const MODEL_PRICING = {
-  'claude-sonnet-5-5': { input: 3, output: 15 },
-  'claude-opus-5-5': { input: 4, output: 20 },
-  'claude-sonnet-5': { input: 3, output: 15 },
-  'claude-haiku-4-5': { input: 1, output: 5 },
-  'claude-opus-4-8': { input: 5, output: 25 },
-};
 
 // Estimate the cost of one Messages API response in microcents (1e-6 cents),
 // from its `usage` block. P $/MTok works out to exactly P*100 microcents per

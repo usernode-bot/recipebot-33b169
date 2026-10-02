@@ -218,6 +218,10 @@ I18N.register('de', {
 
   'settings.title': 'App-Einstellungen',
   'settings.aiModel': 'KI-Modell',
+  'settings.tier.economy': 'Spartarif',
+  'settings.tier.standard': 'Standard',
+  'settings.tier.premium': 'Premium',
+  'settings.costHint': 'Geschätzt {low}–{high} pro Million Tokens',
   'settings.default': ' (Standard)',
   'settings.saved': 'Gespeichert — gilt ab deiner nächsten Nachricht',
   'settings.saveFailed': 'Speichern fehlgeschlagen',

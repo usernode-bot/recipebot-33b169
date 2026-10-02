@@ -218,6 +218,10 @@ I18N.register('id', {
 
   'settings.title': 'Pengaturan Aplikasi',
   'settings.aiModel': 'Model AI',
+  'settings.tier.economy': 'Hemat',
+  'settings.tier.standard': 'Standar',
+  'settings.tier.premium': 'Premium',
+  'settings.costHint': 'Perkiraan {low}–{high} per juta token',
   'settings.default': ' (bawaan)',
   'settings.saved': 'Tersimpan — berlaku untuk pesan berikutnya',
   'settings.saveFailed': 'Gagal menyimpan',
