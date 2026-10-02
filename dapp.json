@@ -296,9 +296,9 @@
       "expectSelector": "#cooking-overlay:not(.cm-text-lg):not(.cm-text-xl) .cm-step-text"
     },
     {
-      "name": "Cooking mode text-size control offers all steps",
+      "name": "Cooking mode text-size control is labelled for screen readers",
       "path": "/?c=900003&cook=1",
-      "expectText": "Text size"
+      "expectSelector": "#cooking-overlay #cm-text-size-btn[aria-label=\"Text size\"]"
     },
     {
       "name": "Cooking mode at default scale shows base quantities",
