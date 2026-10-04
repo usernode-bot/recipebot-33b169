@@ -22,7 +22,7 @@ const PLATFORM_APP_URL = `${PLATFORM_ORIGIN}/#app/recipebot-33b169/full`;
 // public/index.html and setupDarkMode() in public/js/app.js). 'system',
 // missing or unrecognised leaves data-theme unset, so the CSS below falls
 // through to prefers-color-scheme — the normal case for someone opening a
-// share link who has never used RecipeBot.
+// share link who has never used Mom's Recipes.
 const THEME_BOOT_SCRIPT = `<script>(function(){try{var t=localStorage.theme;
 if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;}catch(e){}})();</script>`;
 
@@ -266,7 +266,7 @@ function publicRoutes(config) {
 function notFoundPage() {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Recipe not found — RecipeBot</title>
+<title>Recipe not found — Mom's Recipes</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
@@ -280,7 +280,7 @@ ${THEME_BOOT_SCRIPT}
 </head><body><div style="max-width:24rem;padding:2rem;text-align:center">
 <h1 style="font-family:Fraunces,Georgia,serif;font-size:1.35rem;margin:0 0 .5rem">Recipe not found</h1>
 <p style="color:#5A6378;font-size:.9rem;margin:0 0 1.25rem">This recipe may have been unpublished or deleted by its author.</p>
-<a href="${PLATFORM_APP_URL}" style="display:inline-block;padding:.5rem 1rem;background:#b85a24;color:#fff;border-radius:.6rem;text-decoration:none;font-size:.9rem">Open RecipeBot</a>
+<a href="${PLATFORM_APP_URL}" style="display:inline-block;padding:.5rem 1rem;background:#b85a24;color:#fff;border-radius:.6rem;text-decoration:none;font-size:.9rem">Open Mom's Recipes</a>
 </div></body></html>`;
 }
 
@@ -291,7 +291,7 @@ function recipePage(data, pageUrl) {
   if (r.prep_time) metaBits.push(`Prep ${r.prep_time}`);
   if (r.cook_time) metaBits.push(`Cook ${r.cook_time}`);
   metaBits.push(`Serves ${r.default_servings}`);
-  const description = (r.description || `A recipe by ${data.username} on RecipeBot.`) +
+  const description = (r.description || `A recipe by ${data.username} on Mom's Recipes.`) +
     ` · ${metaBits.join(' · ')}`;
   // Embedded JSON: escape "<" so recipe content can never close the script.
   const payload = JSON.stringify(data).replace(/</g, '\\u003c');
@@ -301,10 +301,10 @@ function recipePage(data, pageUrl) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${esc(title)} — RecipeBot</title>
+<title>${esc(title)} — Mom's Recipes</title>
 <meta name="description" content="${esc(description)}">
 <meta property="og:type" content="article">
-<meta property="og:site_name" content="RecipeBot">
+<meta property="og:site_name" content="Mom's Recipes">
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${esc(pageUrl)}">
@@ -384,7 +384,7 @@ ${THEME_BOOT_SCRIPT}
 </head>
 <body>
 <div class="wrap">
-  <div class="brand"><span>🍳 <b>RecipeBot</b></span><a href="${PLATFORM_APP_URL}">Open the app →</a></div>
+  <div class="brand"><span>🍳 <b>Mom's Recipes</b></span><a href="${PLATFORM_APP_URL}">Open the app →</a></div>
   <p class="kicker">Shared recipe</p>
   <h1 id="title"></h1>
   <p class="byline" id="byline"></p>
@@ -422,7 +422,7 @@ ${THEME_BOOT_SCRIPT}
     <div id="comments"></div>
   </div>
   <div class="foot">
-    Shared by <b id="foot-user"></b> on RecipeBot — recipes without the ads or the life story.
+    Shared by <b id="foot-user"></b> on Mom's Recipes — recipes without the ads or the life story.
     <a href="/">Browse more recipes →</a> ·
     <a href="${PLATFORM_APP_URL}">Cook, remix, and keep your own box →</a>
   </div>
@@ -564,7 +564,7 @@ var DATA = ${payload};
     var el = document.getElementById('cook-step');
     if (cookIdx >= steps.length) {
       el.innerHTML = '<p style="font-size:40px;text-align:center">🎉</p><p class="stepdesc" style="text-align:center">You\\'re done! Enjoy your meal.</p>' +
-        '<p style="text-align:center;margin-top:20px"><a class="btn btn-primary" href="${PLATFORM_APP_URL}" style="text-decoration:none">Keep this recipe — open RecipeBot</a></p>';
+        '<p style="text-align:center;margin-top:20px"><a class="btn btn-primary" href="${PLATFORM_APP_URL}" style="text-decoration:none">Keep this recipe — open Mom\\'s Recipes</a></p>';
       document.getElementById('cook-next').style.visibility = 'hidden';
       return;
     }

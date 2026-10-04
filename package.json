@@ -2,7 +2,7 @@
   "name": "recipebot-33b169",
   "version": "1.0.0",
   "private": true,
-  "description": "RecipeBot — LLM-powered recipe assistant",
+  "description": "Mom's Recipes — LLM-powered recipe assistant",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

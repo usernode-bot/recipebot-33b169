@@ -1,4 +1,4 @@
-# RecipeBot — notes for Claude Code
+# Mom's Recipes — notes for Claude Code
 
 This app runs on **Usernode Social Vibecoding**. If you're Claude Code
 editing this repo, read the platform conventions before making
@@ -26,9 +26,9 @@ tables you've marked private), etc.
 
 ---
 
-## About RecipeBot
+## About Mom's Recipes
 
-RecipeBot is an LLM-powered recipe assistant, ported from a standalone
+Mom's Recipes is an LLM-powered recipe assistant, ported from a standalone
 Express/Postgres app. You chat about what you want to cook; the model
 answers with a structured recipe (versioned JSON) rendered in a
 dedicated panel — servings scaler, per-ingredient grams/volume/macros,

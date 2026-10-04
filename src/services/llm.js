@@ -199,9 +199,9 @@ async function httpError(resp, mode) {
   err.code = code || 'llm_failed';
   err.status = resp.status;
   if (code === 'grant_required') {
-    err.userMessage = 'RecipeBot needs your permission to use AI. Approve access when prompted, then send your message again.';
+    err.userMessage = 'Mom\'s Recipes needs your permission to use AI. Approve access when prompted, then send your message again.';
   } else if (code === 'app_cap_exceeded') {
-    err.userMessage = 'Your daily AI cap for RecipeBot is spent — it resets at midnight UTC.';
+    err.userMessage = 'Your daily AI cap for Mom\'s Recipes is spent — it resets at midnight UTC.';
   } else if (code === 'budget_exceeded') {
     err.userMessage = 'Your overall daily AI budget is exhausted — it resets at midnight UTC.';
   } else {
@@ -395,9 +395,9 @@ async function streamMessage(config, params, userToken, {
       const err = new Error(evt.error?.message || 'LLM stream error');
       err.code = code || 'llm_failed';
       if (code === 'grant_required') {
-        err.userMessage = 'RecipeBot needs your permission to use AI. Approve access when prompted, then send your message again.';
+        err.userMessage = 'Mom\'s Recipes needs your permission to use AI. Approve access when prompted, then send your message again.';
       } else if (code === 'app_cap_exceeded') {
-        err.userMessage = 'Your daily AI cap for RecipeBot is spent — it resets at midnight UTC.';
+        err.userMessage = 'Your daily AI cap for Mom\'s Recipes is spent — it resets at midnight UTC.';
       } else if (code === 'budget_exceeded') {
         err.userMessage = 'Your overall daily AI budget is exhausted — it resets at midnight UTC.';
       } else if (code === 'overloaded_error') {

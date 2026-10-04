@@ -1,6 +1,6 @@
 // Native-kit presentation layer (issue #39).
 //
-// Every dialog, menu, confirm, prompt and transient status in RecipeBot goes
+// Every dialog, menu, confirm, prompt and transient status in Mom's Recipes goes
 // through here. The app keeps owning its CONTENT markup (ids, data-i18n
 // attributes, listeners); the kit owns presentation, dismissal and motion:
 //
@@ -89,7 +89,7 @@
   // ── Dialogs ───────────────────────────────────────────────────────
 
   const Dialogs = {
-    // The single presented dialog, if any. RecipeBot never stacks two.
+    // The single presented dialog, if any. Mom's Recipes never stacks two.
     _current: null,
     // Restores queued behind a dismiss animation, keyed by element.
     _pending: new Map(),

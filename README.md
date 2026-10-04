@@ -1,2 +1,2 @@
 # recipebot-33b169
-RecipeBot — built on Usernode Social Vibecoding
+Mom's Recipes — built on Usernode Social Vibecoding
