@@ -127,8 +127,8 @@
     },
     {
       "name": "Theme menu explains the System option",
-      "path": "/",
-      "expectText": "Match your device setting"
+      "path": "/?ui=theme",
+      "expectSelector": "#theme-menu [data-theme-mode=\"system\"] [data-i18n=\"theme.systemHint\"]"
     },
     {
       "name": "i18n-annotated markup renders",
