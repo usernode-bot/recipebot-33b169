@@ -207,6 +207,7 @@ I18N.register('de', {
   'newColl.title': 'Neue Sammlung',
   'newColl.placeholder': 'z. B. Feierabendküche',
   'newColl.hint': 'Startet privat. Du kannst später Leute einladen oder sie öffentlich machen.',
+  'newColl.failed': 'Die Sammlung konnte nicht erstellt werden. Bitte versuche es erneut.',
 
   'version.title': 'Versionsverlauf',
   'version.current': 'aktuell',

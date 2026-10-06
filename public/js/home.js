@@ -962,17 +962,35 @@ const Home = {
       const input = document.getElementById('collection-pick-new-name');
       const name = input.value.trim();
       if (!name) return input.focus();
+      const createBtn = document.getElementById('collection-pick-create');
+      createBtn.disabled = true;
       try {
         const res = await fetch('/api/collections', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name }),
         });
-        if (!res.ok) throw new Error();
+        // Same silent-failure treatment as the new-collection dialog (issue
+        // #48): the account sheet for signed-out visitors, a toast for the
+        // rest, and the dialog stays open with the name intact.
+        if (!res.ok) {
+          if (res.status === 401) {
+            close();
+            App.promptSignIn(t('signin.saveBox'));
+            return;
+          }
+          console.warn('[home] Collection create failed', res.status);
+          UI.toast(t('newColl.failed'));
+          return;
+        }
         const created = await res.json();
         input.value = '';
         await addTo(created.id);
-      } catch { close(); }
+      } catch {
+        UI.toast(t('newColl.failed'));
+      } finally {
+        createBtn.disabled = false;
+      }
     };
   },
 
@@ -1000,18 +1018,37 @@ const Home = {
     document.getElementById('new-collection-confirm').onclick = async () => {
       const name = input.value.trim();
       if (!name) return input.focus();
+      const confirmBtn = document.getElementById('new-collection-confirm');
+      confirmBtn.disabled = true;
       try {
         const res = await fetch('/api/collections', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name }),
         });
-        if (!res.ok) throw new Error();
+        // Issue #48: a failure used to close the dialog silently, so a
+        // failed create looked like "nothing happened". Signed-out visitors
+        // get the account sheet; any other failure keeps the dialog open
+        // (the typed name survives) and says what went wrong.
+        if (!res.ok) {
+          if (res.status === 401) {
+            close();
+            App.promptSignIn(t('signin.saveBox'));
+            return;
+          }
+          console.warn('[home] Collection create failed', res.status);
+          UI.toast(t('newColl.failed'));
+          return;
+        }
         const created = await res.json();
         close();
         await this.refresh();
         this.openCollection(created.id);
-      } catch { close(); }
+      } catch {
+        UI.toast(t('newColl.failed'));
+      } finally {
+        confirmBtn.disabled = false;
+      }
     };
   },
 

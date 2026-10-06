@@ -207,6 +207,7 @@ I18N.register('es', {
   'newColl.title': 'Nueva colección',
   'newColl.placeholder': 'p. ej. Cenas entre semana',
   'newColl.hint': 'Empieza privada. Puedes invitar personas o hacerla pública desde la propia colección.',
+  'newColl.failed': 'No se pudo crear la colección. Inténtalo de nuevo.',
 
   'version.title': 'Historial de versiones',
   'version.current': 'actual',

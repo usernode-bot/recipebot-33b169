@@ -207,6 +207,7 @@ I18N.register('id', {
   'newColl.title': 'Koleksi baru',
   'newColl.placeholder': 'mis. Makan malam hari kerja',
   'newColl.hint': 'Dimulai sebagai privat. Kamu bisa mengundang orang atau menjadikannya publik dari koleksinya.',
+  'newColl.failed': 'Gagal membuat koleksi. Coba lagi.',
 
   'version.title': 'Riwayat versi',
   'version.current': 'saat ini',
