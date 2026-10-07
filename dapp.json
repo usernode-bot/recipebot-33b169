@@ -81,6 +81,11 @@
       "expectSelector": "#new-conversation-btn"
     },
     {
+      "name": "Homepage no-match new-recipe button renders",
+      "path": "/",
+      "expectSelector": "#home-no-match-create-btn"
+    },
+    {
       "name": "Homepage renders",
       "path": "/",
       "expectSelector": "#homepage"
