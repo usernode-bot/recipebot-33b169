@@ -313,6 +313,7 @@ I18N.register('fr', {
   'cook.done': "C'est terminé ! Bon appétit.",
   'cook.allIngredients': 'Tous les ingrédients',
   'cook.timerDone': '⏱ Terminé !',
+  'cook.textSize': 'Taille du texte',
   'cook.timerResetTitle': "Cliquez pour réinitialiser, ou fermez si c'est terminé",
 
   // ── Collections, comments and homepage bands (issues #32–#35) ──

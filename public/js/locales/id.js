@@ -313,6 +313,7 @@ I18N.register('id', {
   'cook.done': 'Selesai! Selamat menikmati.',
   'cook.allIngredients': 'Semua Bahan',
   'cook.timerDone': '⏱ Selesai!',
+  'cook.textSize': 'Ukuran teks',
   'cook.timerResetTitle': 'Klik untuk reset, atau tutup jika sudah selesai',
 
   // ── Collections, comments and homepage bands (issues #32–#35) ──

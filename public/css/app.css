@@ -474,6 +474,71 @@ h1, h2, h3, .font-display {
   align-items: baseline;
 }
 
+/* Cook mode text size (issue #81): the "Aa" control cycles Normal →
+   Large → Extra large by putting cm-text-lg/cm-text-xl on the overlay.
+   Only size changes, inside the overlay only, so regular recipe view and
+   the overlay header (title, Servings/Scale, close) are untouched. Same
+   rem values the Tailwind type scale already uses; no new colours/fonts. */
+#cooking-overlay.cm-text-lg .cm-step-text {
+  font-size: 1.875rem; /* text-3xl */
+  line-height: 2.25rem;
+}
+@media (min-width: 768px) {
+  #cooking-overlay.cm-text-lg .cm-step-text {
+    font-size: 2.25rem; /* text-4xl */
+    line-height: 2.5rem;
+  }
+}
+#cooking-overlay.cm-text-lg .cm-ing-name {
+  font-size: 1.5rem; /* text-2xl */
+  line-height: 2rem;
+}
+#cooking-overlay.cm-text-lg .cm-ing-amt,
+#cooking-overlay.cm-text-lg .cm-timer-btn,
+#cooking-overlay.cm-text-lg .cm-timer-inline {
+  font-size: 1.125rem; /* text-lg */
+  line-height: 1.75rem;
+}
+#cooking-overlay.cm-text-lg .ingredient-label {
+  font-size: 1.125rem; /* text-lg */
+  line-height: 1.75rem;
+}
+#cooking-overlay.cm-text-lg .ing-name,
+#cooking-overlay.cm-text-lg .ing-amt {
+  font-size: 1.125rem; /* text-lg */
+  line-height: 1.75rem;
+}
+
+#cooking-overlay.cm-text-xl .cm-step-text {
+  font-size: 2.25rem; /* text-4xl */
+  line-height: 2.5rem;
+}
+@media (min-width: 768px) {
+  #cooking-overlay.cm-text-xl .cm-step-text {
+    font-size: 3rem; /* text-5xl */
+    line-height: 1;
+  }
+}
+#cooking-overlay.cm-text-xl .cm-ing-name {
+  font-size: 1.875rem; /* text-3xl */
+  line-height: 2.25rem;
+}
+#cooking-overlay.cm-text-xl .cm-ing-amt,
+#cooking-overlay.cm-text-xl .cm-timer-btn,
+#cooking-overlay.cm-text-xl .cm-timer-inline {
+  font-size: 1.5rem; /* text-2xl */
+  line-height: 2rem;
+}
+#cooking-overlay.cm-text-xl .ingredient-label {
+  font-size: 1.5rem; /* text-2xl */
+  line-height: 2rem;
+}
+#cooking-overlay.cm-text-xl .ing-name,
+#cooking-overlay.cm-text-xl .ing-amt {
+  font-size: 1.5rem; /* text-2xl */
+  line-height: 2rem;
+}
+
 /* Ingredient summary grid — aligns all amounts across all steps.
    The <details> is a size container so the grid can switch to a narrow
    layout whenever the recipe panel itself is narrow (phones, or a desktop
