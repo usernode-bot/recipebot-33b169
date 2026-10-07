@@ -63,7 +63,7 @@ window.addEventListener('usernode:locale-changed', (e) => {
 document.addEventListener('i18n:change', () => {
   if (App.currentView === 'home' && typeof Home !== 'undefined') Home.render();
   if (typeof Recipe !== 'undefined' && App.currentRecipe && !Recipe.diffMode &&
-      App.currentView !== 'home' && !App.pendingRecipe) {
+      App.currentView !== 'home' && !App.pendingRecipe && !Recipe._editorOpen) {
     Recipe.display(App.currentRecipe);
   }
 });
@@ -476,6 +476,16 @@ function openUiState(name) {
     case 'export':
       if (typeof Recipe !== 'undefined' && hasRecipe) Recipe.openExportMenu();
       break;
+    case 'edit':
+      // Gated on Recipe.editableConversationId() — the same ownership
+      // predicate the Edit button and the server use — so the deep link works
+      // on an owned conversation AND on an owned recipe opened read-only from
+      // the community feed (?s=<id>).
+      if (typeof Recipe !== 'undefined' && hasRecipe && !App.pendingRecipe &&
+          Recipe.editableConversationId()) {
+        Recipe.openEditor(App.currentRecipe);
+      }
+      break;
     default:
       console.warn('[route] unknown ui state', name);
   }
@@ -548,7 +558,7 @@ async function restoreRoute(route) {
 // while an undecided edit is on screen — that view owns the panel.
 function applyDeepLinkScale() {
   if (typeof Recipe === 'undefined' || !App.currentRecipe) return;
-  if (Recipe.diffMode || App.pendingRecipe) return;
+  if (Recipe.diffMode || App.pendingRecipe || Recipe._editorOpen) return;
   let changed = false;
   if (App.deepLinkServings) {
     Recipe.currentServings = Math.max(1, App.deepLinkServings);
