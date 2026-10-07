@@ -219,6 +219,10 @@ I18N.register('es', {
 
   'settings.title': 'Ajustes de la app',
   'settings.aiModel': 'Modelo de IA',
+  'settings.tier.economy': 'Económico',
+  'settings.tier.standard': 'Estándar',
+  'settings.tier.premium': 'Premium',
+  'settings.costHint': 'Est. {low}–{high} por millón de tokens',
   'settings.default': ' (predeterminado)',
   'settings.saved': 'Guardado — se aplica a tu próximo mensaje',
   'settings.saveFailed': 'No se pudo guardar',

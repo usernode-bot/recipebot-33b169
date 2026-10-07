@@ -244,6 +244,10 @@ I18N.register('en', {
   // ── Settings modal ──
   'settings.title': 'App Settings',
   'settings.aiModel': 'AI model',
+  'settings.tier.economy': 'Economy',
+  'settings.tier.standard': 'Standard',
+  'settings.tier.premium': 'Premium',
+  'settings.costHint': 'Est. {low}–{high} per million tokens',
   'settings.default': ' (default)',
   'settings.saved': 'Saved — applies to your next message',
   'settings.saveFailed': 'Failed to save',

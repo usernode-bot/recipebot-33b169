@@ -187,6 +187,7 @@
       return;
     }
 
+    const DOLLAR = '$'; // prefix for the per-model cost hints
     models.forEach((m) => {
       const active = m.id === selected;
       const btn = document.createElement('button');
@@ -198,14 +199,33 @@
           : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500');
       btn.innerHTML =
         '<div class="flex items-center justify-between gap-2">' +
+        '<div class="flex items-center gap-2 min-w-0">' +
         '<span class="text-sm font-medium"></span>' +
+        '<span class="tier-badge hidden shrink-0 text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-600 rounded px-1 py-px"></span>' +
+        '</div>' +
         (active
           ? '<svg class="w-4 h-4 text-blue-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
           : '') +
         '</div>' +
-        '<p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5"></p>';
+        '<p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5"></p>' +
+        '<p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5 hidden"></p>';
       btn.querySelector('span').textContent = m.label + (m.default ? t('settings.default') : '');
-      btn.querySelector('p').textContent = m.description || '';
+      // Tier badge and cost hint are additive: a model object without them
+      // (older cached /api/auth/me payload) renders exactly as before.
+      const tierEl = btn.querySelector('.tier-badge');
+      if (m.tier) {
+        tierEl.classList.remove('hidden');
+        tierEl.textContent = t('settings.tier.' + m.tier);
+      }
+      const paras = btn.querySelectorAll('p');
+      paras[0].textContent = m.description || '';
+      if (m.pricing) {
+        paras[1].classList.remove('hidden');
+        paras[1].textContent = t('settings.costHint', {
+          low: DOLLAR + m.pricing.input,
+          high: DOLLAR + m.pricing.output,
+        });
+      }
       btn.addEventListener('click', () => selectModel(m.id));
       optionsEl.appendChild(btn);
     });
