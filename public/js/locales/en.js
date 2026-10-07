@@ -231,6 +231,7 @@ I18N.register('en', {
   'newColl.title': 'New collection',
   'newColl.placeholder': 'e.g. Weeknight dinners',
   'newColl.hint': 'Starts private. You can invite people or make it public from the collection itself.',
+  'newColl.failed': "Couldn't create the collection. Please try again.",
 
   // ── Version history ──
   'version.title': 'Version history',

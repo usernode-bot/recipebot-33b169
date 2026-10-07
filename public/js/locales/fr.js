@@ -208,6 +208,7 @@ I18N.register('fr', {
   'newColl.title': 'Nouvelle collection',
   'newColl.placeholder': 'p. ex. Dîners de semaine',
   'newColl.hint': 'Privée au départ. Vous pourrez inviter des personnes ou la rendre publique depuis la collection.',
+  'newColl.failed': "Impossible de créer la collection. Réessayez.",
 
   'version.title': 'Historique des versions',
   'version.current': 'actuelle',
