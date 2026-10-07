@@ -123,6 +123,26 @@ function findRecipeNode(document) {
   return null;
 }
 
+// Finished-dish photo URLs from a recipe node. schema.org recipe images are
+// editorial shots of the completed dish, so resolve to absolute URLs and
+// keep the first few usable ones.
+function extractRecipeImages(node, pageUrl) {
+  const raw = node && node.image;
+  const items = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+  const out = [];
+  for (const item of items.slice(0, 6)) {
+    let u = plainText(item && item.url ? item.url : item);
+    if (!u) continue;
+    try {
+      u = new URL(u, pageUrl).href;
+    } catch { continue; }
+    if (!/^https?:/i.test(u)) continue;
+    if (out.includes(u)) continue;
+    out.push(u);
+  }
+  return out;
+}
+
 function plainText(value) {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string') return value.replace(/\s+/g, ' ').trim();
@@ -184,10 +204,15 @@ function formatNutrition(nutrition) {
 // Render the recipe node as a compact plain-text block. ~1–3KB of exact
 // amounts beats 8KB of truncated headnotes, which is what drove the model to
 // go fetch more pages (and blow the time budget) in the first place.
-function renderStructuredRecipe(node) {
+function renderStructuredRecipe(node, pageUrl) {
   const lines = [];
   const name = plainText(node.name);
   if (name) lines.push(`Recipe: ${name}`);
+
+  // Surface the finished-dish photo URL explicitly so the model can copy
+  // it into display_recipe's image field verbatim.
+  const image = extractRecipeImages(node, pageUrl);
+  if (image.length) lines.push(`Image: ${image[0]}`);
 
   const description = plainText(node.description);
   if (description) lines.push(`Description: ${description}`);
@@ -309,13 +334,23 @@ async function fetchWebpage(url) {
 
     const pageTitle = document.title || url;
 
+    // Finished-dish photo from the page's own metadata (recipe image /
+    // OG). The model passes it to display_recipe so published recipes
+    // carry a real photo instead of a keyword-guessed placeholder.
+    let photo = null;
+    try {
+      photo = extractRecipeImage(document, url);
+    } catch (err) {
+      log.warn('web', 'Recipe image extraction failed', { url, message: err.message });
+    }
+
     // Structured data first — and when it hits, skip Readability entirely,
     // which is where most of the event-loop blocking came from.
     const recipeNode = findRecipeNode(document);
     if (recipeNode) {
       let structured = null;
       try {
-        structured = renderStructuredRecipe(recipeNode);
+        structured = renderStructuredRecipe(recipeNode, url);
       } catch (err) {
         log.warn('web', 'Structured recipe render failed', { url, message: err.message });
       }
@@ -325,6 +360,7 @@ async function fetchWebpage(url) {
           content: structured.text,
           structured: true,
           truncated: false,
+          image: photo || undefined,
         };
         log.info('web', 'Fetch complete (structured)', {
           url,
@@ -355,6 +391,7 @@ async function fetchWebpage(url) {
       title: article?.title || pageTitle,
       content,
       structured: false,
+      image: photo || undefined,
       // Either the HTML itself was cut at the byte cap, or the extracted prose
       // exceeded the character cap — both mean the model is looking at a
       // partial page and must not fill the gap from imagination.
@@ -384,4 +421,49 @@ async function fetchWebpage(url) {
   }
 }
 
-module.exports = { fetchWebpage, MAX_CONTENT_LENGTH };
+// Pull the best finished-dish photo out of a page's metadata. Priority:
+// schema.org Recipe images (normally the plated dish), then Open Graph /
+// Twitter card images. Absolute HTTP(S) URLs only.
+function extractRecipeImage(document, pageUrl) {
+  const recipeNode = findRecipeNode(document);
+  if (recipeNode) {
+    const images = extractRecipeImages(recipeNode, pageUrl);
+    if (images.length) return images[0];
+  }
+  let metas = [];
+  try {
+    metas = [
+      ...document.querySelectorAll('meta[property="og:image"]'),
+      ...document.querySelectorAll('meta[name="twitter:image"], meta[name="twitter:image:src"]'),
+    ];
+  } catch { return null; }
+  for (const meta of metas) {
+    const raw = meta.getAttribute('content');
+    if (!raw) continue;
+    let u;
+    try {
+      u = new URL(raw, pageUrl).href;
+    } catch { continue; }
+    if (/^https:\/\//i.test(u)) return u;
+  }
+  return null;
+}
+
+// Deterministic last-resort image for a recipe with no photo from its
+// source page: Unsplash's keyword redirect (stable HTTPS, food-themed).
+// Only valid recipe titles reach it; anything odd falls back to null and
+// the UI keeps its plain text-card look.
+function fallbackImageForTitle(title) {
+  if (typeof title !== 'string') return null;
+  const q = title.toLowerCase().trim();
+  if (!q || q.length > 120) return null;
+  const keyword = q.replace(/[^a-z0-9 ]/g, ' ').trim().slice(0, 80);
+  if (!keyword) return null;
+  return `https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=900&q=60&auto=format&fit=crop&food=1&dish=${encodeURIComponent(keyword)}`;
+}
+
+module.exports = {
+  fetchWebpage,
+  MAX_CONTENT_LENGTH,
+  fallbackImageForTitle,
+};

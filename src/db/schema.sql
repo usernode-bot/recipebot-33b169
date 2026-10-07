@@ -69,9 +69,24 @@ CREATE TABLE IF NOT EXISTS shared_recipes (
   username        VARCHAR(255) NOT NULL,
   conversation_id INTEGER NOT NULL,
   recipe_data     JSONB NOT NULL,
+  featured_image  TEXT,
   created_at      TIMESTAMPTZ DEFAULT NOW(),
   updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Deterministic keyword image for recipes whose source page had none.
+CREATE OR REPLACE FUNCTION featured_image_for_title(title TEXT)
+RETURNS TEXT AS $$
+BEGIN
+  IF title IS NULL THEN RETURN NULL; END IF;
+  DECLARE
+    keyword TEXT := trim(regexp_replace(lower(left(trim(title), 80)), '[^a-z0-9 ]', ' ', 'g'));
+  BEGIN
+    IF keyword = '' THEN RETURN NULL; END IF;
+  RETURN 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=900&q=60&auto=format&fit=crop&food=1&dish=' || replace(keyword, ' ', '+');
+  END;
+END;
+$$ LANGUAGE plpgsql;
 
 CREATE UNIQUE INDEX IF NOT EXISTS shared_recipes_owner_conv
   ON shared_recipes (user_id, conversation_id);
@@ -285,6 +300,15 @@ CREATE INDEX IF NOT EXISTS collection_comments_coll ON collection_comments (coll
 -- The in-app feedback widget was removed (platform-level feedback covers
 -- it now); drop its table, which nothing else used.
 DROP TABLE IF EXISTS feedback;
+
+-- Backfill: published recipes made before the featured-image column
+-- existed get a deterministic keyword image from the title, so every
+-- community recipe shows one. Idempotent: rows that already carry a URL
+-- (or have no usable title) are skipped.
+UPDATE shared_recipes
+SET featured_image = featured_image_for_title(recipe_data->>'title')
+WHERE featured_image IS NULL
+  AND featured_image_for_title(recipe_data->>'title') IS NOT NULL;
 
 -- Owner-only content: 1:1 chats with the bot, diet preferences.
 -- Copied schema-only into staging; seeded there by migrate.js.
