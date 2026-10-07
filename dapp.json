@@ -1,5 +1,5 @@
 {
-  "name": "RecipeBot",
+  "name": "Mom's Recipes",
   "icon": { "image": "brand/icon.png", "emoji": "🍳" },
   "llm": {
     "purpose": "Generates and refines cooking recipes in chat",

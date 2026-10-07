@@ -1,4 +1,4 @@
--- RecipeBot schema — applied idempotently on every boot.
+-- Mom's Recipes schema — applied idempotently on every boot.
 -- Identity comes from the platform JWT (req.user.id / req.user.username);
 -- there is no local users/sessions table.
 

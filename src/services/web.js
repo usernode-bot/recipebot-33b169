@@ -271,7 +271,7 @@ async function fetchWebpage(url) {
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; RecipeBot/1.0)',
+        'User-Agent': 'Mozilla/5.0 (compatible; Mom\'s Recipes/1.0)',
         Accept: 'text/html,application/xhtml+xml',
       },
     });
