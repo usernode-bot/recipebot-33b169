@@ -200,8 +200,10 @@ window.Router = {
   // deliberate re-open of the app minutes later starts on home.
   MAX_AGE_MS: 30_000,
   // `coll` addresses an open collection so a refresh (or signing in from a
-  // public collection) comes back to it instead of the box.
-  ROUTE_KEYS: ['c', 's', 'coll', 'cook', 'ing', 'mac', 'ch'],
+  // public collection) comes back to it instead of the box. `page` is the
+  // homepage's "Your recipes" pagination state (10 cards per page) so a
+  // refresh or a shared `?page=N` link reopens the same page.
+  ROUTE_KEYS: ['c', 's', 'coll', 'cook', 'ing', 'mac', 'ch', 'page'],
 
   // Hash params win over query params when both carry the same key.
   read() {
