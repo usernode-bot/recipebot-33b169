@@ -106,6 +106,26 @@
       "expectText": "Your recipes"
     },
     {
+      "name": "Your recipes pager renders with seeded overflow",
+      "path": "/",
+      "expectText": "Page 1 of 2"
+    },
+    {
+      "name": "Pager sits inside the Your recipes section",
+      "path": "/",
+      "expectSelector": "#home-mine #home-mine-pager:not(.hidden)"
+    },
+    {
+      "name": "Page 2 opens from the URL",
+      "path": "/?page=2",
+      "expectText": "Page 2 of 2"
+    },
+    {
+      "name": "Page 2 shows the oldest seeded recipes",
+      "path": "/?page=2",
+      "expectText": "Staging Demo Pantry Pasta"
+    },
+    {
       "name": "Header back button exists (hidden on home)",
       "path": "/",
       "expectSelector": "#home-btn"

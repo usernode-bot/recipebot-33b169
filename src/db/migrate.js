@@ -462,6 +462,45 @@ async function seedStagingDemo(pool) {
   }
   log.info('db', 'Seeded staging draft conversations');
 
+  // Pagination demo: seven more recipe conversations so "Your recipes"
+  // spills past the homepage's 10-cards-per-page and the pager actually
+  // renders in staging. Ages 21–15 days put them at the END of the
+  // newest-first order, behind every existing seed, so page 2 shows the
+  // oldest four for a signed-in tester (Pantry Pasta, Overnight Oats,
+  // Tomato Soup, Mushroom Risotto). Fixed IDs + ON CONFLICT keep this
+  // idempotent; the recipe bodies are clones of DEMO_RECIPE, retitled.
+  const PAGED_RECIPES = [
+    { id: 900060, title: 'Staging Demo Pantry Pasta', daysAgo: 21 },
+    { id: 900061, title: 'Staging Demo Overnight Oats', daysAgo: 20 },
+    { id: 900062, title: 'Staging Demo Tomato Soup', daysAgo: 19 },
+    { id: 900063, title: 'Staging Demo Mushroom Risotto', daysAgo: 18 },
+    { id: 900064, title: 'Staging Demo Lemon Drizzle Cake', daysAgo: 17 },
+    { id: 900065, title: 'Staging Demo Minestrone', daysAgo: 16 },
+    { id: 900066, title: 'Staging Demo Garlic Bread', daysAgo: 15 },
+  ];
+  for (const paged of PAGED_RECIPES) {
+    await pool.query(
+      `INSERT INTO conversations (id, user_id, title, preferences, created_at)
+       VALUES ($1, $2, $3, $4, NOW() - $5::interval)
+       ON CONFLICT (id) DO NOTHING`,
+      [paged.id, DEMO_USER_ID, `Staging demo — ${paged.title.replace(/^Staging Demo /, '')}`,
+       JSON.stringify({ complexity: 'normal', serving: 'normal' }), `${paged.daysAgo} days`]
+    );
+    const { rows: pagedMsgs } = await pool.query(
+      'SELECT 1 FROM messages WHERE conversation_id = $1 LIMIT 1', [paged.id]);
+    if (pagedMsgs.length === 0) {
+      const recipe = { ...DEMO_RECIPE, title: paged.title };
+      await pool.query(
+        `INSERT INTO messages (conversation_id, role, content, recipe_data, created_at) VALUES
+         ($1, 'user', $2, NULL, NOW() - $3::interval - interval '10 min'),
+         ($1, 'assistant', $4, $5, NOW() - $3::interval)`,
+        [paged.id, `Staging demo: make me a ${paged.title.replace(/^Staging Demo /, '').toLowerCase()}`,
+         `${paged.daysAgo} days`, `[Recipe: ${paged.title}]`, JSON.stringify(recipe)]
+      );
+    }
+  }
+  log.info('db', 'Seeded staging pagination demo recipes');
+
   // Two of the demo user's own recipes are favorited (issue #40): 900003 is
   // 5 days old, 900007 is 14, so own-recipe cards in "Your favorites" lead
   // with 900003. NOTE: is_favorited is scoped to the REQUESTER

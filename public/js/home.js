@@ -23,6 +23,12 @@ const Home = {
   // Drafts are collapsed past this many rows until "Show all" is clicked.
   DRAFT_PREVIEW: 3,
   draftsExpanded: false,
+  // "Your recipes" pagination: 10 cards per page. The page lives in the URL
+  // (`#page=N`; the `?page=N` query form works too) so a refresh or a shared
+  // link reopens the same page. The list is filtered client-side (search +
+  // the favorites split), so the page slices the FILTERED list.
+  page: 1,
+  RECIPES_PER_PAGE: 10,
 
   esc(str) {
     return String(str ?? '')
@@ -51,6 +57,11 @@ const Home = {
 
   async refresh() {
     try {
+      // Adopt the URL's page before the first render of this load (`#page=N`
+      // or `?page=N`). render() clamps it to the filtered list's page count.
+      const urlPage = parseInt(HashParams.get().page, 10);
+      if (urlPage >= 1) this.page = urlPage;
+
       // Anonymous browse mode reads only the GET-only /api/public/ surface;
       // the personal box sections stay empty and hidden.
       if (App.isAnonymous) {
@@ -170,9 +181,18 @@ const Home = {
 
     const mineList = document.getElementById('home-mine-list');
     mineList.innerHTML = '';
-    mineRest.forEach((r) => mineList.appendChild(this.ownCard(r)));
+    // Page slicing. An out-of-range page (the data shrank, or the search
+    // narrowed the list) clamps to the last page instead of showing nothing.
+    const minePages = Math.max(1, Math.ceil(mineRest.length / this.RECIPES_PER_PAGE));
+    this.page = Math.min(Math.max(1, this.page || 1), minePages);
+    const shownMine = mineRest.slice(
+      (this.page - 1) * this.RECIPES_PER_PAGE,
+      this.page * this.RECIPES_PER_PAGE);
+    shownMine.forEach((r) => mineList.appendChild(this.ownCard(r)));
     mineSection.classList.toggle('hidden', mineRest.length === 0);
+    // The count pill stays the full filtered total, not the page's slice.
     this._setCount('home-mine', mineRest.length);
+    this.renderMinePager(minePages);
 
     // Collections (the box's organizer) — always shown when signed in, so
     // "+ New collection" is reachable from an empty box.
@@ -244,6 +264,53 @@ const Home = {
     if (noMatchCreateBtn) {
       noMatchCreateBtn.textContent = t('home.noMatchCreate', { q: this.searchQuery.trim() });
     }
+  },
+
+  // ── "Your recipes" pager ──────────────────────────────────────────
+
+  // Previous / page indicator / next under the section's card grid. Uses the
+  // section headers' secondary-button styling; hidden entirely when
+  // everything fits on one page.
+  renderMinePager(totalPages) {
+    const pager = document.getElementById('home-mine-pager');
+    if (!pager) return;
+    pager.innerHTML = '';
+    if (totalPages <= 1) {
+      pager.classList.add('hidden');
+      return;
+    }
+    pager.classList.remove('hidden');
+
+    const btnClasses = (enabled) =>
+      `px-3 py-1.5 text-xs rounded-lg bg-zinc-200 dark:bg-zinc-800 transition-colors ${
+        enabled ? 'hover:bg-zinc-300 dark:hover:bg-zinc-700' : 'opacity-40 cursor-default'
+      }`;
+
+    const prev = document.createElement('button');
+    prev.className = btnClasses(this.page > 1);
+    prev.textContent = t('home.pagePrev');
+    if (this.page > 1) prev.addEventListener('click', () => this.gotoRecipePage(this.page - 1));
+
+    const label = document.createElement('span');
+    label.className = 'text-xs text-zinc-500 dark:text-zinc-400 tabular-nums';
+    label.textContent = t('home.pageOf', { n: this.page, total: totalPages });
+
+    const next = document.createElement('button');
+    next.className = btnClasses(this.page < totalPages);
+    next.textContent = t('home.pageNext');
+    if (this.page < totalPages) next.addEventListener('click', () => this.gotoRecipePage(this.page + 1));
+
+    pager.appendChild(prev);
+    pager.appendChild(label);
+    pager.appendChild(next);
+  },
+
+  // Page 1 is the default, so the URL stays clean there; the hash form is
+  // canonical (the query form is only a boot-time fallback).
+  gotoRecipePage(n) {
+    this.page = n;
+    HashParams.set('page', n > 1 ? String(n) : null);
+    this.render();
   },
 
   // ── Tag filter chips (community feed) ─────────────────────────────
@@ -1108,6 +1175,11 @@ const Home = {
 
 document.getElementById('home-search')?.addEventListener('input', (e) => {
   Home.searchQuery = e.target.value;
+  // A new search re-derives the list; start from its first page.
+  if (Home.page !== 1) {
+    Home.page = 1;
+    HashParams.set('page', null);
+  }
   Home.render();
 });
 document.getElementById('home-no-match-create-btn')?.addEventListener('click', () => {
