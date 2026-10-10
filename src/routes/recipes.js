@@ -34,6 +34,23 @@ function recipeRoutes(config) {
   const ownerClause = (col) =>
     config.isStaging ? `${col} IN ($1, 0)` : `${col} = $1`;
 
+  // The collections the requester can curate (owner or member, matching
+  // canCurate in collections.js) that already contain the recipe — issue
+  // #90. Read-only; ordered most recently added first, and the client's
+  // "Saved ✓" opens the first element. `matchSql` binds the recipe column
+  // (i.conversation_id = … or i.shared_recipe_id = …); every caller already
+  // binds $1 to req.user.id.
+  const savedIn = (matchSql) => `
+    COALESCE((SELECT json_agg(json_build_object('id', col.id, 'name', col.name)
+                              ORDER BY i.created_at DESC, i.id DESC)
+              FROM collection_items i
+              JOIN collections col ON col.id = i.collection_id
+              WHERE ${matchSql}
+                AND (${ownerClause('col.user_id')}
+                     OR EXISTS (SELECT 1 FROM collection_members cm
+                                WHERE cm.collection_id = col.id
+                                  AND ${ownerClause('cm.user_id')}))), '[]'::json) AS saved_in`;
+
   // The requester's created recipes (latest recipe per conversation),
   // newest recipe activity first (issue #40). `created_at` here is the
   // LATEST recipe message's timestamp, not the conversation's — i.e. when
@@ -58,6 +75,7 @@ function recipeRoutes(config) {
                                           WHERE m2.conversation_id = c.id AND m2.recipe_data IS NOT NULL
                                           ORDER BY m2.created_at DESC LIMIT 1)) AS shared_up_to_date,
            (SELECT COUNT(*) FROM made_it_marks mm WHERE mm.conversation_id = c.id)::int AS made_count,
+           ${savedIn('i.conversation_id = c.id')},
            c.forked_from_shared_id, c.forked_from_username
          FROM messages m
          JOIN conversations c ON c.id = m.conversation_id
@@ -207,6 +225,7 @@ function recipeRoutes(config) {
                 COALESCE(agg.rating_count, 0)::int AS rating_count,
                 my.rating AS my_rating,
                 ${SOCIAL_COUNTS},
+                ${savedIn('i.shared_recipe_id = s.id')},
                 EXISTS (SELECT 1 FROM recipe_favorites f
                         WHERE f.shared_recipe_id = s.id AND f.user_id = $1) AS is_favorited,
                 (s.user_id = $1) AS is_mine
@@ -457,6 +476,7 @@ function recipeRoutes(config) {
                 COALESCE(agg.rating_count, 0)::int AS rating_count,
                 my.rating AS my_rating,
                 ${SOCIAL_COUNTS},
+                ${savedIn('i.shared_recipe_id = s.id')},
                 TRUE AS is_favorited,
                 (s.user_id = $1) AS is_mine
          FROM recipe_favorites f

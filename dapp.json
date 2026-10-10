@@ -236,6 +236,21 @@
       "expectSelector": "#collection-pick-modal"
     },
     {
+      "name": "Saved recipe card shows Saved check",
+      "path": "/",
+      "expectText": "Saved ✓"
+    },
+    {
+      "name": "Saved recipe panel button carries its collection",
+      "path": "/?c=900001",
+      "expectSelector": "#add-collection-btn[data-saved-coll=\"900003\"]"
+    },
+    {
+      "name": "Saved shared recipe panel button carries its collection",
+      "path": "/?s=900001",
+      "expectSelector": "#add-collection-btn[data-saved-coll]"
+    },
+    {
       "name": "Made-it dialog exists",
       "path": "/",
       "expectSelector": "#made-it-modal"

@@ -5,6 +5,9 @@ const Store = {
   recipes: {},
   conversations: [],
   favoriteShared: [],
+  // conversation_id → saved_in from /api/recipes (issue #90): which of the
+  // requester's collections already hold that recipe.
+  savedIn: {},
 
   async refresh() {
     try {
@@ -18,11 +21,21 @@ const Store = {
       this.favoriteShared = favRes.ok ? await favRes.json() : [];
 
       this.recipes = {};
+      this.savedIn = {};
       for (const r of recipes) {
-        if (r.conversation_id) this.recipes[r.conversation_id] = r.data;
+        if (r.conversation_id) {
+          this.recipes[r.conversation_id] = r.data;
+          this.savedIn[r.conversation_id] = r.saved_in || [];
+        }
       }
 
       this.conversations = conversations;
+      // A deep-linked recipe can have rendered before this refresh landed;
+      // now that saved_in is here, flip its panel button if it is saved
+      // (issue #90). No-op when nothing is displayed.
+      if (App.currentRecipe && typeof Recipe !== 'undefined') {
+        Recipe.updateCollectionControl?.();
+      }
     } catch { /* retry on next refresh */ }
   },
 
@@ -95,6 +108,9 @@ const Store = {
       forked_from_username: item.forked_from_username || null,
       made_count: item.made_count || 0,
       remix_count: item.remix_count || 0,
+      // Which of the viewer's collections already hold it (issue #90) —
+      // drives the recipe panel's Saved ✓ button.
+      saved_in: item.saved_in || [],
       // Kept so "Back to current" can restore after viewing an old version.
       currentData: item.data,
     };

@@ -323,10 +323,74 @@ const Recipe = {
     return `<button id="made-it-btn" title="${this.escapeHtml(t('recipe.madeItTitle'))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.madeIt')}</button>`;
   },
 
-  // Add to a collection (own conversation or a published recipe).
+  // Add to a collection (own conversation or a published recipe). When the
+  // recipe is already in one of the viewer's collections, the same button
+  // reads "Saved ✓" and opens that collection instead (issue #90).
   renderCollectionControl() {
     if (!App.currentConversationId && !App.viewingShared?.id) return '';
+    const first = this._collectionSavedIn()[0];
+    if (first) {
+      return `<button id="add-collection-btn" data-saved-coll="${first.id}" title="${this.escapeHtml(t('tip.savedInCollection', { name: first.name }))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('common.savedCheck')}</button>`;
+    }
     return `<button id="add-collection-btn" title="${this.escapeHtml(t('recipe.addCollectionTitle'))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.addCollection')}</button>`;
+  },
+
+  // Which of the viewer's collections already hold the recipe on display.
+  // Own conversation: the homepage's /api/recipes row, falling back to
+  // Store.savedIn (covers a deep link to `?c=` before the homepage loaded).
+  // Published recipe: the feed/favorites rows or the copy Store.openShared
+  // kept. Empty for anonymous visitors and unsaved forks.
+  _collectionSavedIn() {
+    if (App.isAnonymous) return [];
+    if (App.currentConversationId) {
+      const row = (typeof Home !== 'undefined')
+        ? Home.mine.find((r) => r.conversation_id === App.currentConversationId)
+        : null;
+      if (row?.saved_in?.length) return row.saved_in;
+      return (typeof Store !== 'undefined' && Store.savedIn?.[App.currentConversationId]) || [];
+    }
+    if (App.viewingShared?.id) {
+      const fromHome = (typeof Home !== 'undefined')
+        ? (Home.shared.find((s) => s.id === App.viewingShared.id)
+          || Home.favorites.find((s) => s.id === App.viewingShared.id))
+        : null;
+      if (fromHome?.saved_in?.length) return fromHome.saved_in;
+      return App.viewingShared.saved_in || [];
+    }
+    return [];
+  },
+
+  // Click behaviour for #add-collection-btn, whichever label it carries:
+  // Saved ✓ opens the collection it is in (same steps as the header's home
+  // button, then the collection route); otherwise the add picker.
+  _bindCollectionControl(display) {
+    display.querySelector('#add-collection-btn')?.addEventListener('click', () => {
+      const savedColl = display.querySelector('#add-collection-btn')?.dataset.savedColl;
+      if (savedColl && typeof Home !== 'undefined') {
+        HashParams.set('c', null);
+        HashParams.set('s', null);
+        HashParams.set('cook', null);
+        App.setSignInPath?.(null);
+        App.showView('home');
+        Home.openCollection(parseInt(savedColl, 10));
+        return;
+      }
+      if (App.isAnonymous) return App.promptSignIn(t('signin.saveBox'));
+      if (typeof Home === 'undefined') return;
+      const target = App.currentConversationId
+        ? { conversationId: App.currentConversationId }
+        : App.viewingShared?.id ? { sharedRecipeId: App.viewingShared.id } : null;
+      if (target) Home.openCollectionPicker(target);
+    });
+  },
+
+  // Flip the panel's collection button in place (after the picker adds to a
+  // collection) instead of re-rendering the whole recipe.
+  updateCollectionControl() {
+    const btn = document.getElementById('add-collection-btn');
+    if (!btn) return;
+    btn.outerHTML = this.renderCollectionControl();
+    this._bindCollectionControl(document.getElementById('recipe-display'));
   },
 
   // Copy the public share link (published recipes only).
@@ -709,14 +773,7 @@ const Recipe = {
 
     display.querySelector('#made-it-btn')?.addEventListener('click', () => this.markMadeIt());
 
-    display.querySelector('#add-collection-btn')?.addEventListener('click', () => {
-      if (App.isAnonymous) return App.promptSignIn(t('signin.saveBox'));
-      if (typeof Home === 'undefined') return;
-      const target = App.currentConversationId
-        ? { conversationId: App.currentConversationId }
-        : App.viewingShared?.id ? { sharedRecipeId: App.viewingShared.id } : null;
-      if (target) Home.openCollectionPicker(target);
-    });
+    this._bindCollectionControl(display);
 
     display.querySelector('#copy-link-btn')?.addEventListener('click', () => {
       const slug = this._currentShareSlug();
