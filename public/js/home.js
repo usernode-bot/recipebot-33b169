@@ -362,6 +362,18 @@ const Home = {
     return a;
   },
 
+  // "Saved ✓" for a recipe already in one of the requester's collections
+  // (issue #90). Same grey secondary button, new label; pressing it opens
+  // that collection, where Remove etc. live. saved_in[0] is the most
+  // recently added collection (server orders it that way).
+  _savedBtn(savedIn) {
+    const first = savedIn[0];
+    const btn = this._actionLink(t('common.savedCheck'), false, `/?coll=${first.id}`,
+      () => this.openCollection(first.id));
+    btn.title = t('tip.savedInCollection', { name: first.name });
+    return btn;
+  },
+
   // Icon-only so the five-button action row still fits a phone-width card.
   _deleteBtn(conversationId) {
     const btn = document.createElement('button');
@@ -432,7 +444,12 @@ const Home = {
     collectBtn.title = t('tip.addToCollection');
     collectBtn.addEventListener('click', () =>
       this.openCollectionPicker({ conversationId: r.conversation_id }));
-    actions.appendChild(collectBtn);
+    // Already in one of your collections: Saved ✓ opens it (issue #90).
+    if (r.saved_in?.length) {
+      actions.appendChild(this._savedBtn(r.saved_in));
+    } else {
+      actions.appendChild(collectBtn);
+    }
     actions.appendChild(this._deleteBtn(r.conversation_id));
     el.appendChild(actions);
     return el;
@@ -523,7 +540,12 @@ const Home = {
       if (App.isAnonymous) return App.promptSignIn(t('signin.saveBox'));
       this.openCollectionPicker({ sharedRecipeId: s.id });
     });
-    actions.appendChild(collectBtn);
+    // Already in one of your collections: Saved ✓ opens it (issue #90).
+    if (!App.isAnonymous && s.saved_in?.length) {
+      actions.appendChild(this._savedBtn(s.saved_in));
+    } else {
+      actions.appendChild(collectBtn);
+    }
     if (s.share_slug) {
       const linkBtn = this._actionBtn(t('common.link'));
       linkBtn.title = t('tip.copyShareLink');
@@ -943,7 +965,10 @@ const Home = {
         if (!res.ok) throw new Error();
         close();
         UI.toast(t('toast.addedToCollection'));
-        this.refresh();
+        // Re-render so the card's add button flips to Saved ✓, and let the
+        // recipe panel's button follow without a full re-display (issue #90).
+        await this.refresh();
+        if (typeof Recipe !== 'undefined') Recipe.updateCollectionControl?.();
       } catch {
         close();
       }
