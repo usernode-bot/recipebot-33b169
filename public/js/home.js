@@ -18,6 +18,10 @@ const Home = {
   publicCollections: [],
   searchQuery: '',
   tagFilter: new Set(),
+  // The diet vocabulary, mirrored from SUGGESTED_TAGS.diet in
+  // src/services/tags.js — keep the two in sync. These chips always show,
+  // ahead of the community's most used tags.
+  DIET_TAGS: ['vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'high-protein', 'low-carb'],
   // When set, the homepage shows this collection's detail instead of the box.
   activeCollection: null,
   // Drafts are collapsed past this many rows until "Show all" is clicked.
@@ -111,13 +115,14 @@ const Home = {
     const noMatchEl = document.getElementById('home-no-match');
     const detailEl = document.getElementById('collection-view');
     const toolbar = document.getElementById('home-toolbar');
+    const tagFilterWrap = document.getElementById('home-tag-filters');
     if (!favSection || !mineSection || !commSection) return;
 
     // Collection detail replaces the box until closed. Blanking the two
     // bands covers every section inside them.
     const inDetail = !!this.activeCollection;
     detailEl?.classList.toggle('hidden', !inDetail);
-    for (const el of [bandMine, bandComm, emptyEl, noMatchEl, toolbar]) {
+    for (const el of [bandMine, bandComm, emptyEl, noMatchEl, toolbar, tagFilterWrap]) {
       if (el) el.style.display = inDetail ? 'none' : '';
     }
     if (inDetail) {
@@ -145,17 +150,21 @@ const Home = {
     // — when the recipe was created or last edited.
     const recipeStamp = (r) => r.created_at;
     const favOwn = this._byRecency(this.mine.filter((r) =>
-      r.is_favorited && matches(r.data?.title || r.conversation_title, r.data?.tags)), recipeStamp);
+      r.is_favorited && matches(r.data?.title || r.conversation_title, r.data?.tags)
+      && tagMatch(r.data?.tags)), recipeStamp);
     const mineRest = this._byRecency(this.mine.filter((r) =>
-      !r.is_favorited && matches(r.data?.title || r.conversation_title, r.data?.tags)), recipeStamp);
-    const favShared = this.favorites.filter((s) => matches(s.data?.title, s.tags));
+      !r.is_favorited && matches(r.data?.title || r.conversation_title, r.data?.tags)
+      && tagMatch(r.data?.tags)), recipeStamp);
+    const favShared = this.favorites.filter((s) =>
+      matches(s.data?.title, s.tags) && tagMatch(s.tags));
     const shared = this.shared.filter((s) => matches(s.data?.title, s.tags) && tagMatch(s.tags));
 
     // Conversations without a recipe yet (recipe-bearing ones already show
     // as cards in "Your recipes" / "Your favorites"), most recently worked
-    // on first.
+    // on first. A draft has no recipe, so no tags — hidden while a chip is
+    // chosen rather than shown as if it matched.
     const recipeConvIds = new Set(this.mine.map((r) => r.conversation_id));
-    const bareConvs = this._byRecency(this.conversations.filter(
+    const bareConvs = this.tagFilter.size ? [] : this._byRecency(this.conversations.filter(
       (c) => !recipeConvIds.has(c.id) && matches(c.title || t('card.newConversation'))),
     (c) => c.last_activity_at || c.created_at);
 
@@ -211,7 +220,7 @@ const Home = {
     const commList = document.getElementById('home-community-list');
     commList.innerHTML = '';
     shared.forEach((s) => commList.appendChild(this.sharedCard(s)));
-    commSection.classList.toggle('hidden', shared.length === 0 && !this.tagFilter.size);
+    commSection.classList.toggle('hidden', shared.length === 0);
     this._setCount('home-community', shared.length);
 
     let pubs = [];
@@ -229,34 +238,42 @@ const Home = {
     // bare page); the box band hides its own sections individually.
     if (bandComm) {
       bandComm.style.display =
-        (shared.length === 0 && !this.tagFilter.size && pubs.length === 0 && !App.isAnonymous)
+        (shared.length === 0 && pubs.length === 0 && !App.isAnonymous)
           ? 'none' : '';
     }
 
     const visible =
       favOwn.length + favShared.length + mineRest.length + bareConvs.length + shared.length;
-    emptyEl?.classList.toggle('hidden', !(visible === 0 && !q && colls.length === 0));
-    noMatchEl?.classList.toggle('hidden', !(visible === 0 && q));
+    const filtering = q || this.tagFilter.size;
+    emptyEl?.classList.toggle('hidden', !(visible === 0 && !filtering && colls.length === 0));
+    noMatchEl?.classList.toggle('hidden', !(visible === 0 && filtering));
     // The no-match empty state's one action is a new recipe named for the
     // search text (issue #51). Label is dynamic — render() owns it, not a
-    // data-i18n attribute.
+    // data-i18n attribute. Only shown for an actual search: with only a
+    // tag chip chosen there is no name to fill it with.
     const noMatchCreateBtn = document.getElementById('home-no-match-create-btn');
     if (noMatchCreateBtn) {
       noMatchCreateBtn.textContent = t('home.noMatchCreate', { q: this.searchQuery.trim() });
+      noMatchCreateBtn.classList.toggle('hidden', !q);
     }
   },
 
-  // ── Tag filter chips (community feed) ─────────────────────────────
+  // ── Tag filter chips (filter every recipe list on the homepage) ────
 
   renderTagFilters() {
     const wrap = document.getElementById('home-tag-filters');
     if (!wrap) return;
     const freq = new Map();
     this.shared.forEach((s) => (s.tags || []).forEach((t) => freq.set(t, (freq.get(t) || 0) + 1)));
-    const top = [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
+    const top = [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12)
+      .map(([tag]) => tag)
+      .filter((tag) => !this.DIET_TAGS.includes(tag));
+    // An active chip never vanishes, even when no visible row carries it.
+    const extra = [...this.tagFilter].filter(
+      (tag) => !this.DIET_TAGS.includes(tag) && !top.includes(tag));
+    const tags = [...this.DIET_TAGS, ...top, ...extra];
     wrap.innerHTML = '';
-    wrap.classList.toggle('hidden', top.length === 0);
-    top.forEach(([tag]) => {
+    tags.forEach((tag) => {
       const active = this.tagFilter.has(tag);
       const chip = document.createElement('button');
       chip.className = `px-2.5 py-1 text-xs rounded-full border transition-colors ${

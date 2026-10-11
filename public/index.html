@@ -364,6 +364,10 @@
             + New recipe
           </button>
         </div>
+        <!-- Tag filter chips — diet tags first, then the community's most
+             used ones. They filter every recipe list on the homepage, not
+             just the community feed (built by home.js). -->
+        <div id="home-tag-filters" class="flex flex-wrap gap-1.5"></div>
         <!-- Collection detail (opened from a collection card; hides the box sections) -->
         <div id="collection-view" class="hidden"></div>
 
@@ -439,8 +443,6 @@
               <span data-i18n="home.communityRecipes">Community recipes</span>
               <span class="home-count text-xs font-normal text-zinc-400 dark:text-zinc-500 tabular-nums"></span>
             </h2>
-            <!-- Tag filter chips (built from tag frequencies by home.js) -->
-            <div id="home-tag-filters" class="hidden flex flex-wrap gap-1.5 mb-3"></div>
             <div id="home-community-list" class="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"></div>
           </section>
 
