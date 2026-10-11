@@ -231,6 +231,16 @@
       "expectText": "one-pot"
     },
     {
+      "name": "Diet chips sit under the search toolbar",
+      "path": "/",
+      "expectSelector": "#home-toolbar + #home-tag-filters"
+    },
+    {
+      "name": "Diet chips always render, even when no recipe carries them",
+      "path": "/",
+      "expectText": "dairy-free"
+    },
+    {
       "name": "Add-to-collection picker exists",
       "path": "/",
       "expectSelector": "#collection-pick-modal"
