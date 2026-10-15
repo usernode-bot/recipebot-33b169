@@ -269,6 +269,7 @@ I18N.register('en', {
   'recipe.macroFat': '{n}g fat',
   'recipe.macroFiber': '{n}g fiber',
   'recipe.cookMode': '🍳 Cook Mode',
+  'recipe.print': 'Print',
   'recipe.export': 'Export ▾',
   'recipe.downloadMd': 'Download Markdown',
   'recipe.copyMd': 'Copy Markdown',

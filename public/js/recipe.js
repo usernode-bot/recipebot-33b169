@@ -74,7 +74,7 @@ const Recipe = {
 
     // Tag chips on the recipe view (from the recipe JSON).
     const tagChipsHtml = (recipe.tags && recipe.tags.length)
-      ? `<div class="flex flex-wrap gap-1 mt-2">${recipe.tags.slice(0, 8).map((t) =>
+      ? `<div class="print-hide flex flex-wrap gap-1 mt-2">${recipe.tags.slice(0, 8).map((t) =>
           `<span class="px-2 py-0.5 text-[11px] rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">${this.escapeHtml(t)}</span>`
         ).join('')}</div>`
       : '';
@@ -84,7 +84,7 @@ const Recipe = {
     if (App.viewingVersion && App.viewingShared &&
         App.viewingVersion.version !== App.viewingShared.current_version) {
       versionBannerHtml = `
-        <div class="flex items-center justify-between gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+        <div class="print-hide flex items-center justify-between gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
           <span class="text-sm font-medium text-blue-800 dark:text-blue-200">${t('version.viewing', { v: App.viewingVersion.version, cur: App.viewingShared.current_version })}</span>
           <button id="version-back-current" class="shrink-0 px-3 py-1 text-sm rounded-lg bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors">${t('version.backToCurrent')}</button>
         </div>`;
@@ -96,7 +96,7 @@ const Recipe = {
         <div>
           <h2 class="text-2xl font-bold tracking-tight">${this.escapeHtml(recipe.title)}</h2>
           ${bylineHtml}
-          ${recipe.description ? `<p class="text-zinc-500 dark:text-zinc-400 text-sm mt-1.5 leading-relaxed">${this.renderInline(recipe.description)}</p>` : ''}
+          ${recipe.description ? `<p class="print-hide text-zinc-500 dark:text-zinc-400 text-sm mt-1.5 leading-relaxed">${this.renderInline(recipe.description)}</p>` : ''}
           ${tagChipsHtml}
           ${this.playlistHtml(recipe)}
         </div>
@@ -119,7 +119,7 @@ const Recipe = {
             </div>
           </div>
           ${timeInfo ? `<span class="text-zinc-400 dark:text-zinc-500">${timeInfo}</span>` : ''}
-          <div id="temp-toggle" class="flex text-xs rounded-full bg-zinc-100 dark:bg-zinc-900 overflow-hidden cursor-pointer select-none">
+          <div id="temp-toggle" class="print-hide flex text-xs rounded-full bg-zinc-100 dark:bg-zinc-900 overflow-hidden cursor-pointer select-none">
             <span class="px-2.5 py-1 rounded-full transition-all ${this.useCelsius ? 'bg-blue-200 dark:bg-blue-700/40 text-blue-800 dark:text-blue-100 font-medium shadow-sm' : 'text-zinc-400 dark:text-zinc-500'}">°C</span>
             <span class="px-2.5 py-1 rounded-full transition-all ${!this.useCelsius ? 'bg-blue-200 dark:bg-blue-700/40 text-blue-800 dark:text-blue-100 font-medium shadow-sm' : 'text-zinc-400 dark:text-zinc-500'}">°F</span>
           </div>
@@ -128,7 +128,7 @@ const Recipe = {
           </button>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="print-hide flex flex-wrap items-center gap-2">
           <span class="text-xs text-zinc-400 dark:text-zinc-500">${t('recipe.perServing')}${ss !== 1.0 ? ` (${scaleLabel})` : ''}</span>
           <span class="macro-pill bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400">${t('recipe.macroCal', { n: Math.round(perServingMacros.calories) })}</span>
           <span class="macro-pill bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">${t('recipe.macroProtein', { n: Math.round(perServingMacros.protein_g) })}</span>
@@ -159,6 +159,7 @@ const Recipe = {
               </label>
             </div>
           </div>
+          <button id="print-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.print')}</button>
         </div>
 
         ${this.renderIngredientSummary(recipe, ingredientScale)}
@@ -167,7 +168,7 @@ const Recipe = {
           ${recipe.steps.map((step, i) => this.renderStep(step, i, ingredientScale)).join('')}
         </div>
 
-        ${recipe.notes ? `<div class="mt-3 p-4 bg-zinc-100/70 dark:bg-zinc-900/50 rounded-xl text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed"><strong class="text-zinc-700 dark:text-zinc-300">${t('recipe.notesLabel')}</strong> ${this.renderInline(recipe.notes)}</div>` : ''}
+        ${recipe.notes ? `<div class="print-plain mt-3 p-4 bg-zinc-100/70 dark:bg-zinc-900/50 rounded-xl text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed"><strong class="text-zinc-700 dark:text-zinc-300">${t('recipe.notesLabel')}</strong> ${this.renderInline(recipe.notes)}</div>` : ''}
 
         <div id="social-section"></div>
       </div>
@@ -201,7 +202,7 @@ const Recipe = {
     const url = this.playlistUrl(recipe.playlist);
     return `
       <a id="playlist-link" href="${url}" target="_blank" rel="noopener noreferrer"
-         class="inline-flex items-center gap-1.5 ${compact ? '' : 'mt-2'} px-2 py-0.5 text-[11px] rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+         class="print-hide inline-flex items-center gap-1.5 ${compact ? '' : 'mt-2'} px-2 py-0.5 text-[11px] rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
          title="${this.escapeHtml(t('recipe.playlistTitle'))}">
         <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm12-2a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -782,6 +783,8 @@ const Recipe = {
     display.querySelector('#export-copy-md')?.addEventListener('click', () => { this.copyMarkdown(recipe); closeExport(); });
     display.querySelector('#export-json')?.addEventListener('click', () => { this.exportJSON(recipe); closeExport(); });
     display.querySelector('#import-json-input')?.addEventListener('change', (e) => { this.importJSON(e); closeExport(); });
+
+    display.querySelector('#print-btn')?.addEventListener('click', () => window.print());
 
     // Step timer buttons
     display.querySelectorAll('.step-timer-btn').forEach((btn) => {
