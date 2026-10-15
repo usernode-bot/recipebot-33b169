@@ -39,6 +39,7 @@ I18N.register('id', {
   'home.emptyTitle': 'Belum ada resep',
   'home.emptySubtitle': 'Mulai percakapan untuk membuat resep, lalu bagikan ke komunitas.',
   'home.noMatch': 'Tidak ada resep yang cocok dengan pencarianmu',
+  'home.noMatchCreate': '+ Resep baru untuk “{q}”',
 
   'card.yourRecipe': 'Resepmu',
   'card.remix': 'Remix',
@@ -247,6 +248,8 @@ I18N.register('id', {
   'recipe.copyMd': 'Salin Markdown',
   'recipe.downloadJson': 'Unduh JSON',
   'recipe.importJson': 'Impor JSON',
+  'recipe.playlistLabel': 'Masak dengan:',
+  'recipe.playlistTitle': 'Buka playlist YouTube yang cocok di tab baru',
   'recipe.notesLabel': 'Catatan:',
   'recipe.madeIt': '☑ Sudah dibuat',
   'recipe.madeItTitle': 'Tandai bahwa kamu memasak ini (catatan opsional)',

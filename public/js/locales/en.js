@@ -45,6 +45,7 @@ I18N.register('en', {
   'home.emptyTitle': 'No recipes yet',
   'home.emptySubtitle': 'Start a conversation to create a recipe, then share it to the community feed.',
   'home.noMatch': 'No recipes match your search',
+  'home.noMatchCreate': '+ New recipe for “{q}”',
 
   // ── Cards ──
   'card.yourRecipe': 'Your recipe',
@@ -273,6 +274,8 @@ I18N.register('en', {
   'recipe.copyMd': 'Copy Markdown',
   'recipe.downloadJson': 'Download JSON',
   'recipe.importJson': 'Import JSON',
+  'recipe.playlistLabel': 'Cook to:',
+  'recipe.playlistTitle': 'Open a matching YouTube playlist in a new tab',
   'recipe.notesLabel': 'Notes:',
   'recipe.madeIt': '☑ Made it',
   'recipe.madeItTitle': 'Mark that you cooked this (optional note)',
