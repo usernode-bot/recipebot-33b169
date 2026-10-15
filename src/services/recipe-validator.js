@@ -17,6 +17,10 @@ function validate(recipe) {
     errors.push('default_servings must be a positive integer');
   }
 
+  if (recipe.image !== undefined && recipe.image !== null && typeof recipe.image !== 'string') {
+    errors.push('image must be a string URL when present');
+  }
+
   if (!Array.isArray(recipe.steps) || recipe.steps.length === 0) {
     errors.push('steps must be a non-empty array');
   } else {

@@ -25,6 +25,15 @@ function newShareSlug() {
   return crypto.randomBytes(8).toString('base64url');
 }
 
+// Featured image for a published snapshot: the recipe's own photo when the
+// model carried one over from the source page; otherwise a deterministic
+// keyword image from the title (same helper the DB backfill uses) so every
+// community recipe renders with one.
+function featuredImageFor(recipe) {
+  if (recipe && /^https:\/\//i.test(recipe.image)) return recipe.image;
+  return null;
+}
+
 function recipeRoutes(config) {
   const router = Router();
   const pool = getPool(config);
@@ -127,8 +136,9 @@ function recipeRoutes(config) {
       const { rows } = await client.query(
         `INSERT INTO shared_recipes
            (user_id, username, conversation_id, recipe_data, tags, share_slug,
-            forked_from_shared_id, forked_from_version, forked_from_username)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            forked_from_shared_id, forked_from_version, forked_from_username, featured_image)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,
+                 COALESCE($10, featured_image_for_title($11)))
          ON CONFLICT (user_id, conversation_id)
          DO UPDATE SET recipe_data = EXCLUDED.recipe_data,
                        username = EXCLUDED.username,
@@ -137,12 +147,14 @@ function recipeRoutes(config) {
                        forked_from_shared_id = EXCLUDED.forked_from_shared_id,
                        forked_from_version = EXCLUDED.forked_from_version,
                        forked_from_username = EXCLUDED.forked_from_username,
+                       featured_image = EXCLUDED.featured_image,
                        updated_at = NOW()
-         RETURNING id, user_id, username, conversation_id, share_slug, tags, created_at, updated_at`,
+         RETURNING id, user_id, username, conversation_id, share_slug, tags, featured_image, created_at, updated_at`,
         [
           req.user.id, req.user.username || 'unknown', convId, recipeJson, tags,
           newShareSlug(),
           conv[0].forked_from_shared_id, conv[0].forked_from_version, conv[0].forked_from_username,
+          featuredImageFor(recipeData), recipeData.title || null,
         ]
       );
       const { rows: verRows } = await client.query(
@@ -199,7 +211,7 @@ function recipeRoutes(config) {
       }
       const { rows } = await pool.query(
         `SELECT s.id, s.user_id, s.username, s.conversation_id, s.recipe_data AS data,
-                s.created_at, s.updated_at, s.share_slug, s.tags,
+                s.created_at, s.updated_at, s.share_slug, s.tags, s.featured_image,
                 s.forked_from_shared_id, s.forked_from_version, s.forked_from_username,
                 COALESCE((SELECT MAX(v.version) FROM shared_recipe_versions v
                           WHERE v.shared_recipe_id = s.id), 1)::int AS current_version,

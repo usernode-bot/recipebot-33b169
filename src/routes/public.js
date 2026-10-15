@@ -39,7 +39,7 @@ function publicRoutes(config) {
   async function loadBySlug(slug) {
     if (!slug || typeof slug !== 'string' || slug.length > 64) return null;
     const { rows } = await pool.query(
-      `SELECT s.id, s.username, s.recipe_data, s.tags, s.share_slug,
+      `SELECT s.id, s.username, s.recipe_data, s.tags, s.share_slug, s.featured_image,
               s.created_at, s.updated_at,
               s.forked_from_shared_id, s.forked_from_username,
               o.share_slug AS forked_from_slug,
@@ -79,6 +79,7 @@ function publicRoutes(config) {
     return {
       username: rec.username,
       recipe: rec.recipe_data,
+      image: rec.featured_image || null,
       tags: rec.tags || [],
       share_slug: rec.share_slug,
       current_version: rec.current_version,
@@ -128,7 +129,7 @@ function publicRoutes(config) {
         where = `WHERE s.tags && $${params.length}::text[]`;
       }
       const { rows } = await pool.query(
-        `SELECT s.id, s.username, s.recipe_data AS data, s.tags, s.share_slug,
+        `SELECT s.id, s.username, s.recipe_data AS data, s.tags, s.share_slug, s.featured_image,
                 s.created_at, s.updated_at,
                 s.forked_from_shared_id, s.forked_from_version, s.forked_from_username,
                 COALESCE((SELECT MAX(v.version) FROM shared_recipe_versions v
@@ -293,6 +294,7 @@ function recipePage(data, pageUrl) {
   metaBits.push(`Serves ${r.default_servings}`);
   const description = (r.description || `A recipe by ${data.username} on RecipeBot.`) +
     ` · ${metaBits.join(' · ')}`;
+  const imageUrl = data.image || r.image || null;
   // Embedded JSON: escape "<" so recipe content can never close the script.
   const payload = JSON.stringify(data).replace(/</g, '\\u003c');
 
@@ -308,7 +310,9 @@ function recipePage(data, pageUrl) {
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${esc(pageUrl)}">
-<meta name="twitter:card" content="summary">
+${imageUrl ? `<meta property="og:image" content="${esc(imageUrl)}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="${esc(imageUrl)}">` : '<meta name="twitter:card" content="summary">'}
 <meta name="twitter:title" content="${esc(title)}">
 <meta name="twitter:description" content="${esc(description)}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -389,6 +393,8 @@ ${THEME_BOOT_SCRIPT}
   <h1 id="title"></h1>
   <p class="byline" id="byline"></p>
   <p class="lineage" id="lineage" style="display:none"></p>
+  ${imageUrl ? `<img src="${esc(imageUrl)}" alt="${esc(title)}" class="hero-photo"
+    style="width:100%;border-radius:10px;border:1px solid var(--hairline);margin:12px 0;aspect-ratio:3/2;object-fit:cover;background:var(--panel)">` : ''}
   <p class="desc" id="desc" style="display:none"></p>
   <div class="tags" id="tags"></div>
   <div class="metaline">
