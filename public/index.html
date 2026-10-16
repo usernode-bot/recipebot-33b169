@@ -439,8 +439,14 @@
               <span data-i18n="home.communityRecipes">Community recipes</span>
               <span class="home-count text-xs font-normal text-zinc-400 dark:text-zinc-500 tabular-nums"></span>
             </h2>
-            <!-- Tag filter chips (built from tag frequencies by home.js) -->
-            <div id="home-tag-filters" class="hidden flex flex-wrap gap-1.5 mb-3"></div>
+            <!-- Tag filter chips (left) + sort menu (right), built by home.js -->
+            <div class="flex items-start gap-2 mb-3">
+              <div id="home-tag-filters" class="hidden flex-1 min-w-0 flex flex-wrap gap-1.5"></div>
+              <select id="home-community-sort" data-i18n-aria-label="home.sortLabel" aria-label="Sort" class="ml-auto shrink-0 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="newest" data-i18n="home.sortNewest">Newest</option>
+                <option value="rating" data-i18n="home.sortTopRated">Top rated</option>
+              </select>
+            </div>
             <div id="home-community-list" class="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"></div>
           </section>
 
