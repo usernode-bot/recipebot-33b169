@@ -1,6 +1,6 @@
 {
   "name": "RecipeBot",
-  "icon": { "image": "brand/icon.png", "emoji": "🍳" },
+  "icon": { "image": "brand/icon.png", "emoji": "🍲" },
   "llm": {
     "purpose": "Generates and refines cooking recipes in chat",
     "suggested_daily_cap_cents": 300
