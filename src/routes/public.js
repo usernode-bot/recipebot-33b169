@@ -384,7 +384,7 @@ ${THEME_BOOT_SCRIPT}
 </head>
 <body>
 <div class="wrap">
-  <div class="brand"><span>🍳 <b>RecipeBot</b></span><a href="${PLATFORM_APP_URL}">Open the app →</a></div>
+  <div class="brand"><span>🍲 <b>RecipeBot</b></span><a href="${PLATFORM_APP_URL}">Open the app →</a></div>
   <p class="kicker">Shared recipe</p>
   <h1 id="title"></h1>
   <p class="byline" id="byline"></p>
