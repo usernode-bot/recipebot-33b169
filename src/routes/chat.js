@@ -267,12 +267,32 @@ function chatRoutes(config) {
     const replyId = parseInt(req.params.replyId);
     const after = req.query.after !== undefined ? parseInt(req.query.after) : -1;
 
+    // Listen BEFORE reading the stored events. Listening after the SELECT
+    // left a gap: anything emitted while the query ran was in neither the
+    // rows read nor the live feed, so a reload mid-reply lost it (issue #52).
+    const hadEmitter = replyEmitters.has(replyId);
+    const emitter = getOrCreateEmitter(replyId);
+    const buffer = [];
+    let onEvent = (evt) => { buffer.push(evt); };
+    let finished = false;
+    let onFinish = () => { finished = true; };
+    const eventListener = (evt) => onEvent(evt);
+    const finishListener = () => onFinish();
+    emitter.on('event', eventListener);
+    emitter.once('finish', finishListener);
+    const detach = () => {
+      emitter.removeListener('event', eventListener);
+      emitter.removeListener('finish', finishListener);
+    };
+
     try {
       const { rows } = await pool.query(
         'SELECT id, status, events FROM pending_replies WHERE id = $1 AND user_id = $2',
         [replyId, req.user.id]
       );
       if (!rows.length) {
+        detach();
+        if (!hadEmitter) cleanupEmitter(replyId);
         return res.status(404).json({ error: 'Reply not found' });
       }
 
@@ -299,50 +319,31 @@ function chatRoutes(config) {
         res.end();
       };
 
-      const emitter = getOrCreateEmitter(replyId);
-      const buffer = [];
-      let flushing = false;
-
-      const onEvent = (evt) => {
-        if (!flushing) {
-          buffer.push(evt);
-        } else {
-          try { writeSse(evt); } catch { emitter.removeListener('event', onEvent); }
-        }
-      };
-
-      let finished = false;
-      const onFinish = () => {
-        finished = true;
-        if (flushing) {
-          emitter.removeListener('event', onEvent);
-          endStream();
-        }
-      };
-
-      emitter.on('event', onEvent);
-      emitter.once('finish', onFinish);
-
-      const existingEvents = (reply.events || []).slice().sort((a, b) => a.index - b.index);
-      let maxSent = after;
-      for (const evt of existingEvents) {
-        if (evt.index > after) {
-          writeSse(evt);
-          if (evt.index > maxSent) maxSent = evt.index;
-        }
-      }
-
-      flushing = true;
-      for (const evt of buffer) {
-        if (evt.index > maxSent) {
-          writeSse(evt);
-        }
+      // Stored events and the ones buffered while the query ran overlap;
+      // send each index once, in order.
+      const pending = new Map();
+      for (const evt of [...(reply.events || []), ...buffer]) {
+        if (evt.index > after && !pending.has(evt.index)) pending.set(evt.index, evt);
       }
       buffer.length = 0;
+      let maxSent = after;
+      for (const evt of [...pending.values()].sort((a, b) => a.index - b.index)) {
+        writeSse(evt);
+        maxSent = evt.index;
+      }
+
+      onEvent = (evt) => {
+        if (evt.index <= maxSent) return;
+        try { writeSse(evt); } catch { detach(); }
+      };
+      onFinish = () => {
+        finished = true;
+        detach();
+        endStream();
+      };
 
       if (reply.status === 'done' || reply.status === 'error' || finished) {
-        emitter.removeListener('event', onEvent);
-        emitter.removeListener('finish', onFinish);
+        detach();
         if (reply.status === 'error') {
           writeSse({ event: 'error', data: { error: 'Response was interrupted' }, index: maxSent + 1 });
         } else if (reply.status === 'done') {
@@ -354,10 +355,10 @@ function chatRoutes(config) {
 
       req.on('close', () => {
         clearInterval(heartbeat);
-        emitter.removeListener('event', onEvent);
-        emitter.removeListener('finish', onFinish);
+        detach();
       });
     } catch (err) {
+      detach();
       log.error('chat', 'Stream setup error', { message: err.message });
       if (!res.headersSent) {
         res.status(500).json({ error: 'Internal server error' });
@@ -505,10 +506,44 @@ function chatRoutes(config) {
   return router;
 }
 
+// Keep the user message's response_log in step with what the client has been
+// shown, so a reload (or a restart mid-reply) renders the same progress lines
+// in the same order (issue #52). Writes run one at a time and each serializes
+// the log when it starts, so an older snapshot can never land after a newer
+// one. `save.soon()` is the throttled form for streamed deltas.
+function makeLogSaver(pool, userMsgId, responseLog) {
+  let tail = Promise.resolve();
+  let queued = null;
+  let timer = null;
+
+  const save = () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    if (queued) return queued;
+    queued = tail.then(() => {
+      queued = null;
+      // `open` is the in-memory marker for appending deltas; never persisted.
+      const json = JSON.stringify(responseLog, (k, v) => (k === 'open' ? undefined : v));
+      return pool.query('UPDATE messages SET response_log = $1::jsonb WHERE id = $2', [json, userMsgId]);
+    }).catch((err) => log.warn('chat', 'Failed to save response_log', { message: err.message }));
+    tail = queued;
+    return queued;
+  };
+
+  save.soon = () => {
+    if (!timer && !queued) timer = setTimeout(save, DELTA_FLUSH_MS);
+  };
+
+  return save;
+}
+
 async function runBackgroundStream(
   userToken, config, pool, convId, replyId, userId, userModel, preferences, send, userMsgId
 ) {
   const responseLog = [];
+  const saveLog = makeLogSaver(pool, userMsgId, responseLog);
 
   // Log entries carry structured fields (kind/query/url/title) alongside the
   // English `text` so the client can render them in the user's language;
@@ -529,23 +564,31 @@ async function runBackgroundStream(
         });
       }
       send.delta('thinking', data.text);
+      saveLog.soon();
       return;
     }
 
-    // Prose deltas need no log entry — the turn loop pushes one
-    // {type:'text'} entry with the whole concatenated text at turn end.
+    // Prose is logged as it streams, the same way: one {type:'text'} entry
+    // per run of text, so text written after a tool call in the same turn, or
+    // before a turn failed, is kept in the order it appeared.
     if (event === 'token') {
+      if (data.text) {
+        const last = responseLog[responseLog.length - 1];
+        if (last && last.type === 'text' && last.open) {
+          last.content += data.text;
+        } else {
+          responseLog.push({ type: 'text', content: data.text, open: true });
+        }
+      }
       send.delta('token', data.text);
+      saveLog.soon();
       return;
     }
 
-    // Any other event closes the open thinking entry so a later turn starts
-    // a fresh one.
-    for (let i = responseLog.length - 1; i >= 0; i--) {
-      if (responseLog[i].type === 'thinking' && responseLog[i].open) {
-        delete responseLog[i].open;
-        break;
-      }
+    // Any other event closes the open thinking/text entries so a later turn
+    // starts fresh ones.
+    for (const entry of responseLog) {
+      if (entry.open) delete entry.open;
     }
 
     if (event === 'status') {
@@ -573,6 +616,7 @@ async function runBackgroundStream(
       });
     }
     send(event, data);
+    saveLog();
   };
   trackingSend.flush = () => send.flush();
 
@@ -615,11 +659,7 @@ async function runBackgroundStream(
     });
 
     sealResponseLog(responseLog);
-
-    await pool.query(
-      'UPDATE messages SET response_log = $1::jsonb WHERE id = $2',
-      [JSON.stringify(responseLog), userMsgId]
-    ).catch((err) => log.warn('chat', 'Failed to save response_log', { message: err.message }));
+    await saveLog();
 
     send('done', {});
 
@@ -633,13 +673,7 @@ async function runBackgroundStream(
     // and survives a reload.
     trackingSend('error', { error: err.userMessage || 'Something went wrong', code: err.code });
     sealResponseLog(responseLog);
-
-    if (responseLog.length) {
-      await pool.query(
-        'UPDATE messages SET response_log = $1::jsonb WHERE id = $2',
-        [JSON.stringify(responseLog), userMsgId]
-      ).catch(() => {});
-    }
+    if (responseLog.length) await saveLog();
 
     await pool.query(
       `UPDATE pending_replies SET status = 'error', updated_at = NOW() WHERE id = $1 AND status = 'processing'`,
@@ -878,7 +912,6 @@ async function streamWithToolHandling(
 
     let assistantText = '';
     const toolResults = [];
-    let textFlushed = false;
     // Streamed turns already pushed every text/thinking delta to the client as
     // it arrived; replaying the finished blocks here would duplicate them.
     const alreadyStreamed = !!response._streamed;
@@ -890,10 +923,6 @@ async function streamWithToolHandling(
         assistantText += block.text;
         if (!alreadyStreamed) send('token', { text: block.text });
       } else if (block.type === 'tool_use') {
-        if (!textFlushed && assistantText) {
-          responseLog.push({ type: 'text', content: assistantText });
-          textFlushed = true;
-        }
         const toolResult = await handleToolCall(
           block, config, currentMessages, systemPrompt, send, convId, pool, userId, responseLog,
           fixState, replyState
@@ -902,10 +931,9 @@ async function streamWithToolHandling(
       }
     }
 
+    // The text itself is already in responseLog: trackingSend logs every
+    // 'token' event, streamed or not.
     if (assistantText) {
-      if (!textFlushed) {
-        responseLog.push({ type: 'text', content: assistantText });
-      }
       await pool.query(
         'INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)',
         [convId, 'assistant', assistantText]
@@ -944,11 +972,6 @@ async function streamWithToolHandling(
       if (send.flush) send.flush();
       return { usage: totalUsage };
     }
-
-    pool.query(
-      'UPDATE messages SET response_log = $1::jsonb WHERE id = $2',
-      [JSON.stringify(responseLog), userMsgId]
-    ).catch(() => {});
 
     currentMessages.push({
       role: 'assistant',
