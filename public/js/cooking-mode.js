@@ -299,7 +299,7 @@ const CookingMode = {
     const group = 'rounded-lg bg-zinc-100 dark:bg-zinc-900 px-1';
     return `
       <div class="${group} flex items-center">
-        <button id="cm-text-size-btn" class="${btn} font-semibold" aria-label="${this.escapeHtml(t('cook.textSize'))}">Aa</button>
+        <button id="cm-text-size-btn" class="${btn} font-semibold" aria-label="${this.escapeHtml(t('cook.textSize'))}">Aa<span class="sr-only">${this.escapeHtml(t('cook.textSize'))}</span></button>
       </div>`;
   },
 

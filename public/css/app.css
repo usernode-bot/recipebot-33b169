@@ -474,6 +474,20 @@ h1, h2, h3, .font-display {
   align-items: baseline;
 }
 
+/* Visually hidden, still read by screen readers (standard clipped-text
+   pattern). Carries the "Text size" label on the cook mode "Aa" button. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
 /* Cook mode text size (issue #81): the "Aa" control cycles Normal →
    Large → Extra large by putting cm-text-lg/cm-text-xl on the overlay.
    Only size changes, inside the overlay only, so regular recipe view and
