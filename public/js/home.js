@@ -9,6 +9,7 @@
 // first (issue #40) — drafts by their last message, recipes by their last
 // recipe message. The servers already sort that way; the client re-sorts
 // anyway so a cached or partial response can't resurrect the old order.
+// The community list can instead be sorted Newest / Top rated (issue #96).
 const Home = {
   shared: [],
   mine: [],
@@ -18,6 +19,8 @@ const Home = {
   publicCollections: [],
   searchQuery: '',
   tagFilter: new Set(),
+  // Community feed order: 'newest' (today's server order) or 'rating'.
+  sortMode: 'newest',
   // When set, the homepage shows this collection's detail instead of the box.
   activeCollection: null,
   // Drafts are collapsed past this many rows until "Show all" is clicked.
@@ -39,6 +42,21 @@ const Home = {
       const tb = Date.parse(stamp(b)) || 0;
       return tb - ta || (b.id || 0) - (a.id || 0);
     });
+  },
+
+  // Order for the community feed only (issue #96). 'newest' reuses the
+  // server's order; 'rating' puts the highest average first, more ratings
+  // breaking ties, unrated rows last among themselves newest first. Like
+  // _byRecency, it sorts in place — callers pass a fresh `filter` array.
+  _sortShared(rows) {
+    if (this.sortMode !== 'rating') {
+      return this._byRecency(rows, (s) => s.created_at);
+    }
+    return rows.sort((a, b) =>
+      (Number(b.avg_rating) - Number(a.avg_rating))
+      || ((b.rating_count || 0) - (a.rating_count || 0))
+      || (Date.parse(b.created_at) || 0) - (Date.parse(a.created_at) || 0)
+      || (b.id || 0) - (a.id || 0));
   },
 
   // Short localized date for the "updated …" line. Returns '' for a missing
@@ -149,7 +167,8 @@ const Home = {
     const mineRest = this._byRecency(this.mine.filter((r) =>
       !r.is_favorited && matches(r.data?.title || r.conversation_title, r.data?.tags)), recipeStamp);
     const favShared = this.favorites.filter((s) => matches(s.data?.title, s.tags));
-    const shared = this.shared.filter((s) => matches(s.data?.title, s.tags) && tagMatch(s.tags));
+    const shared = this._sortShared(
+      this.shared.filter((s) => matches(s.data?.title, s.tags) && tagMatch(s.tags)));
 
     // Conversations without a recipe yet (recipe-bearing ones already show
     // as cards in "Your recipes" / "Your favorites"), most recently worked
@@ -1108,6 +1127,10 @@ const Home = {
 
 document.getElementById('home-search')?.addEventListener('input', (e) => {
   Home.searchQuery = e.target.value;
+  Home.render();
+});
+document.getElementById('home-community-sort')?.addEventListener('change', (e) => {
+  Home.sortMode = e.target.value;
   Home.render();
 });
 document.getElementById('home-no-match-create-btn')?.addEventListener('click', () => {

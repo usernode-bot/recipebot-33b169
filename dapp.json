@@ -231,6 +231,16 @@
       "expectText": "one-pot"
     },
     {
+      "name": "Community sort menu renders",
+      "path": "/",
+      "expectSelector": "#home-community-sort"
+    },
+    {
+      "name": "Community sort offers Top rated",
+      "path": "/",
+      "expectSelector": "#home-community-sort option[value=\"rating\"]"
+    },
+    {
       "name": "Add-to-collection picker exists",
       "path": "/",
       "expectSelector": "#collection-pick-modal"
