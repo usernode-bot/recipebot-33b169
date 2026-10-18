@@ -146,6 +146,7 @@ I18N.register('fr', {
   'chat.searching': 'Recherche : {query}',
   'chat.reading': 'Lecture : {url}',
   'chat.fixingFormat': 'Correction du format de la recette...',
+  'chat.errorDetails': 'Détails',
   'chat.retrying': 'Nouvelle tentative…',
   'chat.stillWorking': 'Toujours en cours — les recettes longues issues de sources détaillées peuvent prendre quelques minutes.',
   'chat.tryAgain': 'Réessayer',
