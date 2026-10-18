@@ -307,6 +307,13 @@ const Chat = {
         const renderMsgs = this.messages.filter(
           m => !(m.role === 'assistant' && new Date(m.created_at).getTime() >= cutoff)
         );
+        // The in-flight reply saves its progress log onto the message that
+        // asked for it as it goes; the resumed stream replays that same
+        // progress from the start, so render it once, from the stream.
+        const lastUserIdx = renderMsgs.map(m => m.role).lastIndexOf('user');
+        if (lastUserIdx !== -1) {
+          renderMsgs[lastUserIdx] = { ...renderMsgs[lastUserIdx], _replyStreaming: true };
+        }
         const saved = this.messages;
         this.messages = renderMsgs;
         this.renderAll(data.preferences, failedReplyId);
@@ -924,7 +931,9 @@ const Chat = {
       if (msg.role === 'user') {
         skipAssistant = false;
         this.appendMessage('user', msg.content);
-        if (msg.response_log?.length) {
+        if (msg._replyStreaming) {
+          skipAssistant = true;
+        } else if (msg.response_log?.length) {
           this._renderResponseLog(container, msg.response_log, failedReplyId);
           skipAssistant = true;
         }

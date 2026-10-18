@@ -41,10 +41,14 @@ I18N.register('en', {
   'home.favorites': 'Your favorites',
   'home.yourRecipes': 'Your recipes',
   'home.communityRecipes': 'Community recipes',
+  'home.sortLabel': 'Sort',
+  'home.sortNewest': 'Newest',
+  'home.sortTopRated': 'Top rated',
   'home.communityCollections': 'Community collections',
   'home.emptyTitle': 'No recipes yet',
   'home.emptySubtitle': 'Start a conversation to create a recipe, then share it to the community feed.',
   'home.noMatch': 'No recipes match your search',
+  'home.noMatchCreate': '+ New recipe for “{q}”',
 
   // ── Cards ──
   'card.yourRecipe': 'Your recipe',
@@ -95,6 +99,7 @@ I18N.register('en', {
   'common.share': 'Share',
   'common.view': 'View',
   'common.save': 'Save',
+  'common.savedCheck': 'Saved ✓',
   'common.link': 'Link',
   'common.browse': 'Browse',
   'common.delete': 'Delete',
@@ -112,6 +117,7 @@ I18N.register('en', {
   'tip.shareToFeed': 'Share recipe to the community feed',
   'tip.addToCollection': 'Add to a collection',
   'tip.saveToCollection': 'Save to a collection (keeps your own copy)',
+  'tip.savedInCollection': 'Saved in {name}. Open the collection',
   'tip.copyShareLink': 'Copy the public share link (no login needed to view or cook)',
   'tip.deleteConversation': 'Delete this conversation',
   'tip.inviteLink': 'Anyone with this link can join and add recipes',
@@ -230,6 +236,7 @@ I18N.register('en', {
   'newColl.title': 'New collection',
   'newColl.placeholder': 'e.g. Weeknight dinners',
   'newColl.hint': 'Starts private. You can invite people or make it public from the collection itself.',
+  'newColl.failed': "Couldn't create the collection. Please try again.",
 
   // ── Version history ──
   'version.title': 'Version history',
@@ -268,6 +275,7 @@ I18N.register('en', {
   'recipe.macroFat': '{n}g fat',
   'recipe.macroFiber': '{n}g fiber',
   'recipe.cookMode': '🍳 Cook Mode',
+  'recipe.print': 'Print',
   'recipe.export': 'Export ▾',
   'recipe.downloadMd': 'Download Markdown',
   'recipe.copyMd': 'Copy Markdown',

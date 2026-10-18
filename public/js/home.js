@@ -9,6 +9,7 @@
 // first (issue #40) — drafts by their last message, recipes by their last
 // recipe message. The servers already sort that way; the client re-sorts
 // anyway so a cached or partial response can't resurrect the old order.
+// The community list can instead be sorted Newest / Top rated (issue #96).
 const Home = {
   shared: [],
   mine: [],
@@ -18,6 +19,8 @@ const Home = {
   publicCollections: [],
   searchQuery: '',
   tagFilter: new Set(),
+  // Community feed order: 'newest' (today's server order) or 'rating'.
+  sortMode: 'newest',
   // When set, the homepage shows this collection's detail instead of the box.
   activeCollection: null,
   // Drafts are collapsed past this many rows until "Show all" is clicked.
@@ -39,6 +42,21 @@ const Home = {
       const tb = Date.parse(stamp(b)) || 0;
       return tb - ta || (b.id || 0) - (a.id || 0);
     });
+  },
+
+  // Order for the community feed only (issue #96). 'newest' reuses the
+  // server's order; 'rating' puts the highest average first, more ratings
+  // breaking ties, unrated rows last among themselves newest first. Like
+  // _byRecency, it sorts in place — callers pass a fresh `filter` array.
+  _sortShared(rows) {
+    if (this.sortMode !== 'rating') {
+      return this._byRecency(rows, (s) => s.created_at);
+    }
+    return rows.sort((a, b) =>
+      (Number(b.avg_rating) - Number(a.avg_rating))
+      || ((b.rating_count || 0) - (a.rating_count || 0))
+      || (Date.parse(b.created_at) || 0) - (Date.parse(a.created_at) || 0)
+      || (b.id || 0) - (a.id || 0));
   },
 
   // Short localized date for the "updated …" line. Returns '' for a missing
@@ -149,7 +167,8 @@ const Home = {
     const mineRest = this._byRecency(this.mine.filter((r) =>
       !r.is_favorited && matches(r.data?.title || r.conversation_title, r.data?.tags)), recipeStamp);
     const favShared = this.favorites.filter((s) => matches(s.data?.title, s.tags));
-    const shared = this.shared.filter((s) => matches(s.data?.title, s.tags) && tagMatch(s.tags));
+    const shared = this._sortShared(
+      this.shared.filter((s) => matches(s.data?.title, s.tags) && tagMatch(s.tags)));
 
     // Conversations without a recipe yet (recipe-bearing ones already show
     // as cards in "Your recipes" / "Your favorites"), most recently worked
@@ -237,6 +256,13 @@ const Home = {
       favOwn.length + favShared.length + mineRest.length + bareConvs.length + shared.length;
     emptyEl?.classList.toggle('hidden', !(visible === 0 && !q && colls.length === 0));
     noMatchEl?.classList.toggle('hidden', !(visible === 0 && q));
+    // The no-match empty state's one action is a new recipe named for the
+    // search text (issue #51). Label is dynamic — render() owns it, not a
+    // data-i18n attribute.
+    const noMatchCreateBtn = document.getElementById('home-no-match-create-btn');
+    if (noMatchCreateBtn) {
+      noMatchCreateBtn.textContent = t('home.noMatchCreate', { q: this.searchQuery.trim() });
+    }
   },
 
   // ── Tag filter chips (community feed) ─────────────────────────────
@@ -355,6 +381,18 @@ const Home = {
     return a;
   },
 
+  // "Saved ✓" for a recipe already in one of the requester's collections
+  // (issue #90). Same grey secondary button, new label; pressing it opens
+  // that collection, where Remove etc. live. saved_in[0] is the most
+  // recently added collection (server orders it that way).
+  _savedBtn(savedIn) {
+    const first = savedIn[0];
+    const btn = this._actionLink(t('common.savedCheck'), false, `/?coll=${first.id}`,
+      () => this.openCollection(first.id));
+    btn.title = t('tip.savedInCollection', { name: first.name });
+    return btn;
+  },
+
   // Icon-only so the five-button action row still fits a phone-width card.
   _deleteBtn(conversationId) {
     const btn = document.createElement('button');
@@ -425,7 +463,12 @@ const Home = {
     collectBtn.title = t('tip.addToCollection');
     collectBtn.addEventListener('click', () =>
       this.openCollectionPicker({ conversationId: r.conversation_id }));
-    actions.appendChild(collectBtn);
+    // Already in one of your collections: Saved ✓ opens it (issue #90).
+    if (r.saved_in?.length) {
+      actions.appendChild(this._savedBtn(r.saved_in));
+    } else {
+      actions.appendChild(collectBtn);
+    }
     actions.appendChild(this._deleteBtn(r.conversation_id));
     el.appendChild(actions);
     return el;
@@ -516,7 +559,12 @@ const Home = {
       if (App.isAnonymous) return App.promptSignIn(t('signin.saveBox'));
       this.openCollectionPicker({ sharedRecipeId: s.id });
     });
-    actions.appendChild(collectBtn);
+    // Already in one of your collections: Saved ✓ opens it (issue #90).
+    if (!App.isAnonymous && s.saved_in?.length) {
+      actions.appendChild(this._savedBtn(s.saved_in));
+    } else {
+      actions.appendChild(collectBtn);
+    }
     if (s.share_slug) {
       const linkBtn = this._actionBtn(t('common.link'));
       linkBtn.title = t('tip.copyShareLink');
@@ -936,7 +984,10 @@ const Home = {
         if (!res.ok) throw new Error();
         close();
         UI.toast(t('toast.addedToCollection'));
-        this.refresh();
+        // Re-render so the card's add button flips to Saved ✓, and let the
+        // recipe panel's button follow without a full re-display (issue #90).
+        await this.refresh();
+        if (typeof Recipe !== 'undefined') Recipe.updateCollectionControl?.();
       } catch {
         close();
       }
@@ -962,17 +1013,35 @@ const Home = {
       const input = document.getElementById('collection-pick-new-name');
       const name = input.value.trim();
       if (!name) return input.focus();
+      const createBtn = document.getElementById('collection-pick-create');
+      createBtn.disabled = true;
       try {
         const res = await fetch('/api/collections', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name }),
         });
-        if (!res.ok) throw new Error();
+        // Same silent-failure treatment as the new-collection dialog (issue
+        // #48): the account sheet for signed-out visitors, a toast for the
+        // rest, and the dialog stays open with the name intact.
+        if (!res.ok) {
+          if (res.status === 401) {
+            close();
+            App.promptSignIn(t('signin.saveBox'));
+            return;
+          }
+          console.warn('[home] Collection create failed', res.status);
+          UI.toast(t('newColl.failed'));
+          return;
+        }
         const created = await res.json();
         input.value = '';
         await addTo(created.id);
-      } catch { close(); }
+      } catch {
+        UI.toast(t('newColl.failed'));
+      } finally {
+        createBtn.disabled = false;
+      }
     };
   },
 
@@ -1000,18 +1069,37 @@ const Home = {
     document.getElementById('new-collection-confirm').onclick = async () => {
       const name = input.value.trim();
       if (!name) return input.focus();
+      const confirmBtn = document.getElementById('new-collection-confirm');
+      confirmBtn.disabled = true;
       try {
         const res = await fetch('/api/collections', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name }),
         });
-        if (!res.ok) throw new Error();
+        // Issue #48: a failure used to close the dialog silently, so a
+        // failed create looked like "nothing happened". Signed-out visitors
+        // get the account sheet; any other failure keeps the dialog open
+        // (the typed name survives) and says what went wrong.
+        if (!res.ok) {
+          if (res.status === 401) {
+            close();
+            App.promptSignIn(t('signin.saveBox'));
+            return;
+          }
+          console.warn('[home] Collection create failed', res.status);
+          UI.toast(t('newColl.failed'));
+          return;
+        }
         const created = await res.json();
         close();
         await this.refresh();
         this.openCollection(created.id);
-      } catch { close(); }
+      } catch {
+        UI.toast(t('newColl.failed'));
+      } finally {
+        confirmBtn.disabled = false;
+      }
     };
   },
 
@@ -1102,6 +1190,13 @@ const Home = {
 document.getElementById('home-search')?.addEventListener('input', (e) => {
   Home.searchQuery = e.target.value;
   Home.render();
+});
+document.getElementById('home-community-sort')?.addEventListener('change', (e) => {
+  Home.sortMode = e.target.value;
+  Home.render();
+});
+document.getElementById('home-no-match-create-btn')?.addEventListener('click', () => {
+  App.startNewRecipe(document.getElementById('home-search')?.value.trim());
 });
 document.getElementById('new-collection-btn')?.addEventListener('click', () => {
   Home.openNewCollection();

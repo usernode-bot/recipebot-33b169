@@ -81,6 +81,11 @@
       "expectSelector": "#new-conversation-btn"
     },
     {
+      "name": "Homepage no-match new-recipe button renders",
+      "path": "/",
+      "expectSelector": "#home-no-match-create-btn"
+    },
+    {
       "name": "Homepage renders",
       "path": "/",
       "expectSelector": "#homepage"
@@ -149,6 +154,16 @@
       "name": "Accepted edit reopens without accept screen",
       "path": "/?c=900003",
       "expectSelector": "#cook-btn"
+    },
+    {
+      "name": "Recipe page shows a Print action",
+      "path": "/?c=900003",
+      "expectSelector": "#print-btn"
+    },
+    {
+      "name": "Print action is reachable on mobile recipe tab",
+      "path": "/?c=900003 @mobile",
+      "expectSelector": "#recipe-panel:not(.panel-hidden) #print-btn"
     },
     {
       "name": "Undecided edit still shows accept screen",
@@ -226,9 +241,34 @@
       "expectText": "one-pot"
     },
     {
+      "name": "Community sort menu renders",
+      "path": "/",
+      "expectSelector": "#home-community-sort"
+    },
+    {
+      "name": "Community sort offers Top rated",
+      "path": "/",
+      "expectSelector": "#home-community-sort option[value=\"rating\"]"
+    },
+    {
       "name": "Add-to-collection picker exists",
       "path": "/",
       "expectSelector": "#collection-pick-modal"
+    },
+    {
+      "name": "Saved recipe card shows Saved check",
+      "path": "/",
+      "expectText": "Saved ✓"
+    },
+    {
+      "name": "Saved recipe panel button carries its collection",
+      "path": "/?c=900001",
+      "expectSelector": "#add-collection-btn[data-saved-coll=\"900003\"]"
+    },
+    {
+      "name": "Saved shared recipe panel button carries its collection",
+      "path": "/?s=900001",
+      "expectSelector": "#add-collection-btn[data-saved-coll]"
     },
     {
       "name": "Made-it dialog exists",
@@ -399,6 +439,11 @@
       "name": "Public page shows made-it note",
       "path": "/r/staging-demo-recipe",
       "expectText": "came out great"
+    },
+    {
+      "name": "Public recipe page shows a Print action",
+      "path": "/r/staging-demo-recipe",
+      "expectSelector": "#print-btn"
     },
     {
       "name": "Public page lists remixes",
