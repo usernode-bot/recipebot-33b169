@@ -280,6 +280,7 @@ I18N.register('en', {
   'recipe.export': 'Export ▾',
   'recipe.downloadMd': 'Download Markdown',
   'recipe.copyMd': 'Copy Markdown',
+  'recipe.copyShoppingList': 'Copy shopping list',
   'recipe.downloadJson': 'Download JSON',
   'recipe.importJson': 'Import JSON',
   'recipe.playlistLabel': 'Cook to:',

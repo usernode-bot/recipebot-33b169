@@ -254,6 +254,7 @@ I18N.register('id', {
   'recipe.export': 'Ekspor ▾',
   'recipe.downloadMd': 'Unduh Markdown',
   'recipe.copyMd': 'Salin Markdown',
+  'recipe.copyShoppingList': 'Salin daftar belanja',
   'recipe.downloadJson': 'Unduh JSON',
   'recipe.importJson': 'Impor JSON',
   'recipe.playlistLabel': 'Masak dengan:',

@@ -152,6 +152,7 @@ const Recipe = {
             <div id="export-menu" class="hidden min-w-[180px] py-1" data-un-menu>
               <button id="export-md" class="block w-full px-4 py-2.5 text-sm text-left hover:bg-zinc-100 dark:hover:bg-zinc-800">${t('recipe.downloadMd')}</button>
               <button id="export-copy-md" class="block w-full px-4 py-2.5 text-sm text-left hover:bg-zinc-100 dark:hover:bg-zinc-800">${t('recipe.copyMd')}</button>
+              <button id="export-shopping" class="block w-full px-4 py-2.5 text-sm text-left hover:bg-zinc-100 dark:hover:bg-zinc-800">${t('recipe.copyShoppingList')}</button>
               <button id="export-json" class="block w-full px-4 py-2.5 text-sm text-left hover:bg-zinc-100 dark:hover:bg-zinc-800">${t('recipe.downloadJson')}</button>
               <div class="border-t border-zinc-200 dark:border-zinc-700 my-1"></div>
               <label id="import-json-label" class="block w-full px-4 py-2.5 text-sm text-left hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer">${t('recipe.importJson')}
@@ -838,6 +839,7 @@ const Recipe = {
     const closeExport = () => this.closeExportMenu();
     display.querySelector('#export-md')?.addEventListener('click', () => { this.exportMarkdown(recipe); closeExport(); });
     display.querySelector('#export-copy-md')?.addEventListener('click', () => { this.copyMarkdown(recipe); closeExport(); });
+    display.querySelector('#export-shopping')?.addEventListener('click', () => { this.copyShoppingList(recipe); closeExport(); });
     display.querySelector('#export-json')?.addEventListener('click', () => { this.exportJSON(recipe); closeExport(); });
     display.querySelector('#import-json-input')?.addEventListener('change', (e) => { this.importJSON(e); closeExport(); });
 
@@ -1169,6 +1171,57 @@ const Recipe = {
     const md = this._buildMarkdown(recipe, servings, scale, macros);
 
     navigator.clipboard.writeText(md).then(() => UI.toast(t('common.copied')));
+  },
+
+  copyShoppingList(recipe) {
+    const text = this._buildShoppingList(recipe, this.scaleFor(recipe));
+    navigator.clipboard.writeText(text).then(() => UI.toast(t('common.copied')));
+  },
+
+  // Shopping list for the clipboard: one line per unique ingredient, in the
+  // order ingredients first appear in the recipe, with amounts scaled to the
+  // current servings. Duplicate names (case/whitespace-insensitive) merge;
+  // "from previous step" intermediates are skipped — there is nothing to buy
+  // for them. Volumes only sum when both entries share a unit, otherwise the
+  // line keeps just its total weight.
+  _buildShoppingList(recipe, scale) {
+    const entries = new Map();
+    for (const step of recipe.steps) {
+      for (const ing of step.ingredients || []) {
+        if (ing.from_step || !ing.name || !ing.name.trim()) continue;
+        const key = ing.name.trim().toLowerCase();
+        let entry = entries.get(key);
+        if (!entry) {
+          // First sighting: store a copy of its volume and move on — the
+          // merge below must not re-add this same ingredient's volume.
+          entry = {
+            name: ing.name.trim(),
+            grams: ing.grams || 0,
+            volume: ing.volume ? { ...ing.volume } : null,
+            volumeMixed: false,
+          };
+          entries.set(key, entry);
+          continue;
+        }
+        entry.grams += ing.grams || 0;
+        if (entry.volume && ing.volume && entry.volume.unit === ing.volume.unit) {
+          entry.volume.amount += ing.volume.amount;
+        } else if (entry.volume || ing.volume) {
+          entry.volume = null;
+          entry.volumeMixed = true;
+        }
+      }
+    }
+    const lines = [];
+    for (const entry of entries.values()) {
+      let line = `${entry.name}: ${Math.round(entry.grams * scale)}g`;
+      if (entry.volume && !entry.volumeMixed) {
+        const vol = this.formatVolume(entry.volume, scale);
+        if (vol) line += ` (${vol})`;
+      }
+      lines.push(line);
+    }
+    return lines.join('\n');
   },
 
   importJSON(event) {

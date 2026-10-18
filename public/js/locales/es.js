@@ -254,6 +254,7 @@ I18N.register('es', {
   'recipe.export': 'Exportar ▾',
   'recipe.downloadMd': 'Descargar Markdown',
   'recipe.copyMd': 'Copiar Markdown',
+  'recipe.copyShoppingList': 'Copiar lista de la compra',
   'recipe.downloadJson': 'Descargar JSON',
   'recipe.importJson': 'Importar JSON',
   'recipe.playlistLabel': 'Cocinar con:',
