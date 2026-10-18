@@ -283,6 +283,9 @@ I18N.register('fr', {
   'recipe.removeIngredient': "Retirer l'ingrédient",
   'recipe.substituteIngredient': "Substituer l'ingrédient",
   'recipe.cookedTimes': 'cuisinée {n}×',
+  'recipe.shoppingList': 'Liste de courses',
+  'recipe.shoppingListTitle': 'Copier tous les ingrédients en une liste de courses',
+  'recipe.shoppingListCopied': 'Liste de courses copiée',
 
   'diff.modified': 'Recette modifiée',
   'diff.accept': 'Accepter',
