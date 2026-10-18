@@ -379,12 +379,27 @@ function recipePage(data, pageUrl) {
   #cook nav button.primary{background:var(--paprika-deep);color:#fff}
   #cook .ings{color:#A5ABBE;border-left-color:#333B54}
   #cook .btn-secondary{background:#28304B;border:none;color:#F3EDDF}
+  /* Print: title, servings/times, ingredients and numbered steps only
+     (issue #98). Nav, buttons, social sections and the dark theme stay
+     off the paper. */
+  @media print{
+    /* The dark-theme var blocks out-specify :root, so list them too. */
+    :root,html[data-theme=light],html[data-theme=dark],html:not([data-theme]){
+      --page:#fff;--panel:#fff;--card:#fff;--ink:#000;--soft:#444;--hairline:#ddd;--brass:#444;--paprika:#000;--paprika-deep:#000}
+    .brand,.kicker,.byline,.lineage,.desc,.tags,.cta,.social,#serv-minus,#serv-plus,
+    #remixes-section,#madeit-section,#comments-section,.foot,#cook{display:none!important}
+    body{background:#fff;color:#000;font-size:12pt}
+    .stepnum{background:none;color:#000;border:1.5pt solid #000}
+    .step{box-shadow:none;break-inside:avoid}
+    h1,h2{break-after:avoid}
+    a{color:#000!important;text-decoration:none!important}
+  }
 </style>
 ${THEME_BOOT_SCRIPT}
 </head>
 <body>
 <div class="wrap">
-  <div class="brand"><span>🍳 <b>RecipeBot</b></span><a href="${PLATFORM_APP_URL}">Open the app →</a></div>
+  <div class="brand"><span>🍲 <b>RecipeBot</b></span><a href="${PLATFORM_APP_URL}">Open the app →</a></div>
   <p class="kicker">Shared recipe</p>
   <h1 id="title"></h1>
   <p class="byline" id="byline"></p>
@@ -402,6 +417,7 @@ ${THEME_BOOT_SCRIPT}
   </div>
   <div class="cta">
     <button class="btn btn-primary" id="cook-btn">🍳 Cook mode</button>
+    <button class="btn btn-secondary" id="print-btn">🖨 Print</button>
     <a class="btn btn-secondary" href="${PLATFORM_APP_URL}">Save this to your box</a>
   </div>
   <h2>Ingredients</h2>
@@ -596,6 +612,7 @@ var DATA = ${payload};
   document.getElementById('cook-next').addEventListener('click', function () {
     cookIdx++; renderCookStep();
   });
+  document.getElementById('print-btn').addEventListener('click', function () { window.print(); });
 
   render();
 })();
