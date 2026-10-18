@@ -748,6 +748,15 @@ function buildSystemPrompt(preferences, currentRecipe) {
   return prompt;
 }
 
+// Sonnet 5.5 / Opus 5.5 reject forced tool_choice ({type: 'tool', ...}) with a
+// 400 whose message names tool_choice. Used by the fix-up path (chat route) to
+// retry the turn without forcing, leaning on the system prompt's standing
+// instruction to always call display_recipe.
+function isToolChoiceUnsupported(err) {
+  return !!err && err.status === 400
+    && /tool_choice/i.test(err.upstreamMessage || err.message || '');
+}
+
 function buildMessages(history) {
   return history.map((msg) => ({
     role: msg.role,
@@ -759,9 +768,10 @@ function getCreateParams(config, messages, systemPrompt, { model, fixup } = {}) 
   const resolvedModel = model || defaultModelFor(config);
   const params = {
     model: resolvedModel,
-    // 16384: a full recipe re-emit (per-ingredient grams/volume/macros) plus
-    // thinking can blow past 8192, which silently truncated the tool call.
-    max_tokens: 16384,
+    // 32768: a full recipe re-emit (per-ingredient grams/volume/macros), a
+    // multi-variant batch, plus adaptive thinking blew past 16384 and the
+    // cut-off silently dropped the display_recipe tool call (issue #108).
+    max_tokens: 32768,
     system: systemPrompt,
     tools: TOOLS,
     messages,
@@ -812,4 +822,5 @@ module.exports = {
   buildSystemPrompt,
   buildMessages,
   getCreateParams,
+  isToolChoiceUnsupported,
 };
