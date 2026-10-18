@@ -755,7 +755,7 @@ function buildMessages(history) {
   }));
 }
 
-function getCreateParams(config, messages, systemPrompt, { model, forceRecipeTool } = {}) {
+function getCreateParams(config, messages, systemPrompt, { model, fixup } = {}) {
   const resolvedModel = model || defaultModelFor(config);
   const params = {
     model: resolvedModel,
@@ -767,11 +767,12 @@ function getCreateParams(config, messages, systemPrompt, { model, forceRecipeToo
     messages,
   };
 
-  // Fix-up turns must actually re-send the recipe: force display_recipe.
-  // Forced tool_choice is incompatible with thinking, so omit it here —
-  // a format fix doesn't need it.
-  if (forceRecipeTool) {
-    params.tool_choice = { type: 'tool', name: 'display_recipe' };
+  // Fix-up turns rely on the fix-up tool result prompt ("Please fix the
+  // issues and call display_recipe again" + schema reminder) to get
+  // display_recipe called again: the upstream rejects forced tool_choice
+  // with a 400 invalid_request_error. Thinking stays off so the retry
+  // stays quick inside the fix-up budget.
+  if (fixup) {
     return params;
   }
 
