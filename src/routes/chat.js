@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { EventEmitter } = require('events');
 const { getPool } = require('../db/pool');
-const { createMessage, streamMessage, isRetryable, isEnabled, buildSystemPrompt, getCreateParams, resolveModel, defaultModelFor, resolveLocale, estimateMicrocents, LLM_IDLE_TIMEOUT_MS, LLM_MAX_TURN_MS } = require('../services/llm');
+const { createMessage, streamMessage, isRetryable, isEnabled, buildSystemPrompt, getCreateParams, resolveModel, defaultModelFor, resolveLocale, estimateMicrocents, isToolChoiceUnsupported, LLM_IDLE_TIMEOUT_MS, LLM_MAX_TURN_MS } = require('../services/llm');
 const { validate, getSchemaReminder } = require('../services/recipe-validator');
 const { fetchWebpage, MAX_CONTENT_LENGTH } = require('../services/web');
 const { webSearch, init: initSearch } = require('../services/search');
@@ -828,7 +828,16 @@ async function streamWithToolHandling(
   // Set once a VALID recipe reaches the client. After that, a later turn
   // timing out is a partial success — deliver what we have with a warning
   // instead of erroring the whole reply away (issue #43).
-  const replyState = { recipeDelivered: false, streamUnavailable: false };
+  // `toolChoiceUnsupported`: set once the model rejects forced tool_choice
+  // (issue #108) — the rest of this reply then never forces it again, so a
+  // second fix-up can't hit the same 400. `truncationRetried`: one-time
+  // second chance for a turn cut off at max_tokens before display_recipe ran.
+  const replyState = {
+    recipeDelivered: false,
+    streamUnavailable: false,
+    toolChoiceUnsupported: false,
+    truncationRetried: false,
+  };
   const replyStartedAt = Date.now();
 
   for (let turn = 0; turn < 5; turn++) {
@@ -853,8 +862,10 @@ async function streamWithToolHandling(
     const params = getCreateParams(config, currentMessages, systemPrompt, {
       model: userModel,
       // Fix-up turns force display_recipe via tool_choice so the model can't
-      // answer with text only and leave the spinner hanging.
-      forceRecipeTool: !!fixState.pending,
+      // answer with text only and leave the spinner hanging. Current models
+      // reject that with a 400 (issue #108) — once seen, stop forcing and rely
+      // on the system prompt's standing instruction to call display_recipe.
+      forceRecipeTool: !!fixState.pending && !replyState.toolChoiceUnsupported,
     });
 
     log.debug('chat', `Turn ${turn} request`, {
@@ -886,9 +897,34 @@ async function streamWithToolHandling(
 
     let response;
     try {
-      response = await callModel(
-        config, params, userToken, budget, send, replyState, turn
-      );
+      try {
+        response = await callModel(
+          config, params, userToken, budget, send, replyState, turn
+        );
+      } catch (err) {
+        // Sonnet 5.5 / Opus 5.5 reject forced tool_choice with a 400 (issue
+        // #108). Retry the fix-up once without forcing — the system prompt
+        // already instructs the model to always call display_recipe. Only an
+        // error from this second call reaches the fix-up catch below.
+        if (fixup && !replyState.toolChoiceUnsupported && isToolChoiceUnsupported(err)) {
+          log.warn('recipe', 'Forced tool_choice rejected, retrying fix-up without it', {
+            conversationId: convId,
+            replyId,
+            attempt: fixup.attempt,
+            upstream_message: (err.upstreamMessage || err.message || '').slice(0, 300),
+          });
+          replyState.toolChoiceUnsupported = true;
+          const unforcedParams = getCreateParams(config, currentMessages, systemPrompt, {
+            model: userModel,
+            forceRecipeTool: false,
+          });
+          response = await callModel(
+            config, unforcedParams, userToken, budget, send, replyState, turn
+          );
+        } else {
+          throw err;
+        }
+      }
     } catch (err) {
       if (fixup) {
         const fixupElapsedMs = Date.now() - fixup.startedAt;
@@ -1016,6 +1052,49 @@ async function streamWithToolHandling(
         'INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)',
         [convId, 'assistant', assistantText]
       );
+    }
+
+    // A turn cut off at max_tokens before display_recipe ran: retry once
+    // (issue #108) rather than failing the reply straight away. The cut-off
+    // assistant text is already on screen and in the log; the replay below
+    // keeps only its text blocks so the API accepts the new turn, and a nudge
+    // tells the model to get to the recipe. Truncation mid-tool-call produces
+    // `input = {}` instead, so calledDisplayRecipe is true there and the
+    // normal validation fix-up round handles it.
+    if (truncated && !calledDisplayRecipe && !replyState.truncationRetried) {
+      replyState.truncationRetried = true;
+      log.warn('recipe', 'Turn truncated before display_recipe — retrying once', {
+        conversationId: convId,
+        replyId,
+        turn,
+        fixup_attempt: fixup ? fixup.attempt : null,
+      });
+      send('status', { kind: 'retrying', text: 'Retrying…' });
+      const NUDGE = 'Your previous response was cut off by the output length limit before display_recipe was called. Keep any text very brief and call display_recipe now with the full recipe.';
+      const textBlocks = response.content
+        .filter((b) => b.type === 'text' && typeof b.text === 'string' && b.text.length > 0)
+        .map((b) => ({ type: 'text', text: b.text }));
+      if (textBlocks.length) {
+        // Thinking blocks are dropped: this starts a fresh user turn, not a
+        // tool-use continuation, so no signature is needed.
+        currentMessages.push({ role: 'assistant', content: textBlocks });
+        currentMessages.push({ role: 'user', content: NUDGE });
+      } else {
+        // No prose before the cut — the last message is already a user turn
+        // (the user's message or a tool_result); append the nudge to it so
+        // roles still alternate.
+        const last = currentMessages[currentMessages.length - 1];
+        if (typeof last.content === 'string') {
+          last.content = [{ type: 'text', text: last.content }];
+        }
+        last.content.push({ type: 'text', text: NUDGE });
+      }
+      // Keep the fix-up loop semantics for a cut-off fix-up turn: the next
+      // call is still a fix-up attempt (tighter budget, '[recipe]' logging).
+      if (fixup) {
+        fixState.pending = { attempt: fixup.attempt, startedAt: Date.now() };
+      }
+      continue;
     }
 
     // A fix-up turn that produced no display_recipe call (possible if an
