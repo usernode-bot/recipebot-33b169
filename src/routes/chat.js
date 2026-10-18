@@ -820,8 +820,8 @@ async function streamWithToolHandling(
   // Recipe-validation fix-up state, shared across turns: `attempts` counts
   // how many fix-up rounds we've asked the model for (bounded by
   // MAX_VALIDATION_RETRIES), `pending` marks that the NEXT LLM call is a
-  // fix-up call — it gets a tighter activity budget, forced tool_choice,
-  // and '[recipe]' logging — and `lastErrors` keeps the most recent
+  // fix-up call — it gets a tighter activity budget, a prompt asking the
+  // model to call display_recipe again, and '[recipe]' logging — and `lastErrors` keeps the most recent
   // validation errors for failure reporting.
   const fixState = { attempts: 0, pending: null, lastErrors: null };
 
@@ -852,9 +852,10 @@ async function streamWithToolHandling(
 
     const params = getCreateParams(config, currentMessages, systemPrompt, {
       model: userModel,
-      // Fix-up turns force display_recipe via tool_choice so the model can't
-      // answer with text only and leave the spinner hanging.
-      forceRecipeTool: !!fixState.pending,
+      // Fix-up turns rely on the fix-up tool result prompt to get
+      // display_recipe called again; the turn is failed loudly below if it
+      // doesn't.
+      fixup: !!fixState.pending,
     });
 
     log.debug('chat', `Turn ${turn} request`, {
@@ -1018,8 +1019,8 @@ async function streamWithToolHandling(
       );
     }
 
-    // A fix-up turn that produced no display_recipe call (possible if an
-    // upstream proxy strips tool_choice), or any turn truncated at
+    // A fix-up turn that produced no display_recipe call (tool choice is not
+    // forced, so the model can answer with text only), or any turn truncated at
     // max_tokens with its display_recipe block dropped, must fail loudly —
     // ending with 'done' here is exactly the silent "Fixing recipe
     // format..." dead end.
