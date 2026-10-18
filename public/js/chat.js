@@ -90,11 +90,78 @@ const Chat = {
   // Render a failed reply's message plus, when the failure is worth retrying,
   // a Try again button that re-runs the existing user message server-side (no
   // retyping, no duplicate message, no extra daily-allowance charge).
+  // Build the text shown inside the error's "Details" box: one line per
+  // present field, technical and English-only on purpose (issue #105).
+  _errorDetailText(detail) {
+    const lines = [];
+    if (detail.code) lines.push(`Code: ${detail.code}`);
+    if (detail.replyId != null || detail.conversationId != null) {
+      lines.push(`Reply: ${detail.replyId ?? '?'} · Conversation: ${detail.conversationId ?? '?'}`);
+    }
+    if (detail.stage === 'fixup') {
+      let step = 'Step: Fixing recipe format';
+      if (detail.attempt != null) {
+        step += `, attempt ${detail.attempt}${detail.max_attempts != null ? ` of ${detail.max_attempts}` : ''}`;
+      }
+      lines.push(step);
+    } else if (detail.turn != null) {
+      lines.push(`Step: turn ${detail.turn}`);
+    }
+    if (detail.step_elapsed_ms != null || detail.reply_elapsed_ms != null) {
+      const parts = [];
+      if (detail.step_elapsed_ms != null) {
+        parts.push(`${Math.round(detail.step_elapsed_ms / 1000)}s in this step`);
+      }
+      if (detail.reply_elapsed_ms != null) {
+        parts.push(`${Math.floor(detail.reply_elapsed_ms / 60000)}m ${Math.round((detail.reply_elapsed_ms % 60000) / 1000)}s in the reply`);
+      }
+      lines.push(`Elapsed: ${parts.join(' · ')}`);
+    }
+    if (detail.upstream_status != null || detail.upstream_message) {
+      const parts = [];
+      if (detail.upstream_status != null) parts.push(String(detail.upstream_status));
+      if (detail.upstream_code) parts.push(String(detail.upstream_code));
+      if (detail.upstream_message) parts.push(String(detail.upstream_message));
+      lines.push(`Upstream: ${parts.join(' ')}`);
+    }
+    const reason = detail.reason
+      || (detail.validation_errors?.length
+        ? `Validation errors: ${detail.validation_errors.join('; ')}.`
+        : null);
+    if (reason) lines.push(`Reason: ${reason}`);
+    return lines.join('\n');
+  },
+
   _appendErrorBlock(target, data, replyId) {
+    // One error per reply: if this wrapper already shows an error bubble, a
+    // later duplicate (the stale checker's "interrupted", a replayed event)
+    // must not stack a second one under the first (issue #105).
+    if (target.querySelector('.chat-error')) return null;
+
     const errEl = document.createElement('div');
-    errEl.className = 'msg-assistant px-4 py-2.5';
+    errEl.className = 'msg-assistant px-4 py-2.5 chat-error';
     errEl.textContent = this._errorText(data);
     target.appendChild(errEl);
+
+    // Structured debug detail, when the server attached it: parked behind a
+    // closed toggle styled like the other progress toggles, so nobody has to
+    // read it unless they're chasing the failure. textContent only —
+    // validation errors are model text, never markup.
+    if (data.detail && typeof data.detail === 'object') {
+      console.warn('[chat] reply error detail', data.detail);
+      const line = document.createElement('div');
+      line.className = 'status-line chat-error-details';
+      const label = document.createElement('span');
+      label.className = 'status-toggle';
+      label.textContent = t('chat.errorDetails');
+      line.appendChild(label);
+      const box = document.createElement('div');
+      box.className = 'status-detail hidden chat-error-details';
+      box.textContent = this._errorDetailText(data.detail);
+      label.addEventListener('click', () => box.classList.toggle('hidden'));
+      target.appendChild(line);
+      target.appendChild(box);
+    }
 
     if (!replyId || !this._retryableCodes.has(data.code || '')) return errEl;
 
@@ -131,6 +198,10 @@ const Chat = {
         return;
       }
       const { replyId: newReplyId } = await res.json();
+      // The retry's response_log replaces the failed attempt's on reload, so
+      // the live view must match: drop the old error bubble and its Details
+      // line/box along with the button (issue #105).
+      btn.parentNode?.querySelectorAll('.chat-error, .chat-error-details').forEach(el => el.remove());
       btn.remove();
       this.streaming = true;
       this._setStreamingBtn(true);
@@ -828,7 +899,7 @@ const Chat = {
       if (entry.type === 'error') {
         this._appendErrorBlock(
           wrap,
-          { error: entry.text, code: entry.kind || 'llm_failed' },
+          { error: entry.text, code: entry.kind || 'llm_failed', detail: entry.detail },
           failedReplyId
         );
         continue;

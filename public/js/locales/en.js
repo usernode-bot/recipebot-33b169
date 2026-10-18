@@ -166,6 +166,7 @@ I18N.register('en', {
   'chat.searching': 'Searching: {query}',
   'chat.reading': 'Reading: {url}',
   'chat.fixingFormat': 'Fixing recipe format...',
+  'chat.errorDetails': 'Details',
   'chat.retrying': 'Retrying…',
   'chat.stillWorking': 'Still working — long recipes from detailed sources can take a couple of minutes.',
   'chat.tryAgain': 'Try again',

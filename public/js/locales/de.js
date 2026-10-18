@@ -148,6 +148,7 @@ I18N.register('de', {
   'chat.searching': 'Suche: {query}',
   'chat.reading': 'Liest: {url}',
   'chat.fixingFormat': 'Rezeptformat wird korrigiert...',
+  'chat.errorDetails': 'Details',
   'chat.retrying': 'Neuer Versuch…',
   'chat.stillWorking': 'Läuft noch — lange Rezepte aus ausführlichen Quellen können ein paar Minuten dauern.',
   'chat.tryAgain': 'Erneut versuchen',

@@ -191,13 +191,21 @@ async function httpError(resp, mode) {
   let body = null;
   try { body = await resp.json(); } catch {}
   const code = body?.code || body?.error?.type || '';
-  log.error('llm', 'Messages API error', { status: resp.status, code, mode });
+  // The upstream's own message (issue #105): without it, a 400 from a
+  // malformed conversation history could only ever show as a generic
+  // "The AI request failed." with nothing in the logs to explain why.
+  const upstreamMessage = body?.error?.message || body?.message || null;
+  log.error('llm', 'Messages API error', {
+    status: resp.status, code, mode,
+    upstream_message: upstreamMessage ? String(upstreamMessage).slice(0, 300) : null,
+  });
 
   // Always carry a machine-readable code so the client can render the
   // error in the user's language; 'llm_failed' is the generic fallback.
   const err = new Error(`LLM request failed (${resp.status})`);
   err.code = code || 'llm_failed';
   err.status = resp.status;
+  err.upstreamMessage = upstreamMessage ? String(upstreamMessage).slice(0, 300) : null;
   if (code === 'grant_required') {
     err.userMessage = 'RecipeBot needs your permission to use AI. Approve access when prompted, then send your message again.';
   } else if (code === 'app_cap_exceeded') {
@@ -394,6 +402,7 @@ async function streamMessage(config, params, userToken, {
       const code = evt.error?.code || evt.error?.type || '';
       const err = new Error(evt.error?.message || 'LLM stream error');
       err.code = code || 'llm_failed';
+      err.upstreamMessage = evt.error?.message ? String(evt.error.message).slice(0, 300) : null;
       if (code === 'grant_required') {
         err.userMessage = 'RecipeBot needs your permission to use AI. Approve access when prompted, then send your message again.';
       } else if (code === 'app_cap_exceeded') {

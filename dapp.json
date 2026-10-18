@@ -211,6 +211,21 @@
       "expectSelector": ".status-line-error"
     },
     {
+      "name": "Failed fix-up shows the Details toggle",
+      "path": "/?c=900009",
+      "expectSelector": ".chat-error-details .status-toggle"
+    },
+    {
+      "name": "Failed fix-up has the Details detail box",
+      "path": "/?c=900009",
+      "expectSelector": ".status-detail.chat-error-details"
+    },
+    {
+      "name": "Failed fix-up keeps exactly one error bubble",
+      "path": "/?c=900009",
+      "expectSelector": ".chat-error"
+    },
+    {
       "name": "Collections section renders",
       "path": "/",
       "expectSelector": "#home-collections"

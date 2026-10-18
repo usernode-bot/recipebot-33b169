@@ -148,6 +148,7 @@ I18N.register('id', {
   'chat.searching': 'Mencari: {query}',
   'chat.reading': 'Membaca: {url}',
   'chat.fixingFormat': 'Memperbaiki format resep...',
+  'chat.errorDetails': 'Detail',
   'chat.retrying': 'Mencoba lagi…',
   'chat.stillWorking': 'Masih bekerja — resep panjang dari sumber yang detail bisa memakan waktu beberapa menit.',
   'chat.tryAgain': 'Coba lagi',
