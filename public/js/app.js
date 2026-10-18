@@ -385,6 +385,7 @@ document.addEventListener('visibilitychange', () => {
   const prefEl = document.getElementById('preferences');
   if (prefEl) prefEl.classList.remove('hidden');
   setupDarkMode();
+  setupPrintMode();
   setupNewConversation();
   setupHomeButton();
   setupTextareaResize();
@@ -828,6 +829,30 @@ function setupDarkMode() {
   document.addEventListener('i18n:change', apply);
 
   apply();
+}
+
+// Print preparation (issue #98). Printing is always on white paper
+// (css/print.css), so the dark theme must not print light text on it:
+// drop the `dark` class for the print snapshot and restore it after.
+// Covers both the recipe's Print button and Ctrl+P. The same handler
+// force-opens collapsed <details> — the ingredient summary — because print
+// wants the ingredients list visible, not its collapsed heading. CSS cannot
+// open a closed <details>, so this is a JS job.
+function setupPrintMode() {
+  let wasDark = false;
+  let closedDetails = [];
+  window.addEventListener('beforeprint', () => {
+    wasDark = document.documentElement.classList.contains('dark');
+    document.documentElement.classList.remove('dark');
+    closedDetails = [...document.querySelectorAll('details:not([open])')];
+    closedDetails.forEach((d) => { d.open = true; });
+  });
+  window.addEventListener('afterprint', () => {
+    if (wasDark) document.documentElement.classList.add('dark');
+    closedDetails.forEach((d) => { d.open = false; });
+    closedDetails = [];
+    wasDark = false;
+  });
 }
 
 function setupTextareaResize() {

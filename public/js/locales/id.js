@@ -246,6 +246,7 @@ I18N.register('id', {
   'recipe.macroFat': '{n}g lemak',
   'recipe.macroFiber': '{n}g serat',
   'recipe.cookMode': '🍳 Mode Masak',
+  'recipe.print': 'Cetak',
   'recipe.export': 'Ekspor ▾',
   'recipe.downloadMd': 'Unduh Markdown',
   'recipe.copyMd': 'Salin Markdown',

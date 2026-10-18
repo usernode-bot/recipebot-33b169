@@ -246,6 +246,7 @@ I18N.register('de', {
   'recipe.macroFat': '{n}g Fett',
   'recipe.macroFiber': '{n}g Ballaststoffe',
   'recipe.cookMode': '🍳 Kochmodus',
+  'recipe.print': 'Drucken',
   'recipe.export': 'Exportieren ▾',
   'recipe.downloadMd': 'Als Markdown herunterladen',
   'recipe.copyMd': 'Markdown kopieren',
