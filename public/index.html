@@ -372,14 +372,27 @@
         <div id="collection-view" class="hidden"></div>
 
         <!-- ── Band 1: your box ─────────────────────────────────────
-             Drafts → favorites → your recipes → collections (issue #40):
-             unfinished work leads, then the pinned and the recent. Hidden
+             Cook again → drafts → favorites → your recipes → collections
+             (issues #40, #119): what you already cooked and can repeat,
+             then unfinished work, then the pinned and the recent. Hidden
              whole for anonymous visitors: an empty personal box is noise. -->
         <section id="home-band-mine" class="space-y-6">
           <div class="flex items-center gap-3">
             <p class="kicker shrink-0" data-i18n="home.bandYours">Your box</p>
             <div class="flex-1 h-px bg-zinc-200 dark:bg-zinc-800"></div>
           </div>
+
+          <!-- Cook again: recipes you marked "Made it", latest cook first
+               (issue #119). Capped at 10 by /api/made-it/mine; cards are
+               resolved against the rows the other sections already load. -->
+          <section id="home-cook-again" class="hidden">
+            <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
+              <span class="text-green-600 shrink-0" aria-hidden="true">☑</span>
+              <span data-i18n="home.cookAgain">Cook again</span>
+              <span class="home-count text-xs font-normal text-zinc-400 dark:text-zinc-500 tabular-nums"></span>
+            </h2>
+            <div id="home-cook-again-list" class="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"></div>
+          </section>
 
           <!-- Drafts: conversations with no recipe yet. They LEAD the box
                (issue #40) but keep the compact row treatment and the

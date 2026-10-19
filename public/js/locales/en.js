@@ -38,6 +38,7 @@ I18N.register('en', {
   'home.collections': 'Collections',
   'home.newCollection': '+ New collection',
   'home.collectionsEmpty': 'Group your recipes into a shelf —',
+  'home.cookAgain': 'Cook again',
   'home.favorites': 'Your favorites',
   'home.yourRecipes': 'Your recipes',
   'home.communityRecipes': 'Community recipes',

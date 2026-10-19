@@ -32,6 +32,7 @@ I18N.register('id', {
   'home.collections': 'Koleksi',
   'home.newCollection': '+ Koleksi baru',
   'home.collectionsEmpty': 'Kelompokkan resepmu dalam satu rak —',
+  'home.cookAgain': 'Masak lagi',
   'home.favorites': 'Favoritmu',
   'home.yourRecipes': 'Resepmu',
   'home.communityRecipes': 'Resep komunitas',

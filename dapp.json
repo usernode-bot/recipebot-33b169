@@ -106,6 +106,26 @@
       "expectText": "Your recipes"
     },
     {
+      "name": "Cook again section renders for a seeded cook",
+      "path": "/",
+      "expectSelector": "#home-cook-again:not(.hidden)"
+    },
+    {
+      "name": "Cook again lists the seeded cooked recipe",
+      "path": "/",
+      "expectSelector": "#home-cook-again-list a[href*=\"?path=/?c=900001\"]"
+    },
+    {
+      "name": "Cook again leads the your-box band",
+      "path": "/",
+      "expectSelector": "#home-band-mine > section:first-of-type#home-cook-again"
+    },
+    {
+      "name": "Drafts follow Cook again",
+      "path": "/",
+      "expectSelector": "#home-cook-again + #home-convs"
+    },
+    {
       "name": "Header back button exists (hidden on home)",
       "path": "/",
       "expectSelector": "#home-btn"
@@ -384,11 +404,6 @@
       "name": "Homepage shows seeded drafts",
       "path": "/",
       "expectText": "Staging demo — Draft: birthday cake ideas"
-    },
-    {
-      "name": "Drafts lead the your-box band",
-      "path": "/",
-      "expectSelector": "#home-band-mine > section:first-of-type#home-convs"
     },
     {
       "name": "Favorites follow drafts in the your-box band",

@@ -1,6 +1,6 @@
 // Homepage ("the box"): a sticky search + new-recipe toolbar over two
 // labelled bands (issue #32) —
-//   Your box:        drafts → favorites → your recipes → collections
+//   Your box:        cook again → drafts → favorites → your recipes → collections
 //   From community:  community recipes → community collections
 // Sections are hidden entirely when empty; the whole page shows an empty
 // state only when every section has nothing to render.
@@ -14,6 +14,9 @@ const Home = {
   shared: [],
   mine: [],
   favorites: [],
+  // The user's cooking history from /api/made-it/mine: one row per cooked
+  // target, already ordered latest cook first and capped by the server.
+  cooked: [],
   conversations: [],
   collections: [],
   publicCollections: [],
@@ -84,6 +87,7 @@ const Home = {
         this.publicCollections = pubCollRes.ok ? await pubCollRes.json() : [];
         this.mine = [];
         this.favorites = [];
+        this.cooked = [];
         this.conversations = [];
         this.collections = [];
         if (this.activeCollection) {
@@ -93,17 +97,19 @@ const Home = {
         return;
       }
 
-      const [sharedRes, mineRes, favRes, convRes, collRes, pubCollRes] = await Promise.all([
+      const [sharedRes, mineRes, favRes, convRes, collRes, pubCollRes, cookedRes] = await Promise.all([
         fetch('/api/shared-recipes'),
         fetch('/api/recipes'),
         fetch('/api/favorites'),
         fetch('/api/conversations'),
         fetch('/api/collections'),
         fetch('/api/collections/public'),
+        fetch('/api/made-it/mine'),
       ]);
       this.shared = sharedRes.ok ? await sharedRes.json() : [];
       this.mine = mineRes.ok ? await mineRes.json() : [];
       this.favorites = favRes.ok ? await favRes.json() : [];
+      this.cooked = cookedRes.ok ? await cookedRes.json() : [];
       this.conversations = convRes.ok ? await convRes.json() : [];
       this.collections = collRes.ok ? await collRes.json() : [];
       this.publicCollections = pubCollRes.ok ? await pubCollRes.json() : [];
@@ -127,6 +133,7 @@ const Home = {
     const favSection = document.getElementById('home-favorites');
     const mineSection = document.getElementById('home-mine');
     const convSection = document.getElementById('home-convs');
+    const cookSection = document.getElementById('home-cook-again');
     const commSection = document.getElementById('home-community');
     const pubCollSection = document.getElementById('home-public-collections');
     const emptyEl = document.getElementById('home-empty');
@@ -188,6 +195,32 @@ const Home = {
     (c) => c.last_activity_at || c.created_at);
 
     this.renderTagFilters();
+
+    // Cook again (issue #119): resolve the server's cooked targets against
+    // rows the other lists already loaded, so the existing cards (hearts,
+    // ratings, Saved ✓) render unchanged. Keep the server order — recency
+    // here is when it was last cooked, not when it was edited.
+    let cookedRows = 0;
+    if (cookSection) {
+      const cookList = document.getElementById('home-cook-again-list');
+      cookList.innerHTML = '';
+      this.cooked.forEach((m) => {
+        if (m.shared_recipe_id) {
+          const s = this.shared.find((x) => x.id === m.shared_recipe_id);
+          if (!s || !matches(s.data?.title, s.tags) || !tagMatch(s.tags)) return;
+          cookList.appendChild(this.sharedCard(s));
+          cookedRows += 1;
+        } else if (m.conversation_id) {
+          const r = this.mine.find((x) => x.conversation_id === m.conversation_id);
+          if (!r || !matches(r.data?.title || r.conversation_title, r.data?.tags)
+            || !tagMatch(r.data?.tags)) return;
+          cookList.appendChild(this.ownCard(r));
+          cookedRows += 1;
+        }
+      });
+      cookSection.classList.toggle('hidden', cookedRows === 0);
+      this._setCount('home-cook-again', cookedRows);
+    }
 
     const favList = document.getElementById('home-favorites-list');
     favList.innerHTML = '';
@@ -262,7 +295,8 @@ const Home = {
     }
 
     const visible =
-      favOwn.length + favShared.length + mineRest.length + bareConvs.length + shared.length;
+      favOwn.length + favShared.length + mineRest.length + bareConvs.length + shared.length
+      + cookedRows;
     const filtering = q || this.tagFilter.size;
     emptyEl?.classList.toggle('hidden', !(visible === 0 && !filtering && colls.length === 0));
     noMatchEl?.classList.toggle('hidden', !(visible === 0 && filtering));
