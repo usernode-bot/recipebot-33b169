@@ -322,6 +322,9 @@ I18N.register('de', {
   'cook.allIngredients': 'Alle Zutaten',
   'cook.timerDone': '⏱ Fertig!',
   'cook.timerResetTitle': 'Klicken zum Zurücksetzen, oder schließen, wenn fertig',
+  'cook.finish': 'Kochen abschließen',
+  'cook.tickStep': 'Schritt {n} als erledigt markieren',
+  'cook.progressAria': 'Kochfortschritt',
 
   // ── Collections, comments and homepage bands (issues #32–#35) ──
   'home.drafts': 'Entwürfe',

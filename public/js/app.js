@@ -436,9 +436,11 @@ document.addEventListener('visibilitychange', () => {
 })();
 
 // Screenshot-state deep links. Each value opens exactly one dialog or menu
-// and writes nothing to the database — see "Make the changed screen
-// URL-reachable" in the platform conventions. Recipe-scoped states are
-// skipped when the route they need failed to restore.
+// (or, for the cooking checklist states, drives the checklist into one
+// deterministic state through its real code paths) and writes nothing to
+// the database — see "Make the changed screen URL-reachable" in the
+// platform conventions. Recipe-scoped states are skipped when the route
+// they need failed to restore.
 function openUiState(name) {
   const hasRecipe = !!App.currentRecipe;
   switch (name) {
@@ -476,6 +478,17 @@ function openUiState(name) {
       break;
     case 'export':
       if (typeof Recipe !== 'undefined' && hasRecipe) Recipe.openExportMenu();
+      break;
+    // Cooking-mode checklist states (issue #116): cooktick = one step ticked,
+    // cookall = everything ticked, cookpersist = tick survives a reload,
+    // cookfinish = finish flow exits cooking mode, cookrestart = cooking
+    // again resets the ticks.
+    case 'cooktick':
+    case 'cookall':
+    case 'cookpersist':
+    case 'cookfinish':
+    case 'cookrestart':
+      if (typeof CookingMode !== 'undefined' && hasRecipe) CookingMode.demoState(name);
       break;
     default:
       console.warn('[route] unknown ui state', name);
@@ -540,7 +553,9 @@ async function restoreRoute(route) {
   applyDeepLinkScale();
 
   if (route.cook === '1' && typeof CookingMode !== 'undefined') {
-    if (App.currentRecipe?.steps?.length) CookingMode.enter(App.currentRecipe);
+    // resume: a reload (or returning via the route) picks the ticks back up
+    // out of localStorage; only a fresh "Cook mode" start resets them.
+    if (App.currentRecipe?.steps?.length) CookingMode.enter(App.currentRecipe, { resume: true });
     else HashParams.set('cook', null);
   }
 }

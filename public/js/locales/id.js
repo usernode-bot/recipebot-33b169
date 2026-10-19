@@ -322,6 +322,9 @@ I18N.register('id', {
   'cook.allIngredients': 'Semua Bahan',
   'cook.timerDone': '⏱ Selesai!',
   'cook.timerResetTitle': 'Klik untuk reset, atau tutup jika sudah selesai',
+  'cook.finish': 'Selesai memasak',
+  'cook.tickStep': 'Tandai langkah {n} selesai',
+  'cook.progressAria': 'Kemajuan memasak',
 
   // ── Collections, comments and homepage bands (issues #32–#35) ──
   'home.drafts': 'Draf',

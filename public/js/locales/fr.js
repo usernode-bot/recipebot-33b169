@@ -322,6 +322,9 @@ I18N.register('fr', {
   'cook.allIngredients': 'Tous les ingrédients',
   'cook.timerDone': '⏱ Terminé !',
   'cook.timerResetTitle': "Cliquez pour réinitialiser, ou fermez si c'est terminé",
+  'cook.finish': 'Terminer la cuisson',
+  'cook.tickStep': 'Marquer l\'étape {n} comme faite',
+  'cook.progressAria': 'Progression de la cuisson',
 
   // ── Collections, comments and homepage bands (issues #32–#35) ──
   'home.drafts': 'Brouillons',

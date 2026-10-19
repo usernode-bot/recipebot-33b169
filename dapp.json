@@ -356,6 +356,56 @@
       "expectText": "400g"
     },
     {
+      "name": "Cooking checklist gives every step a checkbox",
+      "path": "/?c=900003&cook=1",
+      "expectSelector": "#cooking-overlay .cm-step-check"
+    },
+    {
+      "name": "Cooking checklist gives every ingredient a checkbox",
+      "path": "/?c=900003&cook=1",
+      "expectSelector": "#cooking-overlay .cm-ing-check"
+    },
+    {
+      "name": "Cooking checklist progress shows done and total",
+      "path": "/?c=900007&cook=1",
+      "expectText": "0/"
+    },
+    {
+      "name": "Ticking a checklist item updates the progress bar",
+      "path": "/?c=900003&cook=1&ui=cooktick",
+      "expectText": "1/"
+    },
+    {
+      "name": "Cooking checklist ticks survive a reload",
+      "path": "/?c=900006&cook=1&ui=cookpersist",
+      "expectText": "1/"
+    },
+    {
+      "name": "Completed cooking steps collapse",
+      "path": "/?c=900003&cook=1&ui=cooktick",
+      "expectSelector": "#cooking-overlay .cm-step-done"
+    },
+    {
+      "name": "Finish cooking appears when everything is ticked",
+      "path": "/?c=900003&cook=1&ui=cookall",
+      "expectSelector": "#cm-finish"
+    },
+    {
+      "name": "Finish cooking exits cooking mode",
+      "path": "/?c=900003&ui=cookfinish",
+      "expectSelector": "body[data-cook-finished]:not([data-cooking])"
+    },
+    {
+      "name": "Starting to cook again resets the ticks",
+      "path": "/?c=900003&cook=1&ui=cookrestart",
+      "expectText": "0/"
+    },
+    {
+      "name": "Cooking checklist renders at phone width",
+      "path": "/?c=900003&cook=1 @mobile",
+      "expectSelector": "#cooking-overlay .cm-step-check"
+    },
+    {
       "name": "Recipe deep link opens recipe tab on mobile",
       "path": "/?c=900003 @mobile",
       "expectSelector": "#recipe-panel:not(.panel-hidden) #cook-btn"

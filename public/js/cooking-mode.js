@@ -4,11 +4,20 @@ const CookingMode = {
   timers: [],
   wakeLock: null,
   overlay: null,
+  // Checklist ticks for the current cooking session (issue #116): step
+  // indexes and aggregated ingredient names. Persisted to localStorage so a
+  // reload of the same recipe message resumes mid-cook; a fresh "Cook mode"
+  // start resets them.
+  ticks: { steps: new Set(), ings: new Set() },
+  _finishShown: false,
 
-  enter(recipe) {
+  enter(recipe, { resume = false } = {}) {
     if (!recipe?.steps?.length) return;
     this.recipe = recipe;
     this.active = true;
+    this._finishShown = false;
+    if (resume) this._resumeTicks(recipe);
+    else this._resetTicks(recipe);
     const hasRunning = this.timers.some(t => t.remaining > 0);
     if (!hasRunning) this.timers = [];
     const bar = document.getElementById('timer-bar');
@@ -17,11 +26,13 @@ const CookingMode = {
     this.acquireWakeLock();
     // Part of the route so a refresh comes back into cooking mode.
     if (typeof HashParams !== 'undefined') HashParams.set('cook', '1');
+    document.body.setAttribute('data-cooking', '1');
   },
 
   exit() {
     if (typeof HashParams !== 'undefined') HashParams.set('cook', null);
     this.releaseWakeLock();
+    document.body.removeAttribute('data-cooking');
     if (this.overlay) {
       this.overlay.remove();
       this.overlay = null;
@@ -83,13 +94,19 @@ const CookingMode = {
       }
 
       const isActive = Recipe?.activeSteps?.has(String(i));
+      const isDone = this.ticks.steps.has(String(i));
       stepsHtml += `
-        <div class="cm-step step-card rounded-2xl p-6 md:p-8 my-4 cursor-pointer bg-zinc-100/70 dark:bg-zinc-900/50${isActive ? ' step-active' : ''}" data-step="${i}">
-          <div class="text-sm font-medium text-blue-500 dark:text-blue-400 mb-3">${t('cook.stepOf', { n: i + 1, total: recipe.steps.length })}</div>
-          <p class="text-2xl md:text-3xl leading-relaxed font-light">${this.escapeHtml(step.description)}</p>
-          ${temp ? `<div class="text-xl text-orange-500 dark:text-orange-400 mt-3">${temp}</div>` : ''}
-          ${ingsHtml}
-          ${timerHtml}
+        <div class="cm-step step-card rounded-2xl p-6 md:p-8 my-4 cursor-pointer bg-zinc-100/70 dark:bg-zinc-900/50${isActive ? ' step-active' : ''}${isDone ? ' cm-step-done' : ''}" data-step="${i}">
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" class="ingredient-check cm-step-check" data-step="${i}" aria-label="${this.escapeAttr(t('cook.tickStep', { n: i + 1 }))}"${isDone ? ' checked' : ''}>
+            <span class="text-sm font-medium text-blue-500 dark:text-blue-400">${t('cook.stepOf', { n: i + 1, total: recipe.steps.length })}</span>
+          </label>
+          <div class="cm-step-body">
+            <p class="text-2xl md:text-3xl leading-relaxed font-light mt-3">${this.escapeHtml(step.description)}</p>
+            ${temp ? `<div class="text-xl text-orange-500 dark:text-orange-400 mt-3">${temp}</div>` : ''}
+            ${ingsHtml}
+            ${timerHtml}
+          </div>
         </div>`;
     });
 
@@ -108,6 +125,15 @@ const CookingMode = {
           </svg>
         </button>
         </div>
+      </div>
+      <div id="cm-progress" class="shrink-0 px-4 py-2 border-b border-zinc-200 dark:border-zinc-800">
+        <div class="max-w-2xl mx-auto flex items-center gap-3">
+          <div id="cm-progress-track" class="flex-1 min-w-0 h-2 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden" role="progressbar" aria-valuemin="0" aria-valuemax="${this._checklistTotal(recipe)}" aria-valuenow="0" aria-label="${this.escapeAttr(t('cook.progressAria'))}">
+            <div id="cm-progress-bar" class="h-full rounded-full bg-green-600 dark:bg-green-400" style="width:0%"></div>
+          </div>
+          <span id="cm-progress-label" class="text-sm font-medium tabular-nums text-zinc-500 dark:text-zinc-400 shrink-0">0/${this._checklistTotal(recipe)}</span>
+        </div>
+        <div id="cm-finish-wrap" class="max-w-2xl mx-auto"></div>
       </div>
       <div id="cm-body" class="flex-1 overflow-y-auto">
         <div class="max-w-2xl mx-auto px-6">
@@ -198,17 +224,20 @@ const CookingMode = {
       });
     });
 
-    el.querySelectorAll('.cm-ing-sync').forEach((cb) => {
+    el.querySelectorAll('.cm-step-check').forEach((cb) => {
       cb.addEventListener('change', () => {
-        if (!Recipe) return;
-        const keys = JSON.parse(cb.dataset.stepKeys);
-        keys.forEach((k) => {
-          if (cb.checked) Recipe.checkedIngredients.add(k);
-          else Recipe.checkedIngredients.delete(k);
-        });
-        Recipe.saveUIStateToServer();
+        this.setStepTicked(parseInt(cb.dataset.step, 10), cb.checked);
       });
     });
+
+    el.querySelectorAll('.cm-ing-check').forEach((cb) => {
+      cb.addEventListener('change', () => {
+        const ing = this._aggregateIngredients(this.recipe)[parseInt(cb.dataset.ingIdx, 10)];
+        if (ing) this.setIngTicked(ing.name, cb.checked);
+      });
+    });
+
+    this.updateProgress();
   },
 
   // Servings / scale, right where the cook needs them: changing either one
@@ -395,7 +424,7 @@ const CookingMode = {
     const resumeBtn = document.getElementById('timer-bar-resume');
     if (resumeBtn) {
       resumeBtn.onclick = () => {
-        if (this.recipe) this.enter(this.recipe);
+        if (this.recipe) this.enter(this.recipe, { resume: true });
       };
     }
 
@@ -505,40 +534,205 @@ const CookingMode = {
     }
   },
 
-  buildIngredientSummary(recipe, scale) {
+  // One row per distinct ingredient across all steps, in first-seen order.
+  // Drives both the summary checklist and the progress total.
+  _aggregateIngredients(recipe) {
     const allIngs = [];
-    recipe.steps.forEach((step, stepIdx) => {
+    recipe.steps.forEach((step) => {
       (step.ingredients || []).forEach((ing) => {
-        const stepKey = `${stepIdx}-${ing.name}`;
         const existing = allIngs.find((a) => a.name === ing.name);
         if (existing) {
           existing.grams += ing.grams;
           existing.volume.amount += ing.volume.amount;
-          existing.stepKeys.push(stepKey);
         } else {
           allIngs.push({
             name: ing.name,
             grams: ing.grams,
             volume: { amount: ing.volume.amount, unit: ing.volume.unit },
-            stepKeys: [stepKey],
           });
         }
       });
     });
+    return allIngs;
+  },
 
+  _checklistTotal(recipe) {
+    return recipe.steps.length + this._aggregateIngredients(recipe).length;
+  },
+
+  // Checklist tick state (issue #116). Keyed per recipe message: conversation
+  // (or shared copy) plus a title/steps fingerprint, so a reload of the same
+  // recipe resumes mid-cook and an edited recipe starts a clean sheet.
+  _tickStoreKey(recipe) {
+    const scope = App.currentConversationId
+      ? `c${App.currentConversationId}`
+      : (App.viewingShared?.id ? `s${App.viewingShared.id}` : null);
+    if (!scope) return null;
+    return `recipebot:cookticks:${scope}:${recipe.title}|${recipe.steps.length}`;
+  },
+
+  _resetTicks(recipe) {
+    this.ticks.steps.clear();
+    this.ticks.ings.clear();
+    const key = this._tickStoreKey(recipe);
+    if (key) { try { localStorage.removeItem(key); } catch { /* storage blocked */ } }
+  },
+
+  _resumeTicks(recipe) {
+    this.ticks.steps.clear();
+    this.ticks.ings.clear();
+    const key = this._tickStoreKey(recipe);
+    if (!key) return;
+    let data = null;
+    try { data = JSON.parse(localStorage.getItem(key) || 'null'); } catch { data = null; }
+    if (!data) return;
+    const ingNames = new Set(this._aggregateIngredients(recipe).map((a) => a.name));
+    (Array.isArray(data.steps) ? data.steps : []).forEach((s) => {
+      const i = Number(s);
+      if (Number.isInteger(i) && i >= 0 && i < recipe.steps.length) this.ticks.steps.add(String(i));
+    });
+    (Array.isArray(data.ings) ? data.ings : []).forEach((n) => {
+      if (typeof n === 'string' && ingNames.has(n)) this.ticks.ings.add(n);
+    });
+  },
+
+  _saveTicks(recipe) {
+    const key = this._tickStoreKey(recipe);
+    if (!key) return;
+    try {
+      localStorage.setItem(key, JSON.stringify({
+        steps: Array.from(this.ticks.steps),
+        ings: Array.from(this.ticks.ings),
+      }));
+    } catch { /* storage blocked */ }
+  },
+
+  setStepTicked(i, checked) {
+    if (!this.recipe) return;
+    if (checked) this.ticks.steps.add(String(i));
+    else this.ticks.steps.delete(String(i));
+    this._saveTicks(this.recipe);
+    this._applyStepTick(i);
+    this.updateProgress();
+  },
+
+  _applyStepTick(i) {
+    const card = this.overlay?.querySelector(`.cm-step[data-step="${i}"]`);
+    if (!card) return;
+    const done = this.ticks.steps.has(String(i));
+    card.classList.toggle('cm-step-done', done);
+    const cb = card.querySelector('.cm-step-check');
+    if (cb) cb.checked = done;
+  },
+
+  setIngTicked(name, checked) {
+    if (!this.recipe) return;
+    if (checked) this.ticks.ings.add(name);
+    else this.ticks.ings.delete(name);
+    this._saveTicks(this.recipe);
+    this._syncIngChecks();
+    this.updateProgress();
+  },
+
+  _syncIngChecks() {
+    if (!this.overlay || !this.recipe) return;
+    const ings = this._aggregateIngredients(this.recipe);
+    this.overlay.querySelectorAll('.cm-ing-check').forEach((cb) => {
+      const ing = ings[parseInt(cb.dataset.ingIdx, 10)];
+      if (ing) cb.checked = this.ticks.ings.has(ing.name);
+    });
+  },
+
+  // Done and total for the progress bar, plus the Finish cooking button,
+  // which only exists in the DOM once every step and ingredient is ticked.
+  updateProgress() {
+    if (!this.overlay || !this.recipe) return;
+    const total = this._checklistTotal(this.recipe);
+    const done = Math.min(total, this.ticks.steps.size + this.ticks.ings.size);
+    const label = this.overlay.querySelector('#cm-progress-label');
+    if (label) label.textContent = `${done}/${total}`;
+    const track = this.overlay.querySelector('#cm-progress-track');
+    if (track) track.setAttribute('aria-valuenow', String(done));
+    const bar = this.overlay.querySelector('#cm-progress-bar');
+    if (bar) bar.style.width = `${total ? Math.round((done / total) * 100) : 0}%`;
+
+    const complete = total > 0 && done >= total;
+    if (complete !== this._finishShown) {
+      this._finishShown = complete;
+      const wrap = this.overlay.querySelector('#cm-finish-wrap');
+      if (wrap) {
+        wrap.innerHTML = complete
+          ? `<button id="cm-finish" class="mt-2 w-full px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-500 text-white font-medium transition-colors">${t('cook.finish')}</button>`
+          : '';
+        wrap.querySelector('#cm-finish')?.addEventListener('click', () => this.finishCooking());
+      }
+    }
+  },
+
+  finishCooking() {
+    if (this.recipe) this._resetTicks(this.recipe);
+    this.exit();
+    // Marks that the finish flow completed this session (used by checks).
+    document.body.setAttribute('data-cook-finished', '1');
+  },
+
+  // ?ui= deep links for the checklist (see openUiState in app.js): each one
+  // drives the checklist through its real code paths so a URL reaches the
+  // state deterministically. Pure UI state — ticks live in localStorage
+  // only, nothing touches the database.
+  demoState(name) {
+    const recipe = App.currentRecipe;
+    if (!recipe?.steps?.length) return;
+    const tickAll = () => {
+      recipe.steps.forEach((_, i) => this.setStepTicked(i, true));
+      this._aggregateIngredients(recipe).forEach((ing) => this.setIngTicked(ing.name, true));
+    };
+    switch (name) {
+      case 'cooktick':
+        this.enter(recipe);
+        this.setStepTicked(0, true);
+        break;
+      case 'cookall':
+        this.enter(recipe);
+        tickAll();
+        break;
+      case 'cookpersist':
+        // A session that ended mid-cook, then boots the way a reload does:
+        // the tick comes back out of storage.
+        this.enter(recipe);
+        this.setStepTicked(0, true);
+        this.exit();
+        this.enter(recipe, { resume: true });
+        break;
+      case 'cookfinish':
+        this.enter(recipe);
+        tickAll();
+        this.finishCooking();
+        break;
+      case 'cookrestart':
+        // Leftover ticks from a previous session; starting to cook again
+        // resets them.
+        this.enter(recipe);
+        this.setStepTicked(0, true);
+        this.exit();
+        this.enter(recipe);
+        break;
+    }
+  },
+
+  buildIngredientSummary(recipe, scale) {
+    const allIngs = this._aggregateIngredients(recipe);
     if (!allIngs.length) return '';
-
-    const checked = Recipe?.checkedIngredients || new Set();
 
     let rows = '';
     allIngs.forEach((ing, i) => {
       const g = Math.round(ing.grams * scale);
       const vol = Recipe ? Recipe.formatVolume(ing.volume, scale) : '';
       const id = `cm-ing-${i}`;
-      const isChecked = ing.stepKeys.every((k) => checked.has(k));
+      const isChecked = this.ticks.ings.has(ing.name);
       rows += `<label for="${id}" class="ingredient-label flex items-center justify-between py-1.5 text-base cursor-pointer">
         <span class="flex items-center gap-3">
-          <input type="checkbox" id="${id}" class="ingredient-check cm-ing-sync" data-step-keys='${JSON.stringify(ing.stepKeys)}'${isChecked ? ' checked' : ''}>
+          <input type="checkbox" id="${id}" class="ingredient-check cm-ing-check" data-ing-idx="${i}"${isChecked ? ' checked' : ''}>
           <span class="ing-name">${this.escapeHtml(ing.name)}</span>
         </span>
         <span class="ing-amt text-zinc-500 dark:text-zinc-400 tabular-nums ml-4 whitespace-nowrap">${g}g${vol ? ` (${vol})` : ''}</span>
@@ -557,5 +751,11 @@ const CookingMode = {
   escapeHtml(str) {
     if (!str) return '';
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  },
+
+  // For attribute values: also escapes quotes so a value can't close the
+  // attribute it sits in.
+  escapeAttr(str) {
+    return this.escapeHtml(String(str ?? '')).replace(/"/g, '&quot;');
   },
 };
