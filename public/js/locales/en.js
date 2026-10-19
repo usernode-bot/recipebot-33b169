@@ -354,6 +354,9 @@ I18N.register('en', {
   'cook.allIngredients': 'All Ingredients',
   'cook.timerDone': '⏱ Done!',
   'cook.timerResetTitle': 'Click to reset, or dismiss if done',
+  'cook.finish': 'Finish cooking',
+  'cook.tickStep': 'Mark step {n} done',
+  'cook.progressAria': 'Cooking progress',
 
   // ── Collections, comments and homepage bands (issues #32–#35) ──
   'home.drafts': 'Drafts',

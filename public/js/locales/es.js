@@ -322,6 +322,9 @@ I18N.register('es', {
   'cook.allIngredients': 'Todos los ingredientes',
   'cook.timerDone': '⏱ ¡Listo!',
   'cook.timerResetTitle': 'Haz clic para reiniciar, o descártalo si terminó',
+  'cook.finish': 'Terminar de cocinar',
+  'cook.tickStep': 'Marcar el paso {n} como hecho',
+  'cook.progressAria': 'Progreso de la cocina',
 
   // ── Collections, comments and homepage bands (issues #32–#35) ──
   'home.drafts': 'Borradores',

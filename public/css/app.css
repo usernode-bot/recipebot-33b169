@@ -456,6 +456,27 @@ h1, h2, h3, .font-display {
   border-color: rgba(148, 173, 82, 0.35);
 }
 
+/* Cooking-mode checklist (issue #116). Step checkboxes reuse the
+   .ingredient-check styling, one step up in size for the big cooking
+   cards; a ticked step collapses to its header row. */
+.cm-step-check {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.cm-step-check:checked::after {
+  left: 4px;
+  top: 1px;
+}
+
+.cm-step.cm-step-done {
+  opacity: 0.7;
+}
+
+.cm-step.cm-step-done .cm-step-body {
+  display: none;
+}
+
 /* Macro pills */
 .macro-pill {
   padding: 0.25rem 0.625rem;
