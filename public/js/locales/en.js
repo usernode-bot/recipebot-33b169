@@ -39,6 +39,7 @@ I18N.register('en', {
   'home.newCollection': '+ New collection',
   'home.collectionsEmpty': 'Group your recipes into a shelf —',
   'home.favorites': 'Your favorites',
+  'home.cookAgain': 'Cook again',
   'home.yourRecipes': 'Your recipes',
   'home.communityRecipes': 'Community recipes',
   'home.sortLabel': 'Sort',

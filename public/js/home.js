@@ -1,6 +1,6 @@
 // Homepage ("the box"): a sticky search + new-recipe toolbar over two
 // labelled bands (issue #32) —
-//   Your box:        drafts → favorites → your recipes → collections
+//   Your box:        cook again → drafts → favorites → your recipes → collections
 //   From community:  community recipes → community collections
 // Sections are hidden entirely when empty; the whole page shows an empty
 // state only when every section has nothing to render.
@@ -14,6 +14,8 @@ const Home = {
   shared: [],
   mine: [],
   favorites: [],
+  // Marked "Made it", latest cook first (issue #119) — server-ordered.
+  cooked: [],
   conversations: [],
   collections: [],
   publicCollections: [],
@@ -84,6 +86,7 @@ const Home = {
         this.publicCollections = pubCollRes.ok ? await pubCollRes.json() : [];
         this.mine = [];
         this.favorites = [];
+        this.cooked = [];
         this.conversations = [];
         this.collections = [];
         if (this.activeCollection) {
@@ -93,10 +96,11 @@ const Home = {
         return;
       }
 
-      const [sharedRes, mineRes, favRes, convRes, collRes, pubCollRes] = await Promise.all([
+      const [sharedRes, mineRes, favRes, madeRes, convRes, collRes, pubCollRes] = await Promise.all([
         fetch('/api/shared-recipes'),
         fetch('/api/recipes'),
         fetch('/api/favorites'),
+        fetch('/api/made-it/mine'),
         fetch('/api/conversations'),
         fetch('/api/collections'),
         fetch('/api/collections/public'),
@@ -104,6 +108,7 @@ const Home = {
       this.shared = sharedRes.ok ? await sharedRes.json() : [];
       this.mine = mineRes.ok ? await mineRes.json() : [];
       this.favorites = favRes.ok ? await favRes.json() : [];
+      this.cooked = madeRes.ok ? await madeRes.json() : [];
       this.conversations = convRes.ok ? await convRes.json() : [];
       this.collections = collRes.ok ? await collRes.json() : [];
       this.publicCollections = pubCollRes.ok ? await pubCollRes.json() : [];
@@ -178,6 +183,27 @@ const Home = {
     const shared = this._sortShared(
       this.shared.filter((s) => matches(s.data?.title, s.tags) && tagMatch(s.tags)));
 
+    // Cook again (issue #119): the server's order is kept — latest cook
+    // first. Each mark resolves against the rows already loaded, so hearts,
+    // ratings and Saved ✓ match every other section; a mark that no longer
+    // resolves (deleted source) is dropped. A conversation mark maps to the
+    // /api/recipes row, a shared mark to the /api/shared-recipes row.
+    const cookedCards = [];
+    this.cooked.forEach((m) => {
+      if (m.shared_recipe_id) {
+        const s = this.shared.find((x) => x.id === m.shared_recipe_id);
+        if (s && matches(s.data?.title, s.tags) && tagMatch(s.tags)) {
+          cookedCards.push(this.sharedCard(s));
+        }
+      } else if (m.conversation_id) {
+        const r = this.mine.find((x) => x.conversation_id === m.conversation_id);
+        if (r && matches(r.data?.title || r.conversation_title, r.data?.tags)
+            && tagMatch(r.data?.tags)) {
+          cookedCards.push(this.ownCard(r));
+        }
+      }
+    });
+
     // Conversations without a recipe yet (recipe-bearing ones already show
     // as cards in "Your recipes" / "Your favorites"), most recently worked
     // on first. A draft has no recipe, so no tags — hidden while a chip is
@@ -195,6 +221,15 @@ const Home = {
     favShared.forEach((s) => favList.appendChild(this.sharedCard(s, { favoritesSection: true })));
     favSection.classList.toggle('hidden', favOwn.length + favShared.length === 0);
     this._setCount('home-favorites', favOwn.length + favShared.length);
+
+    const cookedSection = document.getElementById('home-cook-again');
+    if (cookedSection) {
+      const cookedList = document.getElementById('home-cook-again-list');
+      cookedList.innerHTML = '';
+      cookedCards.forEach((card) => cookedList.appendChild(card));
+      cookedSection.classList.toggle('hidden', cookedCards.length === 0);
+      this._setCount('home-cook-again', cookedCards.length);
+    }
 
     const mineList = document.getElementById('home-mine-list');
     mineList.innerHTML = '';
@@ -262,7 +297,8 @@ const Home = {
     }
 
     const visible =
-      favOwn.length + favShared.length + mineRest.length + bareConvs.length + shared.length;
+      favOwn.length + favShared.length + cookedCards.length + mineRest.length
+      + bareConvs.length + shared.length;
     const filtering = q || this.tagFilter.size;
     emptyEl?.classList.toggle('hidden', !(visible === 0 && !filtering && colls.length === 0));
     noMatchEl?.classList.toggle('hidden', !(visible === 0 && filtering));
