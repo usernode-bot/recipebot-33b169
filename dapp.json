@@ -386,9 +386,19 @@
       "expectText": "Staging demo — Draft: birthday cake ideas"
     },
     {
-      "name": "Drafts lead the your-box band",
+      "name": "Cook again leads the your-box band",
       "path": "/",
-      "expectSelector": "#home-band-mine > section:first-of-type#home-convs"
+      "expectSelector": "#home-band-mine > section:first-of-type#home-cook-again"
+    },
+    {
+      "name": "Cook again precedes drafts in the your-box band",
+      "path": "/",
+      "expectSelector": "#home-cook-again + #home-convs"
+    },
+    {
+      "name": "Cook again shows the seeded cooked recipe",
+      "path": "/",
+      "expectSelector": "#home-cook-again:not(.hidden) #home-cook-again-list a[href*=\"?path=/?c=\"]"
     },
     {
       "name": "Favorites follow drafts in the your-box band",

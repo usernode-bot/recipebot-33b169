@@ -306,6 +306,35 @@ function recipeRoutes(config) {
     }
   });
 
+  // The requester's cooked recipes for the homepage "Cook again" row
+  // (issue #119): one row per distinct cooked target, latest cook first,
+  // capped at 10. Shared targets cannot dangle (FK cascade); conversation
+  // marks are filtered to ones whose conversation still has a recipe, so
+  // the cap only counts recipes that can still be shown.
+  router.get('/api/made-it/mine', async (req, res) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT mm.conversation_id, mm.shared_recipe_id,
+                MAX(mm.created_at) AS last_made_at
+         FROM made_it_marks mm
+         WHERE ${ownerClause('mm.user_id')}
+           AND (mm.shared_recipe_id IS NOT NULL
+                OR EXISTS (SELECT 1 FROM conversations c
+                           WHERE c.id = mm.conversation_id AND ${ownerClause('c.user_id')}
+                             AND EXISTS (SELECT 1 FROM messages m
+                                         WHERE m.conversation_id = c.id AND m.recipe_data IS NOT NULL)))
+         GROUP BY mm.conversation_id, mm.shared_recipe_id
+         ORDER BY last_made_at DESC, MAX(mm.id) DESC
+         LIMIT 10`,
+        [req.user.id]
+      );
+      res.json(rows);
+    } catch (err) {
+      log.error('recipes', 'Made-it mine failed', { message: err.message });
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // Made-it gallery for a shared recipe (notes from people who cooked it).
   router.get('/api/shared-recipes/:id/made-it', async (req, res) => {
     const sharedId = parseInt(req.params.id);

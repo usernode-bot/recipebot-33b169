@@ -33,6 +33,7 @@ I18N.register('fr', {
   'home.newCollection': '+ Nouvelle collection',
   'home.collectionsEmpty': 'Regroupez vos recettes sur une étagère —',
   'home.favorites': 'Vos favoris',
+  'home.cookAgain': 'À refaire',
   'home.yourRecipes': 'Vos recettes',
   'home.communityRecipes': 'Recettes de la communauté',
   'home.sortLabel': 'Trier',
