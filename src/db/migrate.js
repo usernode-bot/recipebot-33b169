@@ -421,6 +421,102 @@ async function seedStagingDemo(pool) {
     log.info('db', 'Seeded staging timed-out-web-read demo conversation');
   }
 
+  // Failed-fix-up-with-details demo (issue #105): the reply failed during
+  // "Fixing recipe format..." and carries a structured `detail` on its error
+  // log entry — what the client now parks behind a closed "Details" toggle.
+  // Also shows the sentinel row's new code/attempt trailer, so reviewers can
+  // see a realistic failure without having to make the AI fail.
+  await pool.query(
+    `INSERT INTO conversations (id, user_id, title, preferences)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (id) DO NOTHING`,
+    [900009, DEMO_USER_ID, 'Staging demo — Failed fix-up with details', JSON.stringify({ complexity: 'normal', serving: 'normal' })]
+  );
+  const { rows: fixupDetailRows } = await pool.query(
+    'SELECT 1 FROM messages WHERE conversation_id = $1 LIMIT 1',
+    [900009]
+  );
+  if (fixupDetailRows.length === 0) {
+    const fixupDetailLog = [
+      { type: 'thinking', kind: 'thinking', text: 'Thinking...', detail: 'Rebuilding the recipe with the corrected amounts, then re-sending it.' },
+      {
+        type: 'status', kind: 'fetch',
+        text: 'Reading: https://omnivorescookbook.com/how-to-make-chili-oil/',
+        url: 'https://omnivorescookbook.com/how-to-make-chili-oil/',
+      },
+      { type: 'status', kind: 'fixup', text: 'Fixing recipe format...', ok: false },
+      {
+        type: 'error', kind: 'recipe_fixup_failed', ok: false,
+        text: "I couldn't apply the changes to the recipe — the update didn't come through correctly. Please try asking again.",
+        detail: {
+          code: 'recipe_fixup_failed',
+          replyId: 900307,
+          conversationId: 900009,
+          stage: 'fixup',
+          attempt: 2,
+          max_attempts: 2,
+          step_elapsed_ms: 38000,
+          reply_elapsed_ms: 246000,
+          reason: 'Validation errors: steps[2].description must not contain ingredient amounts; ingredients[5].grams is required.',
+          validation_errors: [
+            'steps[2].description must not contain ingredient amounts',
+            'ingredients[5].grams is required',
+          ],
+        },
+      },
+    ];
+    await pool.query(
+      `INSERT INTO messages (conversation_id, role, content, recipe_data, response_log, created_at) VALUES
+       ($1, 'user', 'Staging demo: make me a quick chicken stir fry', NULL, NULL, NOW() - interval '8 min'),
+       ($1, 'assistant', '[Recipe: Staging Demo Chicken Stir Fry]', $2, NULL, NOW() - interval '7 min'),
+       ($1, 'user', 'Staging demo: double the garlic and halve the fennel', NULL, $3, NOW() - interval '5 min'),
+       ($1, 'assistant', '[Recipe update FAILED — display_recipe was not called successfully. (code: recipe_fixup_failed, attempt 2 of 2, after 38s) Validation errors: steps[2].description must not contain ingredient amounts; ingredients[5].grams is required. The current recipe is unchanged; you must call display_recipe with the full corrected recipe on your next turn.]', NULL, NULL, NOW() - interval '4 min')`,
+      [900009, JSON.stringify(DEMO_RECIPE), JSON.stringify(fixupDetailLog)]
+    );
+    // status='error' gives the conversation a working Try again button.
+    await pool.query(
+      `INSERT INTO pending_replies (id, conversation_id, user_id, status, events, created_at, updated_at)
+       VALUES (900307, 900009, $1, 'error', '[]'::jsonb,
+               NOW() - interval '5 min', NOW() - interval '4 min')
+       ON CONFLICT (id) DO NOTHING`,
+      [DEMO_USER_ID]
+    );
+    log.info('db', 'Seeded staging failed-fix-up-details demo conversation');
+  }
+
+  // Successful-fix-up demo: the counterpart to 900005/900009 — a reply whose
+  // "Fixing recipe format..." retry SUCCEEDED. Mirrors what the runtime
+  // stores on success: the fixup status entry has no `ok` field (so the
+  // client renders a checkmark, not an ✕), followed by the recipe event and
+  // the stored recipe_data. Staging-only, obviously fake, idempotent.
+  await pool.query(
+    `INSERT INTO conversations (id, user_id, title, preferences)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (id) DO NOTHING`,
+    [900014, DEMO_USER_ID, 'Staging demo — Successful recipe fix-up', JSON.stringify({ complexity: 'normal', serving: 'normal' })]
+  );
+  const { rows: fixupSuccessRows } = await pool.query(
+    'SELECT 1 FROM messages WHERE conversation_id = $1 LIMIT 1',
+    [900014]
+  );
+  if (fixupSuccessRows.length === 0) {
+    const successfulFixupLog = [
+      { type: 'thinking', kind: 'thinking', text: 'Thinking...', detail: 'Doubling the garlic and rebuilding the ingredient list with per-ingredient grams, then re-sending the full recipe.' },
+      { type: 'text', content: 'Doubling the garlic now — one moment.' },
+      { type: 'status', kind: 'fixup', text: 'Fixing recipe format...' },
+      { type: 'recipe', kind: 'recipe', title: 'Staging Demo Chicken Stir Fry', text: 'Created recipe: Staging Demo Chicken Stir Fry' },
+    ];
+    await pool.query(
+      `INSERT INTO messages (conversation_id, role, content, recipe_data, response_log, created_at) VALUES
+       ($1, 'user', 'Staging demo: make me a quick chicken stir fry', NULL, NULL, NOW() - interval '9 min'),
+       ($1, 'assistant', '[Recipe: Staging Demo Chicken Stir Fry]', $2, NULL, NOW() - interval '8 min'),
+       ($1, 'user', 'Staging demo: double the garlic', NULL, $3, NOW() - interval '4 min'),
+       ($1, 'assistant', '[Recipe: Staging Demo Chicken Stir Fry]', $2, NULL, NOW() - interval '3 min')`,
+      [900014, JSON.stringify(DEMO_RECIPE), JSON.stringify(successfulFixupLog)]
+    );
+    log.info('db', 'Seeded staging successful-fix-up demo conversation');
+  }
+
   // Drafts (issue #32): conversations that never produced a recipe. Every
   // other seeded conversation has one, so without these the homepage's
   // Drafts section — now the FIRST section of "Your box" (issue #40),

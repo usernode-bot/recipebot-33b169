@@ -191,13 +191,21 @@ async function httpError(resp, mode) {
   let body = null;
   try { body = await resp.json(); } catch {}
   const code = body?.code || body?.error?.type || '';
-  log.error('llm', 'Messages API error', { status: resp.status, code, mode });
+  // The upstream's own message (issue #105): without it, a 400 from a
+  // malformed conversation history could only ever show as a generic
+  // "The AI request failed." with nothing in the logs to explain why.
+  const upstreamMessage = body?.error?.message || body?.message || null;
+  log.error('llm', 'Messages API error', {
+    status: resp.status, code, mode,
+    upstream_message: upstreamMessage ? String(upstreamMessage).slice(0, 300) : null,
+  });
 
   // Always carry a machine-readable code so the client can render the
   // error in the user's language; 'llm_failed' is the generic fallback.
   const err = new Error(`LLM request failed (${resp.status})`);
   err.code = code || 'llm_failed';
   err.status = resp.status;
+  err.upstreamMessage = upstreamMessage ? String(upstreamMessage).slice(0, 300) : null;
   if (code === 'grant_required') {
     err.userMessage = 'RecipeBot needs your permission to use AI. Approve access when prompted, then send your message again.';
   } else if (code === 'app_cap_exceeded') {
@@ -394,6 +402,7 @@ async function streamMessage(config, params, userToken, {
       const code = evt.error?.code || evt.error?.type || '';
       const err = new Error(evt.error?.message || 'LLM stream error');
       err.code = code || 'llm_failed';
+      err.upstreamMessage = evt.error?.message ? String(evt.error.message).slice(0, 300) : null;
       if (code === 'grant_required') {
         err.userMessage = 'RecipeBot needs your permission to use AI. Approve access when prompted, then send your message again.';
       } else if (code === 'app_cap_exceeded') {
@@ -744,6 +753,15 @@ function buildSystemPrompt(preferences, currentRecipe) {
   return prompt;
 }
 
+// Sonnet 5.5 / Opus 5.5 reject forced tool_choice ({type: 'tool', ...}) with a
+// 400 whose message names tool_choice. Used by the fix-up path (chat route) to
+// retry the turn without forcing, leaning on the system prompt's standing
+// instruction to always call display_recipe.
+function isToolChoiceUnsupported(err) {
+  return !!err && err.status === 400
+    && /tool_choice/i.test(err.upstreamMessage || err.message || '');
+}
+
 function buildMessages(history) {
   return history.map((msg) => ({
     role: msg.role,
@@ -751,23 +769,25 @@ function buildMessages(history) {
   }));
 }
 
-function getCreateParams(config, messages, systemPrompt, { model, forceRecipeTool } = {}) {
+function getCreateParams(config, messages, systemPrompt, { model, fixup } = {}) {
   const resolvedModel = model || defaultModelFor(config);
   const params = {
     model: resolvedModel,
-    // 16384: a full recipe re-emit (per-ingredient grams/volume/macros) plus
-    // thinking can blow past 8192, which silently truncated the tool call.
-    max_tokens: 16384,
+    // 32768: a full recipe re-emit (per-ingredient grams/volume/macros), a
+    // multi-variant batch, plus adaptive thinking blew past 16384 and the
+    // cut-off silently dropped the display_recipe tool call (issue #108).
+    max_tokens: 32768,
     system: systemPrompt,
     tools: TOOLS,
     messages,
   };
 
-  // Fix-up turns must actually re-send the recipe: force display_recipe.
-  // Forced tool_choice is incompatible with thinking, so omit it here —
-  // a format fix doesn't need it.
-  if (forceRecipeTool) {
-    params.tool_choice = { type: 'tool', name: 'display_recipe' };
+  // Fix-up turns rely on the fix-up tool result prompt ("Please fix the
+  // issues and call display_recipe again" + schema reminder) to get
+  // display_recipe called again: the upstream rejects forced tool_choice
+  // with a 400 invalid_request_error. Thinking stays off so the retry
+  // stays quick inside the fix-up budget.
+  if (fixup) {
     return params;
   }
 
@@ -807,4 +827,5 @@ module.exports = {
   buildSystemPrompt,
   buildMessages,
   getCreateParams,
+  isToolChoiceUnsupported,
 };
