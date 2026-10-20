@@ -295,12 +295,13 @@ const CookingMode = {
   },
 
   buildTextSizeControl() {
-    const btn = 'w-7 h-7 rounded flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors text-zinc-500';
-    const group = 'rounded-lg bg-zinc-100 dark:bg-zinc-900 px-1';
+    // A plain icon button, like the close button next to it. It used to sit
+    // in its own 36px zinc chip: a single 16px semibold glyph filled that
+    // chip edge to edge, so the button read as a broken dark square. The
+    // icon now gets the same 40px hover target and weight as the close
+    // button, with the glyph a touch larger than the 14px +/- controls.
     return `
-      <div class="${group} flex items-center">
-        <button id="cm-text-size-btn" class="${btn} font-semibold" aria-label="${this.escapeHtml(t('cook.textSize'))}">Aa</button>
-      </div>`;
+      <button id="cm-text-size-btn" class="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-400 hover:text-zinc-900 dark:hover:text-white text-lg leading-6" aria-label="${this.escapeHtml(t('cook.textSize'))}">Aa</button>`;
   },
 
   bindTextSizeControl(el) {
