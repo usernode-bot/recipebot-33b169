@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { EventEmitter } = require('events');
 const { getPool } = require('../db/pool');
-const { createMessage, streamMessage, isRetryable, isEnabled, buildSystemPrompt, getCreateParams, isValidModel, resolveLocale, estimateMicrocents, LLM_IDLE_TIMEOUT_MS, LLM_MAX_TURN_MS } = require('../services/llm');
+const { createMessage, streamMessage, isRetryable, isEnabled, buildSystemPrompt, getCreateParams, resolveModel, defaultModelFor, resolveLocale, estimateMicrocents, isToolChoiceUnsupported, LLM_IDLE_TIMEOUT_MS, LLM_MAX_TURN_MS } = require('../services/llm');
 const { validate, getSchemaReminder } = require('../services/recipe-validator');
 const { fetchWebpage, MAX_CONTENT_LENGTH } = require('../services/web');
 const { webSearch, init: initSearch } = require('../services/search');
@@ -239,14 +239,14 @@ function chatRoutes(config) {
 
       // Per-user model choice (saved via the settings modal); falls back to
       // the server default for missing rows or stale/unknown saved ids.
-      let userModel = config.anthropicModel;
+      let userModel = defaultModelFor(config);
       try {
         const { rows: settingsRows } = await pool.query(
           'SELECT preferences FROM user_settings WHERE user_id = $1',
           [req.user.id]
         );
         const savedModel = settingsRows.length ? (settingsRows[0].preferences || {}).model : null;
-        if (isValidModel(savedModel)) userModel = savedModel;
+        if (savedModel) userModel = resolveModel(savedModel, userModel);
       } catch (err) {
         log.warn('chat', 'Failed to load user model preference', { message: err.message });
       }
@@ -267,12 +267,32 @@ function chatRoutes(config) {
     const replyId = parseInt(req.params.replyId);
     const after = req.query.after !== undefined ? parseInt(req.query.after) : -1;
 
+    // Listen BEFORE reading the stored events. Listening after the SELECT
+    // left a gap: anything emitted while the query ran was in neither the
+    // rows read nor the live feed, so a reload mid-reply lost it (issue #52).
+    const hadEmitter = replyEmitters.has(replyId);
+    const emitter = getOrCreateEmitter(replyId);
+    const buffer = [];
+    let onEvent = (evt) => { buffer.push(evt); };
+    let finished = false;
+    let onFinish = () => { finished = true; };
+    const eventListener = (evt) => onEvent(evt);
+    const finishListener = () => onFinish();
+    emitter.on('event', eventListener);
+    emitter.once('finish', finishListener);
+    const detach = () => {
+      emitter.removeListener('event', eventListener);
+      emitter.removeListener('finish', finishListener);
+    };
+
     try {
       const { rows } = await pool.query(
         'SELECT id, status, events FROM pending_replies WHERE id = $1 AND user_id = $2',
         [replyId, req.user.id]
       );
       if (!rows.length) {
+        detach();
+        if (!hadEmitter) cleanupEmitter(replyId);
         return res.status(404).json({ error: 'Reply not found' });
       }
 
@@ -299,50 +319,31 @@ function chatRoutes(config) {
         res.end();
       };
 
-      const emitter = getOrCreateEmitter(replyId);
-      const buffer = [];
-      let flushing = false;
-
-      const onEvent = (evt) => {
-        if (!flushing) {
-          buffer.push(evt);
-        } else {
-          try { writeSse(evt); } catch { emitter.removeListener('event', onEvent); }
-        }
-      };
-
-      let finished = false;
-      const onFinish = () => {
-        finished = true;
-        if (flushing) {
-          emitter.removeListener('event', onEvent);
-          endStream();
-        }
-      };
-
-      emitter.on('event', onEvent);
-      emitter.once('finish', onFinish);
-
-      const existingEvents = (reply.events || []).slice().sort((a, b) => a.index - b.index);
-      let maxSent = after;
-      for (const evt of existingEvents) {
-        if (evt.index > after) {
-          writeSse(evt);
-          if (evt.index > maxSent) maxSent = evt.index;
-        }
-      }
-
-      flushing = true;
-      for (const evt of buffer) {
-        if (evt.index > maxSent) {
-          writeSse(evt);
-        }
+      // Stored events and the ones buffered while the query ran overlap;
+      // send each index once, in order.
+      const pending = new Map();
+      for (const evt of [...(reply.events || []), ...buffer]) {
+        if (evt.index > after && !pending.has(evt.index)) pending.set(evt.index, evt);
       }
       buffer.length = 0;
+      let maxSent = after;
+      for (const evt of [...pending.values()].sort((a, b) => a.index - b.index)) {
+        writeSse(evt);
+        maxSent = evt.index;
+      }
+
+      onEvent = (evt) => {
+        if (evt.index <= maxSent) return;
+        try { writeSse(evt); } catch { detach(); }
+      };
+      onFinish = () => {
+        finished = true;
+        detach();
+        endStream();
+      };
 
       if (reply.status === 'done' || reply.status === 'error' || finished) {
-        emitter.removeListener('event', onEvent);
-        emitter.removeListener('finish', onFinish);
+        detach();
         if (reply.status === 'error') {
           writeSse({ event: 'error', data: { error: 'Response was interrupted' }, index: maxSent + 1 });
         } else if (reply.status === 'done') {
@@ -354,10 +355,10 @@ function chatRoutes(config) {
 
       req.on('close', () => {
         clearInterval(heartbeat);
-        emitter.removeListener('event', onEvent);
-        emitter.removeListener('finish', onFinish);
+        detach();
       });
     } catch (err) {
+      detach();
       log.error('chat', 'Stream setup error', { message: err.message });
       if (!res.headersSent) {
         res.status(500).json({ error: 'Internal server error' });
@@ -470,14 +471,14 @@ function chatRoutes(config) {
       ).catch((err) =>
         log.warn('chat', 'Failed to supersede older replies', { message: err.message }));
 
-      let userModel = config.anthropicModel;
+      let userModel = defaultModelFor(config);
       try {
         const { rows: settingsRows } = await pool.query(
           'SELECT preferences FROM user_settings WHERE user_id = $1',
           [req.user.id]
         );
         const savedModel = settingsRows.length ? (settingsRows[0].preferences || {}).model : null;
-        if (isValidModel(savedModel)) userModel = savedModel;
+        if (savedModel) userModel = resolveModel(savedModel, userModel);
       } catch (err) {
         log.warn('chat', 'Failed to load user model preference', { message: err.message });
       }
@@ -505,10 +506,45 @@ function chatRoutes(config) {
   return router;
 }
 
+// Keep the user message's response_log in step with what the client has been
+// shown, so a reload (or a restart mid-reply) renders the same progress lines
+// in the same order (issue #52). Writes run one at a time and each serializes
+// the log when it starts, so an older snapshot can never land after a newer
+// one. `save.soon()` is the throttled form for streamed deltas.
+function makeLogSaver(pool, userMsgId, responseLog) {
+  let tail = Promise.resolve();
+  let queued = null;
+  let timer = null;
+
+  const save = () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    if (queued) return queued;
+    queued = tail.then(() => {
+      queued = null;
+      // `open` is the in-memory marker for appending deltas; never persisted.
+      const json = JSON.stringify(responseLog, (k, v) => (k === 'open' ? undefined : v));
+      return pool.query('UPDATE messages SET response_log = $1::jsonb WHERE id = $2', [json, userMsgId]);
+    }).catch((err) => log.warn('chat', 'Failed to save response_log', { message: err.message }));
+    tail = queued;
+    return queued;
+  };
+
+  save.soon = () => {
+    if (!timer && !queued) timer = setTimeout(save, DELTA_FLUSH_MS);
+  };
+
+  return save;
+}
+
 async function runBackgroundStream(
   userToken, config, pool, convId, replyId, userId, userModel, preferences, send, userMsgId
 ) {
   const responseLog = [];
+  const saveLog = makeLogSaver(pool, userMsgId, responseLog);
+  const startTime = Date.now();
 
   // Log entries carry structured fields (kind/query/url/title) alongside the
   // English `text` so the client can render them in the user's language;
@@ -529,23 +565,31 @@ async function runBackgroundStream(
         });
       }
       send.delta('thinking', data.text);
+      saveLog.soon();
       return;
     }
 
-    // Prose deltas need no log entry — the turn loop pushes one
-    // {type:'text'} entry with the whole concatenated text at turn end.
+    // Prose is logged as it streams, the same way: one {type:'text'} entry
+    // per run of text, so text written after a tool call in the same turn, or
+    // before a turn failed, is kept in the order it appeared.
     if (event === 'token') {
+      if (data.text) {
+        const last = responseLog[responseLog.length - 1];
+        if (last && last.type === 'text' && last.open) {
+          last.content += data.text;
+        } else {
+          responseLog.push({ type: 'text', content: data.text, open: true });
+        }
+      }
       send.delta('token', data.text);
+      saveLog.soon();
       return;
     }
 
-    // Any other event closes the open thinking entry so a later turn starts
-    // a fresh one.
-    for (let i = responseLog.length - 1; i >= 0; i--) {
-      if (responseLog[i].type === 'thinking' && responseLog[i].open) {
-        delete responseLog[i].open;
-        break;
-      }
+    // Any other event closes the open thinking/text entries so a later turn
+    // starts fresh ones.
+    for (const entry of responseLog) {
+      if (entry.open) delete entry.open;
     }
 
     if (event === 'status') {
@@ -565,14 +609,19 @@ async function runBackgroundStream(
       // this, a timed-out reply reopened as a conversation that just stopped
       // mid-sentence, with no error and no way to retry (issue #43).
       markLastStatusFailed(responseLog);
-      responseLog.push({
+      const entry = {
         type: 'error',
         kind: data.code || 'llm_failed',
         text: data.error,
         ok: false,
-      });
+      };
+      // Structured debug detail (issue #105): rides along so a reloaded
+      // history renders the same "Details" box the live stream showed.
+      if (data.detail && typeof data.detail === 'object') entry.detail = data.detail;
+      responseLog.push(entry);
     }
     send(event, data);
+    saveLog();
   };
   trackingSend.flush = () => send.flush();
 
@@ -591,7 +640,24 @@ async function runBackgroundStream(
     const systemPrompt = buildSystemPrompt(preferences || {}, currentRecipe);
     const messages = history.map((m) => ({ role: m.role, content: m.content }));
 
-    const startTime = Date.now();
+    // A retry re-runs a conversation whose history now ends on the failed
+    // reply's own assistant rows (progress text, the failure sentinel).
+    // Current models reject a conversation ending on an assistant turn as a
+    // prefill (HTTP 400), which is what made "Try again" fail a second time
+    // and stack a generic "The AI request failed." under the first error
+    // (issue #105). A short in-memory note reopens the turn; it is never
+    // inserted into messages. New sends always end on a user row, so in
+    // practice only retries land here.
+    if (messages.length && messages[messages.length - 1].role === 'assistant') {
+      messages.push({
+        role: 'user',
+        content: '[System: The previous attempt to answer the message above failed partway through. Answer it again now.]',
+      });
+      log.info('chat', 'History ended on an assistant row — added retry note', {
+        conversationId: convId,
+        replyId,
+      });
+    }
 
     log.info('chat', 'Starting stream', {
       conversationId: convId,
@@ -602,7 +668,7 @@ async function runBackgroundStream(
     });
 
     const result = await streamWithToolHandling(
-      userToken, config, messages, systemPrompt, trackingSend, convId, pool, userId, userModel,
+      userToken, config, messages, systemPrompt, trackingSend, convId, replyId, pool, userId, userModel,
       responseLog, userMsgId
     );
 
@@ -615,11 +681,7 @@ async function runBackgroundStream(
     });
 
     sealResponseLog(responseLog);
-
-    await pool.query(
-      'UPDATE messages SET response_log = $1::jsonb WHERE id = $2',
-      [JSON.stringify(responseLog), userMsgId]
-    ).catch((err) => log.warn('chat', 'Failed to save response_log', { message: err.message }));
+    await saveLog();
 
     send('done', {});
 
@@ -628,18 +690,27 @@ async function runBackgroundStream(
       [replyId]
     );
   } catch (err) {
-    log.error('chat', 'Background stream error', { message: err.message, code: err.code, replyId });
+    // Structured failure detail (issue #105): the specific fields the failing
+    // step attached, plus the reply-level ones every failure carries.
+    const detail = {
+      code: err.code || 'llm_failed',
+      replyId,
+      conversationId: convId,
+      reply_elapsed_ms: Date.now() - startTime,
+      ...err.detail,
+    };
+    if (!err.detail) {
+      if (err.status != null) detail.upstream_status = err.status;
+      if (err.upstreamMessage) detail.upstream_message = String(err.upstreamMessage).slice(0, 300);
+    }
+    log.error('chat', 'Background stream error', {
+      message: err.message, code: err.code, replyId, conversationId: convId, detail,
+    });
     // trackingSend (not the raw sender) so the failure lands in response_log
     // and survives a reload.
-    trackingSend('error', { error: err.userMessage || 'Something went wrong', code: err.code });
+    trackingSend('error', { error: err.userMessage || 'Something went wrong', code: err.code, detail });
     sealResponseLog(responseLog);
-
-    if (responseLog.length) {
-      await pool.query(
-        'UPDATE messages SET response_log = $1::jsonb WHERE id = $2',
-        [JSON.stringify(responseLog), userMsgId]
-      ).catch(() => {});
-    }
+    if (responseLog.length) await saveLog();
 
     await pool.query(
       `UPDATE pending_replies SET status = 'error', updated_at = NOW() WHERE id = $1 AND status = 'processing'`,
@@ -740,7 +811,7 @@ function isBudgetCode(code) {
 }
 
 async function streamWithToolHandling(
-  userToken, config, messages, systemPrompt, send, convId, pool, userId, userModel,
+  userToken, config, messages, systemPrompt, send, convId, replyId, pool, userId, userModel,
   responseLog, userMsgId
 ) {
   let currentMessages = [...messages];
@@ -749,15 +820,24 @@ async function streamWithToolHandling(
   // Recipe-validation fix-up state, shared across turns: `attempts` counts
   // how many fix-up rounds we've asked the model for (bounded by
   // MAX_VALIDATION_RETRIES), `pending` marks that the NEXT LLM call is a
-  // fix-up call — it gets a tighter activity budget, forced tool_choice,
-  // and '[recipe]' logging — and `lastErrors` keeps the most recent
+  // fix-up call — it gets a tighter activity budget, a prompt asking the
+  // model to call display_recipe again, and '[recipe]' logging — and `lastErrors` keeps the most recent
   // validation errors for failure reporting.
   const fixState = { attempts: 0, pending: null, lastErrors: null };
 
   // Set once a VALID recipe reaches the client. After that, a later turn
   // timing out is a partial success — deliver what we have with a warning
   // instead of erroring the whole reply away (issue #43).
-  const replyState = { recipeDelivered: false, streamUnavailable: false };
+  // `toolChoiceUnsupported`: set once the model rejects forced tool_choice
+  // (issue #108) — the rest of this reply then never forces it again, so a
+  // second fix-up can't hit the same 400. `truncationRetried`: one-time
+  // second chance for a turn cut off at max_tokens before display_recipe ran.
+  const replyState = {
+    recipeDelivered: false,
+    streamUnavailable: false,
+    toolChoiceUnsupported: false,
+    truncationRetried: false,
+  };
   const replyStartedAt = Date.now();
 
   for (let turn = 0; turn < 5; turn++) {
@@ -765,6 +845,8 @@ async function streamWithToolHandling(
     // for 25 minutes.
     if (Date.now() - replyStartedAt > REPLY_BUDGET_MS) {
       log.warn('chat', 'Reply budget exhausted', {
+        conversationId: convId,
+        replyId,
         turn, elapsed_ms: Date.now() - replyStartedAt, budget_ms: REPLY_BUDGET_MS,
       });
       if (replyState.recipeDelivered) {
@@ -779,9 +861,10 @@ async function streamWithToolHandling(
 
     const params = getCreateParams(config, currentMessages, systemPrompt, {
       model: userModel,
-      // Fix-up turns force display_recipe via tool_choice so the model can't
-      // answer with text only and leave the spinner hanging.
-      forceRecipeTool: !!fixState.pending,
+      // Fix-up turns rely on the fix-up tool result prompt to get
+      // display_recipe called again; the turn is failed loudly below if it
+      // doesn't.
+      fixup: !!fixState.pending,
     });
 
     log.debug('chat', `Turn ${turn} request`, {
@@ -801,6 +884,8 @@ async function streamWithToolHandling(
 
     if (fixup) {
       log.info('recipe', 'Fix-up call starting', {
+        conversationId: convId,
+        replyId,
         attempt: fixup.attempt,
         max_attempts: MAX_VALIDATION_RETRIES,
         model: params.model,
@@ -811,15 +896,46 @@ async function streamWithToolHandling(
 
     let response;
     try {
-      response = await callModel(
-        config, params, userToken, budget, send, replyState, turn
-      );
+      try {
+        response = await callModel(
+          config, params, userToken, budget, send, replyState, turn
+        );
+      } catch (err) {
+        // Sonnet 5.5 / Opus 5.5 reject forced tool_choice with a 400 (issue
+        // #108). Retry the fix-up once without forcing — the system prompt
+        // already instructs the model to always call display_recipe. Only an
+        // error from this second call reaches the fix-up catch below.
+        if (fixup && !replyState.toolChoiceUnsupported && isToolChoiceUnsupported(err)) {
+          log.warn('recipe', 'Forced tool_choice rejected, retrying fix-up without it', {
+            conversationId: convId,
+            replyId,
+            attempt: fixup.attempt,
+            upstream_message: (err.upstreamMessage || err.message || '').slice(0, 300),
+          });
+          replyState.toolChoiceUnsupported = true;
+          const unforcedParams = getCreateParams(config, currentMessages, systemPrompt, {
+            model: userModel,
+            fixup: true,
+          });
+          response = await callModel(
+            config, unforcedParams, userToken, budget, send, replyState, turn
+          );
+        } else {
+          throw err;
+        }
+      }
     } catch (err) {
       if (fixup) {
+        const fixupElapsedMs = Date.now() - fixup.startedAt;
         log.error('recipe', 'Fix-up call failed', {
+          conversationId: convId,
+          replyId,
           attempt: fixup.attempt,
-          elapsed_ms: Date.now() - fixup.startedAt,
+          max_attempts: MAX_VALIDATION_RETRIES,
+          elapsed_ms: fixupElapsedMs,
+          status: err.status,
           code: err.code,
+          upstream_message: (err.upstreamMessage || err.message || '').slice(0, 300),
           error: err.message,
         });
         err.userMessage = err.code === 'timeout'
@@ -827,6 +943,35 @@ async function streamWithToolHandling(
           : err.code === 'turn_too_long'
             ? 'Fixing the recipe format is taking much longer than expected. Please try again.'
             : (err.userMessage || 'Fixing the recipe format failed. Please try again.');
+        // Structured failure detail for the error event / response_log (issue
+        // #105) — the client parks it behind a closed "Details" toggle.
+        err.detail = {
+          stage: 'fixup',
+          turn,
+          attempt: fixup.attempt,
+          max_attempts: MAX_VALIDATION_RETRIES,
+          step_elapsed_ms: fixupElapsedMs,
+          upstream_status: err.status,
+          upstream_code: err.code,
+          upstream_message: (err.upstreamMessage || err.message || '').slice(0, 300) || undefined,
+          validation_errors: (fixState.lastErrors || []).slice(0, 5).map((e) => String(e).slice(0, 200)),
+        };
+        // When the error is about to be rethrown (not the partial-delivery
+        // branch below), persist the sentinel here too so the next turn knows
+        // the edit never applied — same as the in-loop failure paths.
+        const partialDelivery = replyState.recipeDelivered
+          && (err.code === 'timeout' || err.code === 'turn_too_long');
+        if (!partialDelivery) {
+          const reason = fixState.lastErrors?.length
+            ? `Validation errors: ${fixState.lastErrors.slice(0, 3).join('; ')}.`
+            : 'The fix-up call failed before a recipe arrived.';
+          await persistRecipeFailureSentinel(pool, convId, reason, {
+            code: err.code,
+            attempt: fixup.attempt,
+            max_attempts: MAX_VALIDATION_RETRIES,
+            step_elapsed_ms: fixupElapsedMs,
+          });
+        }
       }
       // A recipe already landed this reply — keep it rather than throwing the
       // whole turn away.
@@ -849,6 +994,8 @@ async function streamWithToolHandling(
     if (fixup) {
       fixState.pending = null;
       log.info('recipe', 'Fix-up response received', {
+        conversationId: convId,
+        replyId,
         attempt: fixup.attempt,
         elapsed_ms: Date.now() - fixup.startedAt,
         stop_reason: response.stop_reason,
@@ -878,7 +1025,6 @@ async function streamWithToolHandling(
 
     let assistantText = '';
     const toolResults = [];
-    let textFlushed = false;
     // Streamed turns already pushed every text/thinking delta to the client as
     // it arrived; replaying the finished blocks here would duplicate them.
     const alreadyStreamed = !!response._streamed;
@@ -890,35 +1036,75 @@ async function streamWithToolHandling(
         assistantText += block.text;
         if (!alreadyStreamed) send('token', { text: block.text });
       } else if (block.type === 'tool_use') {
-        if (!textFlushed && assistantText) {
-          responseLog.push({ type: 'text', content: assistantText });
-          textFlushed = true;
-        }
         const toolResult = await handleToolCall(
-          block, config, currentMessages, systemPrompt, send, convId, pool, userId, responseLog,
+          block, config, currentMessages, systemPrompt, send, convId, replyId, pool, userId, responseLog,
           fixState, replyState
         );
         toolResults.push({ toolUseId: block.id, result: toolResult });
       }
     }
 
+    // The text itself is already in responseLog: trackingSend logs every
+    // 'token' event, streamed or not.
     if (assistantText) {
-      if (!textFlushed) {
-        responseLog.push({ type: 'text', content: assistantText });
-      }
       await pool.query(
         'INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)',
         [convId, 'assistant', assistantText]
       );
     }
 
-    // A fix-up turn that produced no display_recipe call (possible if an
-    // upstream proxy strips tool_choice), or any turn truncated at
+    // A turn cut off at max_tokens before display_recipe ran: retry once
+    // (issue #108) rather than failing the reply straight away. The cut-off
+    // assistant text is already on screen and in the log; the replay below
+    // keeps only its text blocks so the API accepts the new turn, and a nudge
+    // tells the model to get to the recipe. Truncation mid-tool-call produces
+    // `input = {}` instead, so calledDisplayRecipe is true there and the
+    // normal validation fix-up round handles it.
+    if (truncated && !calledDisplayRecipe && !replyState.truncationRetried) {
+      replyState.truncationRetried = true;
+      log.warn('recipe', 'Turn truncated before display_recipe — retrying once', {
+        conversationId: convId,
+        replyId,
+        turn,
+        fixup_attempt: fixup ? fixup.attempt : null,
+      });
+      send('status', { kind: 'retrying', text: 'Retrying…' });
+      const NUDGE = 'Your previous response was cut off by the output length limit before display_recipe was called. Keep any text very brief and call display_recipe now with the full recipe.';
+      const textBlocks = response.content
+        .filter((b) => b.type === 'text' && typeof b.text === 'string' && b.text.length > 0)
+        .map((b) => ({ type: 'text', text: b.text }));
+      if (textBlocks.length) {
+        // Thinking blocks are dropped: this starts a fresh user turn, not a
+        // tool-use continuation, so no signature is needed.
+        currentMessages.push({ role: 'assistant', content: textBlocks });
+        currentMessages.push({ role: 'user', content: NUDGE });
+      } else {
+        // No prose before the cut — the last message is already a user turn
+        // (the user's message or a tool_result); append the nudge to it so
+        // roles still alternate.
+        const last = currentMessages[currentMessages.length - 1];
+        if (typeof last.content === 'string') {
+          last.content = [{ type: 'text', text: last.content }];
+        }
+        last.content.push({ type: 'text', text: NUDGE });
+      }
+      // Keep the fix-up loop semantics for a cut-off fix-up turn: the next
+      // call is still a fix-up attempt (tighter budget, '[recipe]' logging).
+      if (fixup) {
+        fixState.pending = { attempt: fixup.attempt, startedAt: Date.now() };
+      }
+      continue;
+    }
+
+    // A fix-up turn that produced no display_recipe call (tool choice is not
+    // forced, so the model can answer with text only), or any turn truncated at
     // max_tokens with its display_recipe block dropped, must fail loudly —
     // ending with 'done' here is exactly the silent "Fixing recipe
     // format..." dead end.
     if (!calledDisplayRecipe && (fixup || truncated)) {
       log.error('recipe', 'Recipe reply failed without a display_recipe call', {
+        conversationId: convId,
+        replyId,
         fixup_attempt: fixup ? fixup.attempt : null,
         stop_reason: response.stop_reason,
         truncated,
@@ -928,7 +1114,14 @@ async function streamWithToolHandling(
         : (fixState.lastErrors?.length
           ? `Validation errors: ${fixState.lastErrors.slice(0, 3).join('; ')}.`
           : 'The display_recipe tool call never arrived.');
-      await failRecipeReply(pool, convId, responseLog, reason);
+      await failRecipeReply(pool, convId, responseLog, reason, {
+        turn,
+        attempt: fixup ? fixup.attempt : null,
+        max_attempts: MAX_VALIDATION_RETRIES,
+        step_elapsed_ms: fixup ? Date.now() - fixup.startedAt : null,
+        stop_reason: response.stop_reason,
+        validation_errors: fixState.lastErrors,
+      });
     }
 
     // Truncation after a completed recipe call: the recipe went through but
@@ -944,11 +1137,6 @@ async function streamWithToolHandling(
       if (send.flush) send.flush();
       return { usage: totalUsage };
     }
-
-    pool.query(
-      'UPDATE messages SET response_log = $1::jsonb WHERE id = $2',
-      [JSON.stringify(responseLog), userMsgId]
-    ).catch(() => {});
 
     currentMessages.push({
       role: 'assistant',
@@ -981,12 +1169,19 @@ async function streamWithToolHandling(
   // format..." spinner would resolve with no recipe and no explanation.
   if (fixState.pending) {
     log.error('recipe', 'Turn limit reached with recipe fix-up still pending', {
+      conversationId: convId,
+      replyId,
       attempt: fixState.pending.attempt,
     });
     const reason = fixState.lastErrors?.length
       ? `Validation errors: ${fixState.lastErrors.slice(0, 3).join('; ')}.`
       : 'The turn limit was reached before the fix-up completed.';
-    await failRecipeReply(pool, convId, responseLog, reason);
+    await failRecipeReply(pool, convId, responseLog, reason, {
+      attempt: fixState.pending.attempt,
+      max_attempts: MAX_VALIDATION_RETRIES,
+      step_elapsed_ms: Date.now() - fixState.pending.startedAt,
+      validation_errors: fixState.lastErrors,
+    });
   }
 
   return { usage: totalUsage };
@@ -1009,18 +1204,47 @@ function markLastStatusFailed(responseLog, kind = null) {
   }
 }
 
-async function failRecipeReply(pool, convId, responseLog, reason) {
-  markLastStatusFailed(responseLog, 'fixup');
+// Debug trailer on the failure sentinel, e.g.
+// " (code: recipe_fixup_failed, attempt 2 of 2, after 38s)" — issue #105.
+function failureTrailer(info) {
+  const parts = [`code: ${info?.code || 'recipe_fixup_failed'}`];
+  if (info?.attempt != null) {
+    parts.push(`attempt ${info.attempt}${info.max_attempts != null ? ` of ${info.max_attempts}` : ''}`);
+  }
+  if (info?.step_elapsed_ms != null) parts.push(`after ${Math.round(info.step_elapsed_ms / 1000)}s`);
+  return parts.length ? ` (${parts.join(', ')})` : '';
+}
+
+// Record the assistant-side sentinel row that tells the model's next turn the
+// edit never applied. Kept separate from failRecipeReply so the fix-up-catch
+// path (an LLM failure mid "Fixing recipe format...") can persist it too.
+async function persistRecipeFailureSentinel(pool, convId, reason, info) {
   await pool.query(
     'INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)',
     [convId, 'assistant',
-      `[Recipe update FAILED — display_recipe was not called successfully. ${reason} ` +
+      `[Recipe update FAILED — display_recipe was not called successfully.${failureTrailer(info)} ${reason} ` +
       'The current recipe is unchanged; you must call display_recipe with the full corrected recipe on your next turn.]']
   ).catch((err) => log.warn('chat', 'Failed to persist recipe-failure sentinel', { message: err.message }));
+}
+
+async function failRecipeReply(pool, convId, responseLog, reason, info = {}) {
+  markLastStatusFailed(responseLog, 'fixup');
+  await persistRecipeFailureSentinel(pool, convId, reason, info);
 
   const err = new Error('Recipe fix-up failed');
   err.code = 'recipe_fixup_failed';
   err.userMessage = "I couldn't apply the changes to the recipe — the update didn't come through correctly. Please try asking again.";
+  // Structured detail for the error event / response_log (issue #105).
+  err.detail = {
+    stage: 'fixup',
+    turn: info.turn,
+    attempt: info.attempt,
+    max_attempts: info.max_attempts,
+    step_elapsed_ms: info.step_elapsed_ms,
+    stop_reason: info.stop_reason,
+    reason,
+    validation_errors: (info.validation_errors || []).slice(0, 5).map((e) => String(e).slice(0, 200)),
+  };
   throw err;
 }
 
@@ -1039,7 +1263,7 @@ function recordUsage(pool, userId, model, usage) {
   ).catch((err) => log.warn('chat', 'Failed to record llm usage', { message: err.message }));
 }
 
-async function handleToolCall(block, config, messages, systemPrompt, send, convId, pool, userId, responseLog, fixState, replyState) {
+async function handleToolCall(block, config, messages, systemPrompt, send, convId, replyId, pool, userId, responseLog, fixState, replyState) {
   const lastEntry = () => responseLog[responseLog.length - 1];
 
   if (block.name === 'web_search') {
@@ -1076,13 +1300,13 @@ async function handleToolCall(block, config, messages, systemPrompt, send, convI
   }
 
   if (block.name === 'display_recipe') {
-    return await handleRecipeDisplay(block.input, send, convId, pool, userId, fixState, replyState);
+    return await handleRecipeDisplay(block.input, send, convId, replyId, pool, userId, fixState, replyState);
   }
 
   return 'Unknown tool';
 }
 
-async function handleRecipeDisplay(recipeData, send, convId, pool, userId, fixState, replyState) {
+async function handleRecipeDisplay(recipeData, send, convId, replyId, pool, userId, fixState, replyState) {
   const recipe = recipeData;
   const { valid, errors } = validate(recipe);
 
@@ -1108,7 +1332,12 @@ async function handleRecipeDisplay(recipeData, send, convId, pool, userId, fixSt
     return 'Recipe displayed successfully.';
   }
 
-  log.warn('recipe', 'Validation failed', { attempt: fixState.attempts, errors });
+  log.warn('recipe', 'Validation failed', {
+    conversationId: convId,
+    replyId,
+    attempt: fixState.attempts,
+    errors,
+  });
 
   if (fixState.attempts < MAX_VALIDATION_RETRIES) {
     fixState.attempts += 1;
@@ -1116,6 +1345,8 @@ async function handleRecipeDisplay(recipeData, send, convId, pool, userId, fixSt
     fixState.lastErrors = errors;
     send('status', { text: 'Fixing recipe format...', kind: 'fixup' });
     log.warn('recipe', 'Requesting fix-up from model', {
+      conversationId: convId,
+      replyId,
       attempt: fixState.attempts,
       max_attempts: MAX_VALIDATION_RETRIES,
       errors,

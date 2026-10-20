@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const { getPool } = require('../db/pool');
-const { isEnabled, llmMode, MODELS, DEFAULT_MODEL, isValidModel } = require('../services/llm');
+const { isEnabled, llmMode, MODELS, RETIRED_MODELS, isValidModel, resolveModel, defaultModelFor } = require('../services/llm');
 const log = require('../services/logger');
 
 // Identity comes from the platform JWT (see src/middleware/auth.js).
@@ -16,8 +16,10 @@ function authRoutes(config) {
         [req.user.id]
       );
       const prefs = rows.length ? rows[0].preferences || {} : {};
-      const defaultModel = isValidModel(config.anthropicModel) ? config.anthropicModel : DEFAULT_MODEL;
-      const effectiveModel = isValidModel(prefs.model) ? prefs.model : defaultModel;
+      const defaultModel = defaultModelFor(config);
+      // A saved pick of a retired model resolves to its successor; anything
+      // else unknown falls back to the default.
+      const effectiveModel = prefs.model ? resolveModel(prefs.model, defaultModel) : defaultModel;
       res.json({
         user: {
           id: req.user.id,
@@ -77,7 +79,12 @@ function authRoutes(config) {
     // user setting (the JWT locale claim); any client-sent value is ignored.
     const { diet, complexity, serving, tempUnit, model } = req.body;
 
-    if (model != null && !isValidModel(model)) {
+    // A retired id (a page loaded before the model list changed) saves as
+    // its successor rather than failing the whole preferences save.
+    const knownModel =
+      model != null &&
+      (isValidModel(model) || Object.prototype.hasOwnProperty.call(RETIRED_MODELS, model));
+    if (model != null && !knownModel) {
       return res.status(400).json({ error: 'Unknown model' });
     }
 
@@ -87,7 +94,7 @@ function authRoutes(config) {
       serving: serving || 'normal',
       tempUnit: tempUnit === 'F' ? 'F' : 'C',
     };
-    if (isValidModel(model)) prefs.model = model;
+    if (knownModel) prefs.model = resolveModel(model);
 
     try {
       await pool.query(
