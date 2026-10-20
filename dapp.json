@@ -96,6 +96,11 @@
       "expectText": "Staging Demo Chicken Stir Fry"
     },
     {
+      "name": "Community recipe card shows total time and servings",
+      "path": "/",
+      "expectText": "Total: 25 min · Serves 4"
+    },
+    {
       "name": "Homepage shows creator username",
       "path": "/",
       "expectText": "staging-demo-chef"
