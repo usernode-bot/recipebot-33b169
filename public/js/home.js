@@ -348,10 +348,42 @@ const Home = {
     return btn;
   },
 
+  // "20 min", "1 hr 30 min", "1 Std." → minutes. Only plain whole-number
+  // amounts count; ranges, decimals and free text ("overnight") return null,
+  // so the card simply shows no Total for them (issue #123). Unit words cover
+  // the five languages recipes are written in.
+  _parseMinutes(str) {
+    if (typeof str !== 'string') return null;
+    const s = str.trim().toLowerCase();
+    if (!s) return null;
+    const HOUR = '(\\d+)\\s*(?:h|hr|hrs|hour|hours|std|stunde|stunden|heure|heures|hora|horas|jam)\\.?';
+    const MIN = '(\\d+)\\s*(?:m|min|mins|minute|minutes|minuten|minuto|minutos|menit)\\.?';
+    let m = s.match(new RegExp(`^${HOUR}\\s*(?:${MIN})?$`));
+    if (m) return parseInt(m[1], 10) * 60 + (m[2] ? parseInt(m[2], 10) : 0);
+    m = s.match(new RegExp(`^${MIN}$`));
+    if (m) return parseInt(m[1], 10);
+    return null;
+  },
+
+  _formatMinutes(n) {
+    if (n < 60) return `${n} min`;
+    const h = Math.floor(n / 60);
+    const m = n % 60;
+    return m > 0 ? `${h} h ${m} min` : `${h} h`;
+  },
+
   _metaLine(recipe) {
     const bits = [];
     if (recipe.prep_time) bits.push(t('card.prep', { t: this.esc(recipe.prep_time) }));
     if (recipe.cook_time) bits.push(t('card.cook', { t: this.esc(recipe.cook_time) }));
+    const prep = this._parseMinutes(recipe.prep_time);
+    const cook = this._parseMinutes(recipe.cook_time);
+    if (prep !== null && cook !== null && prep + cook > 0) {
+      bits.push(t('card.total', { t: this._formatMinutes(prep + cook) }));
+    }
+    if (Number.isInteger(recipe.default_servings) && recipe.default_servings > 0) {
+      bits.push(t('card.serves', { n: recipe.default_servings }));
+    }
     return bits.join(' · ');
   },
 
@@ -926,6 +958,14 @@ const Home = {
         <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${srcBit} · ${t('card.addedBy', { name: this.esc(item.added_by_username) })}</p>`;
     el.appendChild(meta);
     if (recipe.description) el.appendChild(this._description(recipe.description));
+
+    const metaLine = this._metaLine(recipe);
+    if (metaLine) {
+      const metaEl = document.createElement('p');
+      metaEl.className = 'text-xs text-zinc-400 dark:text-zinc-500';
+      metaEl.innerHTML = metaLine;
+      el.appendChild(metaEl);
+    }
 
     const actions = document.createElement('div');
     actions.className = 'flex flex-wrap items-center gap-2 mt-auto pt-1';
