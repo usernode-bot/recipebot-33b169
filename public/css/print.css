@@ -10,6 +10,7 @@
   #mobile-tabs,
   #save-recipe-btn,
   .servings-btn,
+  #cooking-overlay,
   button {
     display: none !important;
   }
@@ -25,10 +26,55 @@
     display: none !important;
   }
 
+  /* Everything on the recipe view that is not the recipe itself
+     (issue #98: title, ingredients and numbered steps only).
+     Blocks rendered by recipe.js carry .print-hide: description, tag
+     chips, playlist suggestion, macro pills, °C/°F toggle, version
+     banner. The social section (made-it, comments, remixes) is an id. */
+  .print-hide,
+  #social-section,
+  .step-timer-inline,
+  .ing-actions,
+  .ingredient-check,
+  .ing-macros-summary-toggle,
+  .ing-macro,
+  .summary-chevron {
+    display: none !important;
+  }
+
   body {
     background: white !important;
     color: black !important;
     font-size: 12pt;
+  }
+
+  /* Subtle decorative glow (app.css body::before) must not tint the paper. */
+  body::before {
+    display: none !important;
+  }
+
+  /* Faint screen grays wash out on paper; darken the recipe's secondary
+     text (amounts, step headings' helpers) so the printout reads well. */
+  #recipe-display .text-zinc-400,
+  #recipe-display .text-zinc-500,
+  #recipe-display .text-zinc-600 {
+    color: #444 !important;
+  }
+
+  /* Accent-tinted text (the step's °C/°F figure) prints black: the accent
+     is a screen device, and colored ink on paper adds nothing here. */
+  #recipe-display .text-orange-500,
+  #recipe-display .text-orange-400 {
+    color: black !important;
+  }
+
+  /* Cream control chips (servings count, scale label) become plain text
+     with a hairline instead of a tinted pill. */
+  #recipe-display .bg-zinc-100,
+  #recipe-display .bg-zinc-100\/70,
+  #recipe-display .bg-zinc-900,
+  #recipe-display .bg-zinc-900\/50 {
+    background: white !important;
   }
 
   #recipe-panel {
@@ -49,20 +95,57 @@
     display: none !important;
   }
 
+  /* The collapsible "All Ingredients (N)" summary prints as the
+     ingredients heading with its list forced open underneath. */
   details {
     display: block !important;
   }
 
-  details[open] summary {
-    display: none;
-  }
-
-  details summary {
-    display: none;
+  #recipe-display details > summary {
+    display: flex !important;
   }
 
   details > div {
     display: block !important;
+  }
+
+  /* Print only needs name + amount; drop the empty grid columns the
+     actions and macros leave behind. Pin display:grid — print emulation
+     re-evaluates app.css's narrow-panel container query, which must not
+     win the cascade. */
+  .summary-grid {
+    display: grid !important;
+    grid-template-columns: minmax(0, max-content) auto !important;
+    column-gap: 1.25rem;
+  }
+
+  .ing-summary {
+    background: none !important;
+  }
+
+  /* Notes keep their box on paper, but as a plain bordered block. */
+  .print-plain {
+    background: white !important;
+    border: 1pt solid #ddd !important;
+    padding: 0.75rem 1rem !important;
+  }
+
+  /* Steps print as a clean numbered list: paper background, a light
+     rule around each step, and no step broken across two pages. */
+  .step-card {
+    background: white !important;
+    border: 1pt solid #ddd !important;
+    break-inside: avoid;
+  }
+
+  .step-number {
+    background: none !important;
+    color: black !important;
+    border: 1.5pt solid black;
+  }
+
+  #recipe-display h2 {
+    break-after: avoid;
   }
 
   .diff-removed,
