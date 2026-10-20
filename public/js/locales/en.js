@@ -309,6 +309,9 @@ I18N.register('en', {
   'recipe.removeIngredient': 'Remove ingredient',
   'recipe.substituteIngredient': 'Substitute ingredient',
   'recipe.cookedTimes': 'cooked {n}×',
+  'recipe.shoppingList': 'Shopping list',
+  'recipe.shoppingListTitle': 'Copy all ingredients as one shopping list',
+  'recipe.shoppingListCopied': 'Shopping list copied',
 
   // ── Diff view ──
   'diff.modified': 'Recipe modified',

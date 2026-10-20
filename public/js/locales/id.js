@@ -283,6 +283,9 @@ I18N.register('id', {
   'recipe.removeIngredient': 'Hapus bahan',
   'recipe.substituteIngredient': 'Ganti bahan',
   'recipe.cookedTimes': 'dimasak {n}×',
+  'recipe.shoppingList': 'Daftar belanja',
+  'recipe.shoppingListTitle': 'Salin semua bahan sebagai daftar belanja',
+  'recipe.shoppingListCopied': 'Daftar belanja disalin',
 
   'diff.modified': 'Resep diubah',
   'diff.accept': 'Terima',

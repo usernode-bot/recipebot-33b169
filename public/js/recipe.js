@@ -159,6 +159,7 @@ const Recipe = {
               </label>
             </div>
           </div>
+          <button id="shopping-list-btn" title="${this.escapeHtml(t('recipe.shoppingListTitle'))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.shoppingList')}</button>
           <button id="print-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.print')}</button>
         </div>
 
@@ -841,6 +842,8 @@ const Recipe = {
     display.querySelector('#export-json')?.addEventListener('click', () => { this.exportJSON(recipe); closeExport(); });
     display.querySelector('#import-json-input')?.addEventListener('change', (e) => { this.importJSON(e); closeExport(); });
 
+    display.querySelector('#shopping-list-btn')?.addEventListener('click', () => this.copyShoppingList(recipe));
+
     display.querySelector('#print-btn')?.addEventListener('click', () => window.print());
 
     // Step timer buttons
@@ -1169,6 +1172,44 @@ const Recipe = {
     const md = this._buildMarkdown(recipe, servings, scale, macros);
 
     navigator.clipboard.writeText(md).then(() => UI.toast(t('common.copied')));
+  },
+
+  // ── Shopping list ─────────────────────────────────────────────
+
+  // One copyable list of everything to buy: ingredients aggregated by name
+  // across steps (a from_step entry is the output of an earlier step, not
+  // something to shop for), amounts scaled to the current servings/scale.
+  // Volume is summed when the units match, otherwise the first entry wins.
+  buildShoppingListText(recipe) {
+    const scale = this.scaleFor(recipe);
+    const totals = new Map();
+    recipe.steps.forEach((step) => {
+      (step.ingredients || []).forEach((ing) => {
+        if (ing.from_step) return;
+        const tot = totals.get(ing.name) || { grams: 0, volume: null };
+        tot.grams += ing.grams * scale;
+        if (ing.volume) {
+          if (tot.volume && tot.volume.unit === ing.volume.unit) {
+            tot.volume = { amount: tot.volume.amount + ing.volume.amount * scale, unit: ing.volume.unit };
+          } else if (!tot.volume) {
+            tot.volume = { amount: ing.volume.amount * scale, unit: ing.volume.unit };
+          }
+        }
+        totals.set(ing.name, tot);
+      });
+    });
+
+    let text = `${t('recipe.shoppingList')}: ${recipe.title}\n\n`;
+    totals.forEach((tot, name) => {
+      const vol = tot.volume ? ` (${this.friendlyFraction(tot.volume.amount)} ${tot.volume.unit})` : '';
+      text += `- ${name}, ${Math.round(tot.grams)}g${vol}\n`;
+    });
+    return text;
+  },
+
+  copyShoppingList(recipe) {
+    const text = this.buildShoppingListText(recipe);
+    navigator.clipboard.writeText(text).then(() => UI.toast(t('recipe.shoppingListCopied')));
   },
 
   importJSON(event) {

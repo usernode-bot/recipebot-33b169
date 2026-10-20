@@ -161,6 +161,24 @@
       "expectSelector": "#print-btn"
     },
     {
+      "name": "Recipe page shows a Shopping list action",
+      "path": "/?c=900003",
+      "expectSelector": "#shopping-list-btn"
+    },
+    {
+      "id": "recipe.shopping-list",
+      "name": "Shopping list button renders on a recipe",
+      "path": "/?c=900003",
+      "expectSelector": "#shopping-list-btn",
+      "visual": true,
+      "impact": ["public/js/recipe.js", "public/js/locales/*.js"]
+    },
+    {
+      "name": "Shared recipe page shows a Shopping list action",
+      "path": "/?s=900001",
+      "expectSelector": "#shopping-list-btn"
+    },
+    {
       "name": "Print action is reachable on mobile recipe tab",
       "path": "/?c=900003 @mobile",
       "expectSelector": "#recipe-panel:not(.panel-hidden) #print-btn"
