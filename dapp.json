@@ -356,6 +356,25 @@
       "expectText": "400g"
     },
     {
+      "id": "recipe.servings-dropdown",
+      "name": "Recipe servings dropdown defaults to the recipe's own count",
+      "path": "/?c=900003",
+      "expectSelector": "#servings-select option[value=\"4\"]:checked",
+      "visual": true,
+      "impact": ["public/js/recipe.js"]
+    },
+    {
+      "name": "Servings dropdown scales ingredient amounts",
+      "path": "/?c=900003&servings=8",
+      "expectSelector": "#servings-select option[value=\"8\"]:checked",
+      "expectText": "800g"
+    },
+    {
+      "name": "Ingredients with no amount stay unscaled",
+      "path": "/?c=900003&servings=8",
+      "expectSelector": "#recipe-display .ing-unscaled"
+    },
+    {
       "name": "Recipe deep link opens recipe tab on mobile",
       "path": "/?c=900003 @mobile",
       "expectSelector": "#recipe-panel:not(.panel-hidden) #cook-btn"
