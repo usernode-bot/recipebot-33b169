@@ -67,6 +67,8 @@ I18N.register('es', {
   'card.newConversation': 'Nueva conversación',
   'card.prep': 'Prep: {t}',
   'card.cook': 'Cocción: {t}',
+  'card.total': 'Total: {t}',
+  'card.serves': 'Para {n}',
   'card.comments_one': '{n} comentario',
   'card.comments_other': '{n} comentarios',
   'card.remixes_one': '{n} remix',

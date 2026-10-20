@@ -348,10 +348,47 @@ const Home = {
     return btn;
   },
 
+  // Parses a free-form prep/cook time string ("20 min", "1 hr 30 min",
+  // "1 Std.") into minutes, or null when it isn't a plain amount — ranges
+  // ("10-15 min"), decimals ("1.5 hours") and words ("overnight") stay
+  // unparsed so the card keeps showing the raw Prep/Cook labels. Recipes are
+  // written in the user's language, so the unit words of all five locales
+  // are understood; trailing dots ("Std.") are allowed.
+  _parseMinutes(str) {
+    if (typeof str !== 'string') return null;
+    const s = str.trim();
+    if (!s) return null;
+    const H = '(?:hours|hour|hrs|hr|stunden|stunde|std|heures|heure|horas|hora|jam|h)';
+    const M = '(?:minutes|minuten|minutos|minute|minuto|menit|mins|min|m)';
+    const hoursMin = new RegExp('^(\\d+)\\s*' + H + '\\.?(?:\\s+(\\d+)\\s*' + M + '\\.?)?$', 'i');
+    const m = s.match(hoursMin);
+    if (m) return parseInt(m[1], 10) * 60 + (m[2] ? parseInt(m[2], 10) : 0);
+    const onlyMin = new RegExp('^(\\d+)\\s*' + M + '\\.?$', 'i');
+    const m2 = s.match(onlyMin);
+    return m2 ? parseInt(m2[1], 10) : null;
+  },
+
+  // "45 min", "2 h" or "1 h 30 min" — short units that read the same in all
+  // five supported languages.
+  _formatMinutes(n) {
+    if (n < 60) return `${n} min`;
+    const h = Math.floor(n / 60);
+    const m = n % 60;
+    return m > 0 ? `${h} h ${m} min` : `${h} h`;
+  },
+
   _metaLine(recipe) {
     const bits = [];
     if (recipe.prep_time) bits.push(t('card.prep', { t: this.esc(recipe.prep_time) }));
     if (recipe.cook_time) bits.push(t('card.cook', { t: this.esc(recipe.cook_time) }));
+    const prep = this._parseMinutes(recipe.prep_time);
+    const cook = this._parseMinutes(recipe.cook_time);
+    if (prep != null && cook != null && prep + cook > 0) {
+      bits.push(t('card.total', { t: this._formatMinutes(prep + cook) }));
+    }
+    if (Number.isInteger(recipe.default_servings) && recipe.default_servings > 0) {
+      bits.push(t('card.serves', { n: recipe.default_servings }));
+    }
     return bits.join(' · ');
   },
 
@@ -926,6 +963,14 @@ const Home = {
         <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${srcBit} · ${t('card.addedBy', { name: this.esc(item.added_by_username) })}</p>`;
     el.appendChild(meta);
     if (recipe.description) el.appendChild(this._description(recipe.description));
+
+    const metaLine = this._metaLine(recipe);
+    if (metaLine) {
+      const metaEl = document.createElement('p');
+      metaEl.className = 'text-xs text-zinc-400 dark:text-zinc-500';
+      metaEl.innerHTML = metaLine;
+      el.appendChild(metaEl);
+    }
 
     const actions = document.createElement('div');
     actions.className = 'flex flex-wrap items-center gap-2 mt-auto pt-1';
