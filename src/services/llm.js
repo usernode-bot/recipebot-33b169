@@ -552,6 +552,7 @@ When calling display_recipe, every step must include:
 - description: Full step instructions
 - temperature_f: oven/cooking temperature in Fahrenheit (or null)
 - ingredients: array with name, grams, volume {amount, unit}, and macros {calories, protein_g, carbs_g, fat_g, fiber_g} for each
+  (an ingredient with no measurable amount, like salt to taste, uses grams 0 and volume {amount: 0, unit: "to taste"})
 
 Also include at the top level: version (always 1), title, description, default_servings, prep_time, cook_time, and notes if relevant.
 

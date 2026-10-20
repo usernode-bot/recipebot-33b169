@@ -59,11 +59,10 @@ const CookingMode = {
       if (step.ingredients?.length) {
         ingsHtml = '<div class="ing-grid mt-4 ml-1 pl-4 border-l-2 border-zinc-200 dark:border-zinc-800">';
         step.ingredients.forEach((ing) => {
-          const g = Math.round(ing.grams * scale);
-          const vol = Recipe ? Recipe.formatVolume(ing.volume, scale) : '';
+          const amount = Recipe ? Recipe.formatAmount(ing, scale) : `${Math.round(ing.grams * scale)}g`;
           ingsHtml += `
             <span class="text-zinc-600 dark:text-zinc-400 text-lg">${this.escapeHtml(ing.name)}</span>
-            <span class="text-zinc-400 dark:text-zinc-500 tabular-nums text-base">${g}g${vol ? ` · ${vol}` : ''}</span>`;
+            <span class="text-zinc-400 dark:text-zinc-500 tabular-nums text-base">${this.escapeHtml(amount)}</span>`;
         });
         ingsHtml += '</div>';
       }

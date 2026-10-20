@@ -189,7 +189,27 @@ const DEMO_RECIPE_2 = {
 
 // Edited-recipe variants for the issue #16 regression seeds — distinct
 // titles so the dapp.json tests (and testers) can tell the two apart.
-const DEMO_RECIPE_ACCEPTED = { ...DEMO_RECIPE_2, title: 'Staging Demo Accepted Tofu Stir Fry' };
+// It also carries a "to taste" ingredient (no numeric amount) so the
+// servings dropdown's "leave unscaled" case is visible (request #121).
+const DEMO_RECIPE_ACCEPTED = {
+  ...DEMO_RECIPE_2,
+  title: 'Staging Demo Accepted Tofu Stir Fry',
+  steps: [
+    {
+      ...DEMO_RECIPE_2.steps[0],
+      ingredients: [
+        ...DEMO_RECIPE_2.steps[0].ingredients,
+        {
+          name: 'black pepper',
+          grams: 0,
+          volume: { amount: 0, unit: 'to taste' },
+          macros: { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 },
+        },
+      ],
+    },
+    ...DEMO_RECIPE_2.steps.slice(1),
+  ],
+};
 const DEMO_RECIPE_PENDING = { ...DEMO_RECIPE_2, title: 'Staging Demo Pending Tofu Stir Fry' };
 // Issue #24 regression variants: a conversation where an older proposal was
 // left undecided and a newer one was accepted, and one whose decision is

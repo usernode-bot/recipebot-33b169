@@ -104,11 +104,9 @@ const Recipe = {
         <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
           <div class="flex items-center gap-2">
             <span class="text-zinc-400 dark:text-zinc-500">${t('recipe.servings')}</span>
-            <div class="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 rounded-lg px-1 py-0.5">
-              <button class="servings-btn w-6 h-6 rounded flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors text-zinc-500" data-delta="-1">&minus;</button>
-              <span id="servings-count" class="font-semibold w-5 text-center text-sm">${servings}</span>
-              <button class="servings-btn w-6 h-6 rounded flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors text-zinc-500" data-delta="1">+</button>
-            </div>
+            <select id="servings-select" aria-label="${this.escapeHtml(t('recipe.servings'))}" class="font-semibold text-sm tabular-nums bg-zinc-100 dark:bg-zinc-900 rounded-lg pl-2 pr-1 py-1 cursor-pointer border-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+              ${this.servingsOptions(recipe).map((n) => `<option value="${n}"${n === servings ? ' selected' : ''}>${n}</option>`).join('')}
+            </select>
           </div>
           <div class="flex items-center gap-2">
             <span class="text-zinc-400 dark:text-zinc-500">${t('recipe.scale')}</span>
@@ -793,13 +791,12 @@ const Recipe = {
     display.querySelector('#history-btn')?.addEventListener('click', () => this.openVersionHistory());
     display.querySelector('#version-back-current')?.addEventListener('click', () => this.backToCurrentVersion());
 
-    display.querySelectorAll('.servings-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const delta = parseInt(btn.dataset.delta);
-        this.currentServings = Math.max(1, (this.currentServings || recipe.default_servings) + delta);
-        this.display(App.currentRecipe);
-        this.saveUIStateToServer();
-      });
+    display.querySelector('#servings-select')?.addEventListener('change', (e) => {
+      const n = parseInt(e.target.value, 10);
+      if (!n) return;
+      this.currentServings = n;
+      this.display(App.currentRecipe);
+      this.saveUIStateToServer();
     });
 
     display.querySelectorAll('.scale-btn').forEach((btn) => {
@@ -1259,8 +1256,7 @@ const Recipe = {
         : t('recipe.step', { n: i + 1 });
       html += `<div class="text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider summary-grid-header">${stepLabel}</div>`;
       step.ingredients.forEach((ing) => {
-        const g = Math.round(ing.grams * scale);
-        const vol = this.formatVolume(ing.volume, scale);
+        const amount = this.formatAmount(ing, scale);
         const key = `${i}-${ing.name}`;
         const escapedName = this.escapeHtml(ing.name);
         const fromStep = ing.from_step;
@@ -1282,7 +1278,7 @@ const Recipe = {
               <input type="checkbox" class="ingredient-check" data-key="${this.escapeHtml(key)}">
               <span class="ing-name text-sm">${escapedName}${fromStep ? ` <span class="text-zinc-400 dark:text-zinc-600 text-xs italic">${t('recipe.prevStep')}</span>` : ''}</span>
             </label>
-            <span class="ing-amt text-zinc-400 dark:text-zinc-500 tabular-nums text-xs py-0.5">${g}g${vol ? ` · ${vol}` : ''}</span>
+            <span class="ing-amt text-zinc-400 dark:text-zinc-500 tabular-nums text-xs py-0.5">${this.escapeHtml(amount)}</span>
             <span class="ing-actions flex items-center gap-0.5 py-0.5">
               <button class="ing-remove p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-zinc-300 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 transition-colors" data-name="${escapedName}" title="${this.escapeHtml(t('recipe.removeIngredient'))}">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="-2 -2 28 28"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -1322,11 +1318,9 @@ const Recipe = {
     if (step.ingredients?.length) {
       ingredientsHtml = '<div class="ing-grid mt-3 ml-1 pl-3 border-l-2 border-zinc-200 dark:border-zinc-800">';
       step.ingredients.forEach((ing) => {
-        const g = Math.round(ing.grams * scale);
-        const vol = this.formatVolume(ing.volume, scale);
         ingredientsHtml += `
           <span class="text-zinc-600 dark:text-zinc-400 text-sm">${this.escapeHtml(ing.name)}</span>
-          <span class="text-zinc-400 dark:text-zinc-500 tabular-nums text-xs">${g}g${vol ? ` · ${vol}` : ''}</span>`;
+          <span class="${this.hasAmount(ing) ? '' : 'ing-unscaled '}text-zinc-400 dark:text-zinc-500 tabular-nums text-xs">${this.escapeHtml(this.formatAmount(ing, scale))}</span>`;
       });
       ingredientsHtml += '</div>';
     }
@@ -1376,6 +1370,30 @@ const Recipe = {
   scaleFor(recipe) {
     const base = recipe?.default_servings || 1;
     return (this.servingsFor(recipe) / base) * (this.servingScale || 1);
+  },
+
+  // Choices for the servings dropdown: 1 to 12, extended to cover the
+  // recipe's own count and whatever is currently selected (a deep link or
+  // cooking mode's stepper can go past 12).
+  servingsOptions(recipe) {
+    const max = Math.max(12, recipe?.default_servings || 1, this.servingsFor(recipe));
+    return Array.from({ length: max }, (_, i) => i + 1);
+  },
+
+  // "400g · 1½ cup" for an ingredient at the given scale. An ingredient with
+  // no numeric amount ("salt, to taste": grams 0, volume amount 0) shows its
+  // unit as written instead of "0g · 0 to taste", so scaling leaves it alone.
+  formatAmount(ing, scale) {
+    const g = Math.round((ing.grams || 0) * scale);
+    const hasVolume = ing.volume && ing.volume.amount > 0;
+    const vol = hasVolume ? this.formatVolume(ing.volume, scale) : '';
+    if (!this.hasAmount(ing)) return ing.volume?.unit || '';
+    if (!ing.grams) return vol;
+    return `${g}g${vol ? ` · ${vol}` : ''}`;
+  },
+
+  hasAmount(ing) {
+    return ing.grams > 0 || (ing.volume && ing.volume.amount > 0);
   },
 
   scaleLabel() {
