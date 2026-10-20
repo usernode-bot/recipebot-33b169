@@ -79,7 +79,7 @@ const Recipe = {
 
     // Tag chips on the recipe view (from the recipe JSON).
     const tagChipsHtml = (recipe.tags && recipe.tags.length)
-      ? `<div class="flex flex-wrap gap-1 mt-2">${recipe.tags.slice(0, 8).map((t) =>
+      ? `<div class="print-hide flex flex-wrap gap-1 mt-2">${recipe.tags.slice(0, 8).map((t) =>
           `<span class="px-2 py-0.5 text-[11px] rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">${this.escapeHtml(t)}</span>`
         ).join('')}</div>`
       : '';
@@ -89,7 +89,7 @@ const Recipe = {
     if (App.viewingVersion && App.viewingShared &&
         App.viewingVersion.version !== App.viewingShared.current_version) {
       versionBannerHtml = `
-        <div class="flex items-center justify-between gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+        <div class="print-hide flex items-center justify-between gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
           <span class="text-sm font-medium text-blue-800 dark:text-blue-200">${t('version.viewing', { v: App.viewingVersion.version, cur: App.viewingShared.current_version })}</span>
           <button id="version-back-current" class="shrink-0 px-3 py-1 text-sm rounded-lg bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors">${t('version.backToCurrent')}</button>
         </div>`;
@@ -101,8 +101,9 @@ const Recipe = {
         <div>
           <h2 class="text-2xl font-bold tracking-tight">${this.escapeHtml(recipe.title)}</h2>
           ${bylineHtml}
-          ${recipe.description ? `<p class="text-zinc-500 dark:text-zinc-400 text-sm mt-1.5 leading-relaxed">${this.renderInline(recipe.description)}</p>` : ''}
+          ${recipe.description ? `<p class="print-hide text-zinc-500 dark:text-zinc-400 text-sm mt-1.5 leading-relaxed">${this.renderInline(recipe.description)}</p>` : ''}
           ${tagChipsHtml}
+          ${this.playlistHtml(recipe)}
         </div>
 
         <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
@@ -123,7 +124,7 @@ const Recipe = {
             </div>
           </div>
           ${timeInfo ? `<span class="text-zinc-400 dark:text-zinc-500">${timeInfo}</span>` : ''}
-          <div id="temp-toggle" class="flex text-xs rounded-full bg-zinc-100 dark:bg-zinc-900 overflow-hidden cursor-pointer select-none">
+          <div id="temp-toggle" class="print-hide flex text-xs rounded-full bg-zinc-100 dark:bg-zinc-900 overflow-hidden cursor-pointer select-none">
             <span class="px-2.5 py-1 rounded-full transition-all ${this.useCelsius ? 'bg-blue-200 dark:bg-blue-700/40 text-blue-800 dark:text-blue-100 font-medium shadow-sm' : 'text-zinc-400 dark:text-zinc-500'}">°C</span>
             <span class="px-2.5 py-1 rounded-full transition-all ${!this.useCelsius ? 'bg-blue-200 dark:bg-blue-700/40 text-blue-800 dark:text-blue-100 font-medium shadow-sm' : 'text-zinc-400 dark:text-zinc-500'}">°F</span>
           </div>
@@ -132,7 +133,7 @@ const Recipe = {
           </button>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="print-hide flex flex-wrap items-center gap-2">
           <span class="text-xs text-zinc-400 dark:text-zinc-500">${t('recipe.perServing')}${ss !== 1.0 ? ` (${scaleLabel})` : ''}</span>
           <span class="macro-pill bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400">${t('recipe.macroCal', { n: Math.round(perServingMacros.calories) })}</span>
           <span class="macro-pill bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">${t('recipe.macroProtein', { n: Math.round(perServingMacros.protein_g) })}</span>
@@ -164,6 +165,7 @@ const Recipe = {
               </label>
             </div>
           </div>
+          <button id="print-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.print')}</button>
         </div>
 
         ${this.renderIngredientSummary(recipe, ingredientScale)}
@@ -172,7 +174,7 @@ const Recipe = {
           ${recipe.steps.map((step, i) => this.renderStep(step, i, ingredientScale)).join('')}
         </div>
 
-        ${recipe.notes ? `<div class="mt-3 p-4 bg-zinc-100/70 dark:bg-zinc-900/50 rounded-xl text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed"><strong class="text-zinc-700 dark:text-zinc-300">${t('recipe.notesLabel')}</strong> ${this.renderInline(recipe.notes)}</div>` : ''}
+        ${recipe.notes ? `<div class="print-plain mt-3 p-4 bg-zinc-100/70 dark:bg-zinc-900/50 rounded-xl text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed"><strong class="text-zinc-700 dark:text-zinc-300">${t('recipe.notesLabel')}</strong> ${this.renderInline(recipe.notes)}</div>` : ''}
 
         <div id="social-section"></div>
       </div>
@@ -184,6 +186,35 @@ const Recipe = {
     if (App.viewingShared?.id && !App.currentConversationId) {
       this.loadSocialSection(App.viewingShared.id);
     }
+  },
+
+  // ── "Cook to:" playlist suggestion (top-level playlist field) ──
+  // Rendered as a quiet pill like the tag chips; absent or malformed →
+  // nothing (a best-effort recipe from the fix-up path can carry a
+  // half-formed field). The link is a YouTube SEARCH built from the query,
+  // never a model-invented URL, so it always lands on real playlists.
+  hasPlaylist(recipe) {
+    const p = recipe?.playlist;
+    return !!(p && typeof p.title === 'string' && p.title.trim() &&
+      typeof p.query === 'string' && p.query.trim());
+  },
+
+  playlistUrl(p) {
+    return `https://www.youtube.com/results?search_query=${encodeURIComponent(p.query)}`;
+  },
+
+  playlistHtml(recipe, { compact = false } = {}) {
+    if (!this.hasPlaylist(recipe)) return '';
+    const url = this.playlistUrl(recipe.playlist);
+    return `
+      <a id="playlist-link" href="${url}" target="_blank" rel="noopener noreferrer"
+         class="print-hide inline-flex items-center gap-1.5 ${compact ? '' : 'mt-2'} px-2 py-0.5 text-[11px] rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+         title="${this.escapeHtml(t('recipe.playlistTitle'))}">
+        <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm12-2a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        <span>${t('recipe.playlistLabel')} ${this.escapeHtml(recipe.playlist.title)}</span>
+      </a>`;
   },
 
   saveUIState(display) {
@@ -329,409 +360,48 @@ const Recipe = {
     return `<button id="made-it-btn" title="${this.escapeHtml(t('recipe.madeItTitle'))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.madeIt')}</button>`;
   },
 
-  // Add to a collection (own conversation or a published recipe).
+  // Add to a collection (own conversation or a published recipe). When the
+  // recipe is already in one of the viewer's collections, the same button
+  // reads "Saved ✓" and opens that collection instead (issue #90).
   renderCollectionControl() {
     if (!App.currentConversationId && !App.viewingShared?.id) return '';
+    const first = this._collectionSavedIn()[0];
+    if (first) {
+      return `<button id="add-collection-btn" data-saved-coll="${first.id}" title="${this.escapeHtml(t('tip.savedInCollection', { name: first.name }))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('common.savedCheck')}</button>`;
+    }
     return `<button id="add-collection-btn" title="${this.escapeHtml(t('recipe.addCollectionTitle'))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.addCollection')}</button>`;
   },
 
-  // Copy the public share link (published recipes only).
-  _currentShareSlug() {
-    if (App.viewingShared?.share_slug) return App.viewingShared.share_slug;
-    if (App.currentConversationId && typeof Store !== 'undefined') {
-      const conv = Store.conversations.find((c) => c.id === App.currentConversationId);
-      if (conv?.is_shared && conv.share_slug) return conv.share_slug;
-    }
-    return null;
-  },
-
-  renderShareLinkControl() {
-    if (!this._currentShareSlug()) return '';
-    return `<button id="copy-link-btn" title="${this.escapeHtml(t('recipe.copyLinkTitle'))}" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.copyLink')}</button>`;
-  },
-
-  // ── Export menu (native popover) ──────────────────────────────
-  //
-  // The menu markup is rebuilt with every display(), so the handle is
-  // dropped whenever the recipe re-renders — always re-query the anchor.
-  openExportMenu() {
-    const btn = document.getElementById('export-btn');
-    const menu = document.getElementById('export-menu');
-    if (!btn || !menu) return;
-    if (this._exportMenu || Date.now() - (this._exportClosedAt || 0) < 250) return;
-    this._exportMenu = Dialogs.menu(btn, menu, {
-      name: 'export',
-      placement: 'bottom-start',
-      onDismiss: () => {
-        this._exportMenu = null;
-        this._exportClosedAt = Date.now();
-      },
-    });
-  },
-
-  closeExportMenu() {
-    if (this._exportMenu) this._exportMenu.dismiss();
-  },
-
-  // ── "Made it" ────────────────────────────────────────────────
-
-  // Resolves the note (possibly '') or null when cancelled. Dismissing the
-  // kit sheet — backdrop, Escape, swipe-down — counts as cancelling.
-  promptMadeItNote() {
-    return new Promise((resolve) => {
-      const modal = document.getElementById('made-it-modal');
-      const input = document.getElementById('made-it-note');
-      if (!modal || !input) return resolve('');
-      const confirmBtn = document.getElementById('made-it-confirm');
-      const cancelBtn = document.getElementById('made-it-cancel');
-      const closeBtn = document.getElementById('made-it-close');
-
-      input.value = '';
-
-      let settled = null;
-      const dialog = Dialogs.present(modal, {
-        name: 'madeit',
-        onPresent() { input.focus({ preventScroll: true }); },
-        onDismiss() {
-          confirmBtn.removeEventListener('click', onConfirm);
-          cancelBtn.removeEventListener('click', onCancel);
-          closeBtn.removeEventListener('click', onCancel);
-          resolve(settled);
-        },
-      });
-      const onConfirm = () => { settled = input.value.trim(); dialog.dismiss(); };
-      const onCancel = () => dialog.dismiss();
-      confirmBtn.addEventListener('click', onConfirm);
-      cancelBtn.addEventListener('click', onCancel);
-      closeBtn.addEventListener('click', onCancel);
-    });
-  },
-
-  async markMadeIt() {
-    if (App.isAnonymous) return App.promptSignIn(t('signin.madeIt'));
-    const note = await this.promptMadeItNote();
-    if (note === null) return; // cancelled
-    const target = App.currentConversationId
-      ? { conversationId: App.currentConversationId }
-      : App.viewingShared?.id ? { sharedRecipeId: App.viewingShared.id } : null;
-    if (!target) return;
-    try {
-      const res = await fetch('/api/made-it', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...target, note: note || undefined }),
-      });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      UI.toast(t('recipe.madeItDone', { n: data.made_count }));
-      if (App.viewingShared) {
-        App.viewingShared.made_count = data.made_count;
-        if (App.viewingShared.id) this.loadSocialSection(App.viewingShared.id);
-      }
-    } catch {
-      UI.toast(t('recipe.madeItFailed'));
-    }
-  },
-
-  // ── Publish dialog: creator tags + optional update note ─────────
-
-  // Resolves { tags, note } or null when cancelled. AI-proposed tags from
-  // the recipe JSON pre-fill the chips; the creator confirms/edits.
-  promptPublish(recipe, { isUpdate } = {}) {
-    return new Promise((resolve) => {
-      const modal = document.getElementById('share-note-modal');
-      const input = document.getElementById('share-note-input');
-      if (!modal || !input) return resolve({ tags: undefined, note: '' });
-      const confirmBtn = document.getElementById('share-note-confirm');
-      const cancelBtn = document.getElementById('share-note-cancel');
-      const closeBtn = document.getElementById('share-note-close');
-      const titleEl = document.getElementById('share-note-title');
-      const noteField = document.getElementById('share-note-field');
-      const tagsList = document.getElementById('share-tags-list');
-      const tagInput = document.getElementById('share-tag-input');
-
-      const tags = Array.isArray(recipe?.tags)
-        ? recipe.tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean)
-        : [];
-      const renderTags = () => {
-        tagsList.innerHTML = '';
-        if (!tags.length) {
-          const hint = document.createElement('span');
-          hint.className = 'text-xs text-zinc-400 dark:text-zinc-500';
-          hint.textContent = t('shareModal.noTags');
-          tagsList.appendChild(hint);
-        }
-        tags.forEach((tag, idx) => {
-          const chip = document.createElement('button');
-          chip.type = 'button';
-          chip.className = 'px-2.5 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-600 transition-colors';
-          chip.textContent = `${tag} ✕`;
-          chip.title = t('shareModal.removeTag');
-          chip.addEventListener('click', () => { tags.splice(idx, 1); renderTags(); });
-          tagsList.appendChild(chip);
-        });
-      };
-
-      titleEl.textContent = isUpdate ? t('shareModal.titleUpdate') : t('shareModal.title');
-      confirmBtn.textContent = isUpdate ? t('shareModal.update') : t('shareModal.share');
-      noteField.style.display = isUpdate ? '' : 'none';
-      input.value = '';
-      tagInput.value = '';
-      renderTags();
-
-      const onTagKey = (e) => {
-        if (e.key !== 'Enter') return;
-        e.preventDefault();
-        const t = tagInput.value.trim().toLowerCase().slice(0, 32);
-        if (t && !tags.includes(t) && tags.length < 12) {
-          tags.push(t);
-          renderTags();
-        }
-        tagInput.value = '';
-      };
-      tagInput.addEventListener('keydown', onTagKey);
-
-      // Dismissing the sheet any other way (backdrop, Escape, swipe-down)
-      // resolves null, i.e. cancelled — same contract as before.
-      let result = null;
-      const dialog = Dialogs.present(modal, {
-        name: 'publish',
-        onDismiss() {
-          confirmBtn.removeEventListener('click', onConfirm);
-          cancelBtn.removeEventListener('click', onCancel);
-          closeBtn.removeEventListener('click', onCancel);
-          tagInput.removeEventListener('keydown', onTagKey);
-          resolve(result);
-        },
-      });
-      const onConfirm = () => {
-        result = { tags: tags.slice(), note: input.value.trim() };
-        dialog.dismiss();
-      };
-      const onCancel = () => dialog.dismiss();
-      confirmBtn.addEventListener('click', onConfirm);
-      cancelBtn.addEventListener('click', onCancel);
-      closeBtn.addEventListener('click', onCancel);
-    });
-  },
-
-  // ── Social section (made-it gallery, remixes, comments) ─────────
-
-  async loadSocialSection(sharedId) {
-    const container = document.getElementById('social-section');
-    if (!container) return;
-    try {
-      // Anonymous mode reads everything from the slug-keyed public payload
-      // (one fetch: comments + made-it notes + remixes). The recipe-id
-      // endpoints stay behind the JWT gate.
-      if (App.isAnonymous) {
-        const slug = App.viewingShared?.share_slug;
-        if (!slug) return;
-        const res = await fetch(`/api/public/recipes/${encodeURIComponent(slug)}`);
-        if (!res.ok || document.getElementById('social-section') !== container) return;
-        const pub = await res.json();
-        const comments = (pub.comments || []).map((c) => ({ ...c, deleted: false, is_mine: false }));
-        const madeIt = pub.made_it_notes || [];
-        this.renderSocialSection(container, sharedId, madeIt, comments, pub.remixes || [], {
-          madeCount: pub.made_count || madeIt.length,
-        });
-        return;
-      }
-
-      const [madeRes, commentsRes, remixRes] = await Promise.all([
-        fetch(`/api/shared-recipes/${sharedId}/made-it`),
-        fetch(`/api/shared-recipes/${sharedId}/comments`),
-        fetch(`/api/shared-recipes/${sharedId}/remixes`),
-      ]);
-      if (document.getElementById('social-section') !== container) return;
-      const madeIt = madeRes.ok ? await madeRes.json() : [];
-      const comments = commentsRes.ok ? await commentsRes.json() : [];
-      const remixes = remixRes.ok ? await remixRes.json() : [];
-      this.renderSocialSection(container, sharedId, madeIt, comments, remixes);
-    } catch { /* leave section empty */ }
-  },
-
-  renderSocialSection(container, sharedId, madeIt, comments, remixes, opts) {
-    // Anonymous payloads carry only NOTED made-it marks; opts.madeCount
-    // carries the true cooked-count for the heading.
-    const madeCount = opts?.madeCount ?? madeIt.length;
-    let html = '<div class="space-y-4 mt-2 pt-4 border-t border-zinc-200 dark:border-zinc-800">';
-
-    if (remixes.length) {
-      html += `<div>
-        <h3 class="text-sm font-semibold mb-2">${tn('social.remixes', remixes.length)}</h3>
-        <div class="space-y-1">`;
-      remixes.slice(0, 10).forEach((r) => {
-        html += `<p class="text-sm text-zinc-500 dark:text-zinc-400">${this.escapeHtml(r.title || t('common.untitled'))} <span class="text-zinc-400 dark:text-zinc-500">${t('card.by', { name: this.escapeHtml(r.username) })}</span>${r.share_slug ? ` · <a class="text-blue-500 hover:text-blue-400" href="/r/${this.escapeHtml(r.share_slug)}" target="_blank" rel="noopener">${t('social.viewLink')}</a>` : ''}</p>`;
-      });
-      html += '</div></div>';
-    }
-
-    const notes = madeIt.filter((m) => m.note);
-    if (madeCount) {
-      html += `<div>
-        <h3 class="text-sm font-semibold mb-2">${t('social.madeIt', { n: madeCount })}</h3>`;
-      if (notes.length) {
-        html += '<div class="space-y-2">';
-        notes.slice(0, 10).forEach((m) => {
-          html += `<div class="p-3 rounded-lg bg-zinc-100/70 dark:bg-zinc-900/50 text-sm">
-            <span class="font-medium">${this.escapeHtml(m.username)}</span>
-            <p class="text-zinc-500 dark:text-zinc-400 mt-0.5">${this.escapeHtml(m.note)}</p>
-          </div>`;
-        });
-        html += '</div>';
-      } else if (madeIt.length) {
-        html += `<p class="text-xs text-zinc-400 dark:text-zinc-500">${t('social.cookedThis', { names: madeIt.map((m) => this.escapeHtml(m.username)).slice(0, 8).join(', ') })}</p>`;
-      }
-      html += '</div>';
-    }
-
-    html += '<div id="comments-block"></div>';
-    html += '</div>';
-    container.innerHTML = html;
-
-    // Thread rendering is shared with the collection detail view — see
-    // public/js/comments.js.
-    CommentThread.render(container.querySelector('#comments-block'), {
-      comments,
-      canModerate: !!App.viewingShared?.is_mine,
-      signInReason: t('signin.comment'),
-      onPost: async (body) => {
-        await fetch(`/api/shared-recipes/${sharedId}/comments`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ body }),
-        }).catch(() => {});
-        this.loadSocialSection(sharedId);
-      },
-      onDelete: async (id) => {
-        await fetch(`/api/comments/${id}`, { method: 'DELETE' }).catch(() => {});
-        this.loadSocialSection(sharedId);
-      },
-    });
-  },
-
-  // ── Version history (shared recipes) ─────────────────────────
-
-  async openVersionHistory() {
-    const vs = App.viewingShared;
-    if (!vs?.id) return;
-    const modal = document.getElementById('version-history-modal');
-    const list = document.getElementById('version-history-list');
-    if (!modal || !list) return;
-    list.innerHTML = `<p class="text-sm text-zinc-400 dark:text-zinc-500">${t('common.loading')}</p>`;
-    // Presented before the fetch resolves — the kit re-measures on content
-    // growth, so late-rendered rows still get the full presentation.
-    this._versionDialog = Dialogs.present(modal, {
-      name: 'versions',
-      onDismiss: () => { this._versionDialog = null; },
-    });
-
-    try {
-      const res = await fetch(`/api/shared-recipes/${vs.id}/versions`);
-      if (!res.ok) throw new Error('versions failed');
-      const versions = await res.json();
-      if (versions.length) vs.current_version = versions[0].version;
-
-      list.innerHTML = '';
-      versions.forEach((v) => {
-        const isCurrent = v.version === vs.current_version;
-        const row = document.createElement('div');
-        row.className = 'flex items-start justify-between gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50';
-        const date = v.created_at ? new Date(v.created_at).toLocaleDateString(I18N.lang) : '';
-        row.innerHTML = `
-          <div class="min-w-0">
-            <p class="text-sm font-medium">v${v.version}${isCurrent ? ` <span class="text-xs font-normal text-blue-500">${t('version.current')}</span>` : ''}</p>
-            <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">${t('card.by', { name: this.escapeHtml(v.username) })}${date ? ` · ${date}` : ''}</p>
-            ${v.note ? `<p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">${this.escapeHtml(v.note)}</p>` : ''}
-          </div>
-          <button class="version-view-btn shrink-0 px-3 py-1.5 text-xs rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors">${t('version.view')}</button>`;
-        row.querySelector('.version-view-btn').addEventListener('click', () => this.viewVersion(v));
-        list.appendChild(row);
-      });
-    } catch {
-      list.innerHTML = `<p class="text-sm text-red-500">${t('version.loadFailed')}</p>`;
-    }
-  },
-
-  closeVersionHistory() {
-    if (this._versionDialog) this._versionDialog.dismiss();
-  },
-
-  viewVersion(v) {
-    const vs = App.viewingShared;
-    this.closeVersionHistory();
-    if (!vs) return;
-    if (v.version === vs.current_version) return this.backToCurrentVersion();
-    App.viewingVersion = { version: v.version };
-    App.currentRecipe = v.recipe_data;
-    this.currentServings = v.recipe_data.default_servings;
-    this.servingScale = 1.0;
-    this.display(v.recipe_data);
-  },
-
-  backToCurrentVersion() {
-    const vs = App.viewingShared;
-    App.viewingVersion = null;
-    if (!vs?.currentData) return;
-    App.currentRecipe = vs.currentData;
-    this.currentServings = vs.currentData.default_servings;
-    this.servingScale = 1.0;
-    this.display(vs.currentData);
-  },
-
-  bindActions(recipe, display) {
-    display.querySelector('#share-btn')?.addEventListener('click', async () => {
-      const btn = display.querySelector('#share-btn');
-      if (btn?.disabled) return;
-
-      // Publish dialog: confirm creator tags (AI-proposed) every time; the
-      // "what changed" note is only asked when updating a shared copy.
-      const conv = (typeof Store !== 'undefined')
-        ? Store.conversations.find((c) => c.id === App.currentConversationId)
+  // Which of the viewer's collections already hold the recipe on display.
+  // Own conversation: the homepage's /api/recipes row, falling back to
+  // Store.savedIn (covers a deep link to `?c=` before the homepage loaded).
+  // Published recipe: the feed/favorites rows or the copy Store.openShared
+  // kept. Empty for anonymous visitors and unsaved forks.
+  _collectionSavedIn() {
+    if (App.isAnonymous) return [];
+    if (App.currentConversationId) {
+      const row = (typeof Home !== 'undefined')
+        ? Home.mine.find((r) => r.conversation_id === App.currentConversationId)
         : null;
-      const result = await this.promptPublish(recipe, { isUpdate: !!conv?.is_shared });
-      if (result === null) return; // cancelled
+      if (row?.saved_in?.length) return row.saved_in;
+      return (typeof Store !== 'undefined' && Store.savedIn?.[App.currentConversationId]) || [];
+    }
+    if (App.viewingShared?.id) {
+      const fromHome = (typeof Home !== 'undefined')
+        ? (Home.shared.find((s) => s.id === App.viewingShared.id)
+          || Home.favorites.find((s) => s.id === App.viewingShared.id))
+        : null;
+      if (fromHome?.saved_in?.length) return fromHome.saved_in;
+      return App.viewingShared.saved_in || [];
+    }
+    return [];
+  },
 
-      try {
-        const res = await fetch('/api/recipes/share', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            conversationId: App.currentConversationId,
-            note: result.note || undefined,
-            tags: result.tags,
-          }),
-        });
-        if (!res.ok) throw new Error('share failed');
-        UI.toast(t('recipe.sharedBang'));
-        if (App.currentRecipe) App.currentRecipe.tags = result.tags;
-        if (typeof Store !== 'undefined') await Store.refresh();
-        this.display(App.currentRecipe);
-      } catch {
-        UI.toast(t('recipe.shareFailed'));
-      }
-    });
-
-    display.querySelector('#made-it-btn')?.addEventListener('click', () => this.markMadeIt());
-
-    display.querySelector('#edit-btn')?.addEventListener('click', () => {
-      if (App.isAnonymous) return App.promptSignIn(t('edit.signIn'));
-      if (App.pendingRecipe || Recipe.diffMode) {
-        UI.toast(t('edit.conflict'));
-        return;
-      }
-      Recipe.openEditor(App.currentRecipe);
-    });
-
-    display.querySelector('#add-collection-btn')?.addEventListener('click', () => {
-      if (App.isAnonymous) return App.promptSignIn(t('signin.saveBox'));
-      if (typeof Home === 'undefined') return;
-      const target = App.currentConversationId
-        ? { conversationId: App.currentConversationId }
-        : App.viewingShared?.id ? { sharedRecipeId: App.viewingShared.id } : null;
-      if (target) Home.openCollectionPicker(target);
-    });
+  // Click behaviour for #add-collection-btn, whichever label it carries:
+  // Saved ✓ opens the collection it is in (same steps as the header's home
+  // button, then the collection route); otherwise the add picker.
+  _bindCollectionControl(display) {
+    this._bindCollectionControl(display);
 
     display.querySelector('#copy-link-btn')?.addEventListener('click', () => {
       const slug = this._currentShareSlug();
@@ -797,6 +467,8 @@ const Recipe = {
     display.querySelector('#export-copy-md')?.addEventListener('click', () => { this.copyMarkdown(recipe); closeExport(); });
     display.querySelector('#export-json')?.addEventListener('click', () => { this.exportJSON(recipe); closeExport(); });
     display.querySelector('#import-json-input')?.addEventListener('change', (e) => { this.importJSON(e); closeExport(); });
+
+    display.querySelector('#print-btn')?.addEventListener('click', () => window.print());
 
     // Step timer buttons
     display.querySelectorAll('.step-timer-btn').forEach((btn) => {
@@ -1370,6 +1042,13 @@ const Recipe = {
     md += `\n\n`;
     md += `**${t('export.macros')}:** ${Math.round(macros.calories)} cal | ${Math.round(macros.protein_g)}g ${t('export.protein')} | ${Math.round(macros.carbs_g)}g ${t('export.carbs')} | ${Math.round(macros.fat_g)}g ${t('export.fat')}\n\n`;
 
+    if (this.hasPlaylist(recipe)) {
+      // Strip markdown link syntax from the model-generated title so it can't
+      // break the [title](url) pair.
+      const safeTitle = recipe.playlist.title.replace(/[[\]()]/g, '');
+      md += `**${t('recipe.playlistLabel')}** [${safeTitle}](${this.playlistUrl(recipe.playlist)})\n\n`;
+    }
+
     md += `## ${t('export.ingredients')}\n\n`;
     recipe.steps.forEach((step, i) => {
       if (!step.ingredients?.length) return;
@@ -1469,7 +1148,7 @@ const Recipe = {
     // is only visible while the section is expanded (see app.css). Flex on
     // <summary> drops the native disclosure marker, so a chevron stands in.
     let html = `
-      <details class="rounded-xl bg-zinc-100/70 dark:bg-zinc-900/50">
+      <details class="ing-summary rounded-xl bg-zinc-100/70 dark:bg-zinc-900/50">
         <summary class="px-4 py-2.5 cursor-pointer text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors flex items-center justify-between gap-2">
           <span class="flex items-center gap-1.5"><span class="summary-chevron text-[0.6rem]">▶</span>${t('recipe.allIngredients', { n: totalIngredients })}</span>
           <label class="ing-macros-summary-toggle flex items-center gap-1.5 cursor-pointer text-xs text-zinc-400 dark:text-zinc-500 select-none">
@@ -1541,7 +1220,7 @@ const Recipe = {
                 <svg class="w-3.5 h-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="-1 -1 26 26"><path d="M21.5 2v6h-6M2.5 22v-6h6M21.5 8A10 10 0 0 0 3.2 5.3L2.5 6M2.5 16a10 10 0 0 0 18.3 2.7l.7-.7"/></svg>
               </button>
             </span>
-            ${fromStep ? `
+            <span class="ing-macros${fromStep ? ' ing-macros-empty' : ''}">${fromStep ? `
             <span class="ing-macro"></span><span class="ing-macro"></span><span class="ing-macro"></span><span class="ing-macro"></span><span class="ing-macro"></span>
             ` : `
             <span class="ing-macro tabular-nums text-xs py-0.5 text-orange-400 dark:text-orange-500 text-right" style="opacity:${mo.cal.opacity};font-weight:${mo.cal.weight}">${Math.round(psCal)} cal</span>
@@ -1549,7 +1228,7 @@ const Recipe = {
             <span class="ing-macro tabular-nums text-xs py-0.5 text-amber-400 dark:text-amber-500 text-right" style="opacity:${mo.c.opacity};font-weight:${mo.c.weight}">${Math.round(psC)}c</span>
             <span class="ing-macro tabular-nums text-xs py-0.5 text-violet-400 dark:text-violet-500 text-right" style="opacity:${mo.f.opacity};font-weight:${mo.f.weight}">${Math.round(psF)}f</span>
             <span class="ing-macro tabular-nums text-xs py-0.5 text-green-400 dark:text-green-500 text-right" style="opacity:${mo.fi.opacity};font-weight:${mo.fi.weight}">${Math.round(psFi)}fi</span>
-            `}
+            `}</span>
           </div>`;
       });
     });

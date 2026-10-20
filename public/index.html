@@ -364,6 +364,10 @@
             + New recipe
           </button>
         </div>
+        <!-- Tag filter chips — diet tags first, then the community's most
+             used ones. They filter every recipe list on the homepage, not
+             just the community feed (built by home.js). -->
+        <div id="home-tag-filters" class="flex flex-wrap gap-1.5"></div>
         <!-- Collection detail (opened from a collection card; hides the box sections) -->
         <div id="collection-view" class="hidden"></div>
 
@@ -402,7 +406,7 @@
 
           <section id="home-mine" class="hidden">
             <h2 class="text-base font-semibold mb-3 flex items-center gap-2">
-              <span class="text-orange-400 shrink-0">🍳</span>
+              <span class="text-orange-400 shrink-0">🍲</span>
               <span data-i18n="home.yourRecipes">Your recipes</span>
               <span class="home-count text-xs font-normal text-zinc-400 dark:text-zinc-500 tabular-nums"></span>
             </h2>
@@ -439,8 +443,13 @@
               <span data-i18n="home.communityRecipes">Community recipes</span>
               <span class="home-count text-xs font-normal text-zinc-400 dark:text-zinc-500 tabular-nums"></span>
             </h2>
-            <!-- Tag filter chips (built from tag frequencies by home.js) -->
-            <div id="home-tag-filters" class="hidden flex flex-wrap gap-1.5 mb-3"></div>
+            <!-- Sort menu, built by home.js; tag chips live under the toolbar -->
+            <div class="flex items-start gap-2 mb-3">
+              <select id="home-community-sort" data-i18n-aria-label="home.sortLabel" aria-label="Sort" class="ml-auto shrink-0 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="newest" data-i18n="home.sortNewest">Newest</option>
+                <option value="rating" data-i18n="home.sortTopRated">Top rated</option>
+              </select>
+            </div>
             <div id="home-community-list" class="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"></div>
           </section>
 
@@ -462,6 +471,9 @@
         </div>
         <div id="home-no-match" class="hidden text-center text-zinc-500 py-16">
           <p class="text-sm" data-i18n="home.noMatch">No recipes match your search</p>
+          <button id="home-no-match-create-btn" class="mt-4 rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-sm font-medium text-white transition-colors">
+            + New recipe
+          </button>
         </div>
       </div>
     </div>
