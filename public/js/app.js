@@ -520,9 +520,14 @@ async function restoreRoute(route) {
   let ok = false;
   if (route.c) {
     // Conversations are owner-scoped: anonymous visitors can't restore one.
+    // The staging demo conversation is the exception — its recipe is served
+    // signed out so screenshot deep links land on the recipe.
     if (App.isAnonymous) {
-      console.warn('[route] conversation deep link needs an account — showing home');
-      HashParams.set('c', null);
+      ok = await Store.openDemoConversation(parseInt(route.c));
+      if (!ok) {
+        console.warn('[route] conversation deep link needs an account — showing home');
+        HashParams.set('c', null);
+      }
     } else {
       ok = await Store.selectConversation(parseInt(route.c), { restore: true });
       if (!ok) {

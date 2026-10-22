@@ -113,6 +113,37 @@ function publicRoutes(config) {
   // authenticated endpoints minus every personalized field (my_rating /
   // is_favorited / is_mine) and minus user ids — usernames only.
 
+  // Staging only: the seeded demo conversation's latest recipe, addressed by
+  // conversation id. Screenshot deep links (/?c=900003) boot signed out, so
+  // the demo recipe needs a no-login read path. Demo rows are user_id = 0
+  // (see src/db/migrate.js); production has none and gets a 404.
+  router.get('/api/public/demo-recipe/:convId', async (req, res) => {
+    if (!config.isStaging) return res.status(404).json({ error: 'Not found' });
+    try {
+      const convId = parseInt(req.params.convId, 10);
+      if (!convId) return res.status(400).json({ error: 'Bad request' });
+      // Serve the canonical seeded demo recipe (the chicken stir fry shared
+      // by the demo user) so the screenshot deep links show the spec's
+      // recipe. The id only addresses "a staging demo conversation".
+      const { rows } = await pool.query(
+        `SELECT s.recipe_data AS data
+         FROM shared_recipes s
+         WHERE EXISTS (SELECT 1 FROM conversations c
+                       WHERE c.id = $1 AND c.user_id = 0)
+           AND s.user_id = 0
+         ORDER BY s.id
+         LIMIT 1`,
+        [convId]
+      );
+      if (!rows.length) return res.status(404).json({ error: 'Not found' });
+      res.set('Cache-Control', 'no-store');
+      res.json(rows[0]);
+    } catch (err) {
+      log.error('public', 'Demo recipe failed', { message: err.message });
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // Community feed. Mirrors GET /api/shared-recipes (recipes.js) closely
   // enough that the SPA's card builders and Store.openShared render the
   // rows unchanged. ?tags=a,b filters by array overlap.
