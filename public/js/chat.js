@@ -163,6 +163,13 @@ const Chat = {
       target.appendChild(box);
     }
 
+    // A permission failure is fixable by approving AI access in the platform
+    // shell, then re-running the same reply — no retyping (issue #126).
+    if (data.code === 'grant_required' && replyId && this._canRequestLlmAccess()) {
+      this._appendApproveAccessBtn(target, (btn) => this._retryReply(replyId, btn));
+      return errEl;
+    }
+
     if (!replyId || !this._retryableCodes.has(data.code || '')) return errEl;
 
     // One retry button at a time — the stale checker and the error event can
@@ -180,6 +187,43 @@ const Chat = {
     const container = document.getElementById('chat-messages');
     container.scrollTop = container.scrollHeight;
     return errEl;
+  },
+
+  // The platform shell owns AI consent. Without the bridge (standalone) there
+  // is no dialog to open, so callers must not offer the button.
+  _canRequestLlmAccess() {
+    return typeof usernode !== 'undefined' && typeof usernode.requestLlmAccess === 'function';
+  },
+
+  // Opens the platform's consent dialog from the button, then hands off to the
+  // caller's retry. A refused or failed request restores the button so it can
+  // be tried again.
+  async _appendApproveAccessBtn(target, onGranted) {
+    document.getElementById('chat-approve-access')?.remove();
+
+    const btn = document.createElement('button');
+    btn.id = 'chat-approve-access';
+    btn.type = 'button';
+    btn.className = 'chat-retry-btn';
+    btn.textContent = t('chat.approveAccess');
+    btn.addEventListener('click', async () => {
+      if (this.streaming) return;
+      btn.disabled = true;
+      btn.textContent = t('chat.approvingAccess');
+      try {
+        const result = await usernode.requestLlmAccess();
+        if (result?.granted) {
+          onGranted(btn);
+          return;
+        }
+      } catch { /* no shell or dialog failed; fall through to re-enable */ }
+      btn.disabled = false;
+      btn.textContent = t('chat.approveAccess');
+    });
+    target.appendChild(btn);
+
+    const container = document.getElementById('chat-messages');
+    if (container) container.scrollTop = container.scrollHeight;
   },
 
   async _retryReply(replyId, btn) {
@@ -714,10 +758,6 @@ const Chat = {
         this._failActiveStatus();
         this._appendErrorBlock(wrapper, data, replyId);
         this._cleanupStream();
-        if (data.code === 'grant_required' && typeof usernode !== 'undefined' && usernode.requestLlmAccess) {
-          // Ask the platform shell for AI consent so the next send works.
-          usernode.requestLlmAccess().catch(() => {});
-        }
       } catch {
         es.close();
         setTimeout(() => {
@@ -1080,7 +1120,14 @@ const Chat = {
     }
 
     if (!(await this._ensureLlmGrant())) {
-      this.appendMessage('assistant', t('chat.needsAccess'));
+      const el = this.appendMessage('assistant', t('chat.needsAccess'));
+      if (this._canRequestLlmAccess()) {
+        this._appendApproveAccessBtn(document.getElementById('chat-messages'), (btn) => {
+          btn.remove();
+          el.remove();
+          this.send(message);
+        });
+      }
       return;
     }
 

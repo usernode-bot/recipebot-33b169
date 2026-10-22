@@ -152,6 +152,8 @@ I18N.register('id', {
   'chat.retrying': 'Mencoba lagi…',
   'chat.stillWorking': 'Masih bekerja — resep panjang dari sumber yang detail bisa memakan waktu beberapa menit.',
   'chat.tryAgain': 'Coba lagi',
+  'chat.approveAccess': 'Setujui akses AI',
+  'chat.approvingAccess': 'Menunggu persetujuan…',
   'chat.recipeFormatWarning': 'Resep ini mungkin memiliki masalah format',
   'chat.responseTruncated': 'Respons terpotong sebelum selesai. Silakan coba lagi.',
   'chat.rateLimitBadge': '{used}/{limit} hari ini',

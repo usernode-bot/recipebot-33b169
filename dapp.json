@@ -226,6 +226,11 @@
       "expectSelector": ".chat-error"
     },
     {
+      "name": "AI access failure shows the approve button",
+      "path": "/?c=900015",
+      "expectSelector": "#chat-approve-access"
+    },
+    {
       "name": "Collections section renders",
       "path": "/",
       "expectSelector": "#home-collections"

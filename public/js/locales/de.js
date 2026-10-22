@@ -152,6 +152,8 @@ I18N.register('de', {
   'chat.retrying': 'Neuer Versuch…',
   'chat.stillWorking': 'Läuft noch — lange Rezepte aus ausführlichen Quellen können ein paar Minuten dauern.',
   'chat.tryAgain': 'Erneut versuchen',
+  'chat.approveAccess': 'KI-Zugriff genehmigen',
+  'chat.approvingAccess': 'Warte auf Genehmigung…',
   'chat.recipeFormatWarning': 'Dieses Rezept kann Formatierungsprobleme haben',
   'chat.responseTruncated': 'Die Antwort wurde vorzeitig abgeschnitten. Bitte versuche es erneut.',
   'chat.rateLimitBadge': '{used}/{limit} heute',
