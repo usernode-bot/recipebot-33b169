@@ -100,6 +100,7 @@ I18N.register('de', {
   'common.cancel': 'Abbrechen',
   'common.create': 'Erstellen',
   'common.post': 'Posten',
+  'common.close': 'Schließen',
   'common.copied': 'Kopiert!',
   'common.untitled': 'Ohne Titel',
   'common.loading': 'Wird geladen…',
@@ -251,6 +252,14 @@ I18N.register('de', {
   'recipe.macroFiber': '{n}g Ballaststoffe',
   'recipe.cookMode': '🍳 Kochmodus',
   'recipe.print': 'Drucken',
+  'recipe.shoppingList': 'Einkaufsliste',
+
+  // ── Einkaufsliste ──
+  'shopping.title': 'Einkaufsliste',
+  'shopping.subtitle': '{title} · {n} Portionen',
+  'shopping.copy': 'Liste kopieren',
+  'shopping.empty': 'Dieses Rezept hat keine Zutaten zum Einkaufen.',
+  'shopping.copyFailed': 'Liste konnte nicht kopiert werden',
   'recipe.export': 'Exportieren ▾',
   'recipe.downloadMd': 'Als Markdown herunterladen',
   'recipe.copyMd': 'Markdown kopieren',

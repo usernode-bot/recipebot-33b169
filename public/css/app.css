@@ -589,6 +589,16 @@ details[open] .summary-chevron {
   opacity: 0.5;
 }
 
+/* Checked state in the one-off shopping list (same look as the summary). */
+.shopping-row:has(.ingredient-check:checked) .ing-name {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+.shopping-row:has(.ingredient-check:checked) .ing-amt {
+  opacity: 0.5;
+}
+
 /* Ingredient checkboxes */
 .ingredient-check {
   appearance: none;

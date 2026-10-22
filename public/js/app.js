@@ -477,6 +477,9 @@ function openUiState(name) {
     case 'export':
       if (typeof Recipe !== 'undefined' && hasRecipe) Recipe.openExportMenu();
       break;
+    case 'shoppinglist':
+      if (typeof Recipe !== 'undefined' && hasRecipe) Recipe.openShoppingList(App.currentRecipe);
+      break;
     default:
       console.warn('[route] unknown ui state', name);
   }

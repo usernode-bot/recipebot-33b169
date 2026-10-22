@@ -166,6 +166,21 @@
       "expectSelector": "#recipe-panel:not(.panel-hidden) #print-btn"
     },
     {
+      "name": "Recipe page shows a Shopping list action",
+      "path": "/?c=900003",
+      "expectSelector": "#shopping-list-btn"
+    },
+    {
+      "name": "Shopping list action is reachable on mobile recipe tab",
+      "path": "/?c=900003 @mobile",
+      "expectSelector": "#recipe-panel:not(.panel-hidden) #shopping-list-btn"
+    },
+    {
+      "name": "Shopping list dialog opens with ingredients",
+      "path": "/?c=900003&ui=shoppinglist",
+      "expectSelector": "html[data-dialog=\"shoppinglist\"] #shopping-list-items .shopping-row"
+    },
+    {
       "name": "Undecided edit still shows accept screen",
       "path": "/?c=900004",
       "expectSelector": "#diff-accept"

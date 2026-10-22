@@ -109,6 +109,7 @@ I18N.register('en', {
   'common.create': 'Create',
   'common.post': 'Post',
   'common.copied': 'Copied!',
+  'common.close': 'Close',
   'common.untitled': 'Untitled',
   'common.loading': 'Loading…',
   'common.name': 'Name',
@@ -277,6 +278,14 @@ I18N.register('en', {
   'recipe.macroFiber': '{n}g fiber',
   'recipe.cookMode': '🍳 Cook Mode',
   'recipe.print': 'Print',
+  'recipe.shoppingList': 'Shopping list',
+
+  // ── Shopping list ──
+  'shopping.title': 'Shopping list',
+  'shopping.subtitle': '{title} · {n} servings',
+  'shopping.copy': 'Copy list',
+  'shopping.empty': 'This recipe has no ingredients to buy.',
+  'shopping.copyFailed': "Couldn't copy the list",
   'recipe.export': 'Export ▾',
   'recipe.downloadMd': 'Download Markdown',
   'recipe.copyMd': 'Copy Markdown',

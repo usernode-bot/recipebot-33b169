@@ -100,6 +100,7 @@ I18N.register('id', {
   'common.cancel': 'Batal',
   'common.create': 'Buat',
   'common.post': 'Kirim',
+  'common.close': 'Tutup',
   'common.copied': 'Tersalin!',
   'common.untitled': 'Tanpa judul',
   'common.loading': 'Memuat…',
@@ -251,6 +252,14 @@ I18N.register('id', {
   'recipe.macroFiber': '{n}g serat',
   'recipe.cookMode': '🍳 Mode Masak',
   'recipe.print': 'Cetak',
+  'recipe.shoppingList': 'Daftar belanja',
+
+  // ── Daftar belanja ──
+  'shopping.title': 'Daftar belanja',
+  'shopping.subtitle': '{title} · {n} porsi',
+  'shopping.copy': 'Salin daftar',
+  'shopping.empty': 'Resep ini tidak punya bahan untuk dibeli.',
+  'shopping.copyFailed': 'Gagal menyalin daftar',
   'recipe.export': 'Ekspor ▾',
   'recipe.downloadMd': 'Unduh Markdown',
   'recipe.copyMd': 'Salin Markdown',

@@ -620,6 +620,20 @@
     </div>
   </div>
 
+  <!-- Shopping list: one-off checklist built from the recipe's ingredients -->
+  <div id="shopping-list-modal" class="hidden p-5 w-full max-h-[80vh] flex flex-col" data-un-dialog>
+    <div class="flex items-center justify-between mb-3 shrink-0">
+      <h3 class="text-base font-semibold" data-i18n="shopping.title">Shopping list</h3>
+      <button id="shopping-list-close" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">&times;</button>
+    </div>
+    <p id="shopping-list-sub" class="text-xs text-zinc-500 dark:text-zinc-400 mb-2 shrink-0"></p>
+    <div id="shopping-list-items" class="overflow-y-auto min-h-0"></div>
+    <div class="flex justify-end gap-2 mt-4 pt-3 border-t border-zinc-200 dark:border-zinc-800 shrink-0">
+      <button id="shopping-list-done" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors" data-i18n="common.close">Close</button>
+      <button id="shopping-list-copy" class="px-4 py-2 text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-default" data-i18n="shopping.copy">Copy list</button>
+    </div>
+  </div>
+
   <!-- Add-to-collection picker -->
   <div id="collection-pick-modal" class="hidden p-5 w-full max-h-[70vh] flex flex-col" data-un-dialog>
     <div class="flex items-center justify-between mb-3">

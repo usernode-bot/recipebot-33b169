@@ -100,6 +100,7 @@ I18N.register('fr', {
   'common.cancel': 'Annuler',
   'common.create': 'Créer',
   'common.post': 'Publier',
+  'common.close': 'Fermer',
   'common.copied': 'Copié !',
   'common.untitled': 'Sans titre',
   'common.loading': 'Chargement…',
@@ -251,6 +252,14 @@ I18N.register('fr', {
   'recipe.macroFiber': '{n}g fibres',
   'recipe.cookMode': '🍳 Mode cuisine',
   'recipe.print': 'Imprimer',
+  'recipe.shoppingList': 'Liste de courses',
+
+  // ── Liste de courses ──
+  'shopping.title': 'Liste de courses',
+  'shopping.subtitle': '{title} · {n} portions',
+  'shopping.copy': 'Copier la liste',
+  'shopping.empty': 'Cette recette n’a pas d’ingrédients à acheter.',
+  'shopping.copyFailed': 'Impossible de copier la liste',
   'recipe.export': 'Exporter ▾',
   'recipe.downloadMd': 'Télécharger en Markdown',
   'recipe.copyMd': 'Copier le Markdown',
