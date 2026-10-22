@@ -42,6 +42,8 @@ I18N.register('de', {
   'home.emptyTitle': 'Noch keine Rezepte',
   'home.emptySubtitle': 'Starte eine Unterhaltung, um ein Rezept zu erstellen, und teile es dann mit der Community.',
   'home.noMatch': 'Keine Rezepte passen zu deiner Suche',
+  'home.loadError': 'Rezepte konnten nicht geladen werden',
+  'home.tryAgain': 'Erneut versuchen',
   'home.noMatchCreate': '+ Neues Rezept für „{q}“',
 
   'card.yourRecipe': 'Dein Rezept',
@@ -156,7 +158,7 @@ I18N.register('de', {
   'chat.recipeFormatWarning': 'Dieses Rezept kann Formatierungsprobleme haben',
   'chat.responseTruncated': 'Die Antwort wurde vorzeitig abgeschnitten. Bitte versuche es erneut.',
   'chat.rateLimitBadge': '{used}/{limit} heute',
-  'chat.aiUnavailablePlaceholder': 'KI ist in dieser Umgebung nicht verfügbar (Staging-Vorschauen haben keinen KI-Zugriff).',
+  'chat.aiUnavailablePlaceholder': 'KI ist hier nicht verfügbar',
   'chat.signInPlaceholder': 'Melde dich an, um mit der KI zu kochen.',
   'chat.aiDisabled': 'KI ist in dieser Umgebung nicht verfügbar, daher ist der Chat hier deaktiviert.',
   'chat.needsAccess': 'RecipeBot braucht KI-Zugriff, um Rezepte zu erstellen. Genehmige den Zugriff, wenn du gefragt wirst, und versuche es erneut.',

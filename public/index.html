@@ -462,6 +462,19 @@
             <div id="home-public-collections-list" class="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"></div>
           </section>
         </section>
+        <!-- Loading skeleton for the box: shown while the recipe requests are
+             in flight, so the page never falls through to an empty state. -->
+        <div id="home-loading" class="hidden space-y-3" aria-busy="true">
+          <div class="h-5 w-32 rounded bg-zinc-200 dark:bg-zinc-800 animate-pulse"></div>
+          <div class="h-24 rounded-2xl bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+          <div class="h-24 rounded-2xl bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+          <div class="h-24 rounded-2xl bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+        </div>
+        <!-- The recipe requests failed — say so instead of blaming an empty box -->
+        <div id="home-error" class="hidden text-center text-zinc-500 py-16">
+          <p class="text-lg mb-1" data-i18n="home.loadError">Couldn't load recipes</p>
+          <button id="home-retry-btn" class="mt-4 rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-sm font-medium text-white transition-colors" data-i18n="home.tryAgain">Try again</button>
+        </div>
         <div id="home-empty" class="hidden text-center text-zinc-500 py-16">
           <svg class="w-12 h-12 mx-auto mb-3 text-zinc-300 dark:text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/>

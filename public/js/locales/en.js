@@ -48,6 +48,8 @@ I18N.register('en', {
   'home.emptyTitle': 'No recipes yet',
   'home.emptySubtitle': 'Start a conversation to create a recipe, then share it to the community feed.',
   'home.noMatch': 'No recipes match your search',
+  'home.loadError': "Couldn't load recipes",
+  'home.tryAgain': 'Try again',
   'home.noMatchCreate': '+ New recipe for “{q}”',
 
   // ── Cards ──
@@ -174,7 +176,7 @@ I18N.register('en', {
   'chat.recipeFormatWarning': 'This recipe may have formatting issues',
   'chat.responseTruncated': 'The response was cut off before finishing. Please try again.',
   'chat.rateLimitBadge': '{used}/{limit} today',
-  'chat.aiUnavailablePlaceholder': 'AI is unavailable in this environment (staging previews have no AI access).',
+  'chat.aiUnavailablePlaceholder': 'AI is unavailable here',
   'chat.signInPlaceholder': 'Sign in to cook with the AI.',
   'chat.aiDisabled': 'AI is unavailable in this environment, so chat is disabled here.',
   'chat.needsAccess': 'RecipeBot needs AI access to generate recipes. Approve access when prompted, then try again.',

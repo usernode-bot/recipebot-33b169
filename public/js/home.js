@@ -27,6 +27,10 @@ const Home = {
   sortMode: 'newest',
   // When set, the homepage shows this collection's detail instead of the box.
   activeCollection: null,
+  // True while the recipe requests are in flight; loadError is set when they
+  // failed. Together they pick the box's skeleton / error state over its lists.
+  loading: false,
+  loadError: false,
   // Drafts are collapsed past this many rows until "Show all" is clicked.
   DRAFT_PREVIEW: 3,
   draftsExpanded: false,
@@ -72,6 +76,11 @@ const Home = {
   },
 
   async refresh() {
+    // The box's first paint is a skeleton, not the empty state — an empty box
+    // and a box whose recipes haven't arrived look the same otherwise.
+    this.loading = true;
+    this.loadError = false;
+    this.render();
     try {
       // Anonymous browse mode reads only the GET-only /api/public/ surface;
       // the personal box sections stay empty and hidden.
@@ -80,38 +89,39 @@ const Home = {
           fetch('/api/public/feed'),
           fetch('/api/public/collections'),
         ]);
+        if (!feedRes.ok || !pubCollRes.ok) this.loadError = true;
         this.shared = feedRes.ok ? await feedRes.json() : [];
         this.publicCollections = pubCollRes.ok ? await pubCollRes.json() : [];
         this.mine = [];
         this.favorites = [];
         this.conversations = [];
         this.collections = [];
-        if (this.activeCollection) {
-          await this.reloadActiveCollection();
-        }
-        this.render();
-        return;
+      } else {
+        const [sharedRes, mineRes, favRes, convRes, collRes, pubCollRes] = await Promise.all([
+          fetch('/api/shared-recipes'),
+          fetch('/api/recipes'),
+          fetch('/api/favorites'),
+          fetch('/api/conversations'),
+          fetch('/api/collections'),
+          fetch('/api/collections/public'),
+        ]);
+        if (!sharedRes.ok || !mineRes.ok || !favRes.ok ||
+            !convRes.ok || !collRes.ok || !pubCollRes.ok) this.loadError = true;
+        this.shared = sharedRes.ok ? await sharedRes.json() : [];
+        this.mine = mineRes.ok ? await mineRes.json() : [];
+        this.favorites = favRes.ok ? await favRes.json() : [];
+        this.conversations = convRes.ok ? await convRes.json() : [];
+        this.collections = collRes.ok ? await collRes.json() : [];
+        this.publicCollections = pubCollRes.ok ? await pubCollRes.json() : [];
       }
-
-      const [sharedRes, mineRes, favRes, convRes, collRes, pubCollRes] = await Promise.all([
-        fetch('/api/shared-recipes'),
-        fetch('/api/recipes'),
-        fetch('/api/favorites'),
-        fetch('/api/conversations'),
-        fetch('/api/collections'),
-        fetch('/api/collections/public'),
-      ]);
-      this.shared = sharedRes.ok ? await sharedRes.json() : [];
-      this.mine = mineRes.ok ? await mineRes.json() : [];
-      this.favorites = favRes.ok ? await favRes.json() : [];
-      this.conversations = convRes.ok ? await convRes.json() : [];
-      this.collections = collRes.ok ? await collRes.json() : [];
-      this.publicCollections = pubCollRes.ok ? await pubCollRes.json() : [];
-      if (this.activeCollection) {
-        await this.reloadActiveCollection();
-      }
-      this.render();
-    } catch { /* retry on next visit */ }
+      if (this.activeCollection) await this.reloadActiveCollection();
+    } catch {
+      // A network failure is a load failure, not an empty box. The button in
+      // the error state retries.
+      this.loadError = true;
+    }
+    this.loading = false;
+    this.render();
   },
 
   // Writes the "· N" count pill in a section header.
@@ -145,6 +155,23 @@ const Home = {
     }
     if (inDetail) {
       this.renderCollectionDetail(detailEl);
+      return;
+    }
+
+    // While the box is loading (or after a failed load) the bands are hidden
+    // behind the skeleton / error state, so neither an empty box nor a stale
+    // list is shown as if it were the answer.
+    const loadingEl = document.getElementById('home-loading');
+    const errorEl = document.getElementById('home-error');
+    loadingEl?.classList.toggle('hidden', !this.loading);
+    errorEl?.classList.toggle('hidden', !(this.loadError && !this.loading));
+    if (loadingEl) loadingEl.setAttribute('aria-busy', this.loading ? 'true' : 'false');
+    if (this.loading || this.loadError) {
+      for (const el of [bandMine, bandComm, emptyEl, noMatchEl, tagFilterWrap]) {
+        if (el) el.style.display = 'none';
+      }
+      const retryBtn = document.getElementById('home-retry-btn');
+      if (retryBtn) retryBtn.onclick = () => this.refresh();
       return;
     }
 

@@ -69,7 +69,7 @@ document.addEventListener('i18n:change', () => {
 });
 
 // Toggle between the homepage feed and the chat + recipe layout.
-App.showView = function (view) {
+App.showView = function (view, opts) {
   App.currentView = view;
   const isHome = view === 'home';
   const homepage = document.getElementById('homepage');
@@ -87,7 +87,7 @@ App.showView = function (view) {
       isHome || (chatPanel && chatPanel.classList.contains('chat-closed')) ? 'none' : '';
   }
   if (tabs) tabs.style.display = isHome ? 'none' : '';
-  if (isHome && typeof Home !== 'undefined') Home.refresh();
+  if (isHome && typeof Home !== 'undefined' && !opts?.skipRefresh) Home.refresh();
 };
 
 // Anonymous mode: one dialog for every ownership/AI affordance. The reason
@@ -305,6 +305,16 @@ document.addEventListener('visibilitychange', () => {
   if (document.readyState === 'loading') {
     await new Promise((resolve) =>
       document.addEventListener('DOMContentLoaded', resolve, { once: true }));
+  }
+
+  // Show the homepage with its loading skeleton before the auth probe and the
+  // route restore go out. Otherwise a slow (or held) API leaves the phone
+  // layout on the chat panel — the default panel pair — instead of the box
+  // that is still loading.
+  if (typeof Home !== 'undefined') {
+    Home.loading = true;
+    App.showView('home', { skipRefresh: true });
+    Home.render();
   }
 
   // Signed in automatically via the platform iframe token — no login page.

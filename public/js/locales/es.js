@@ -42,6 +42,8 @@ I18N.register('es', {
   'home.emptyTitle': 'Aún no hay recetas',
   'home.emptySubtitle': 'Inicia una conversación para crear una receta y luego compártela con la comunidad.',
   'home.noMatch': 'Ninguna receta coincide con tu búsqueda',
+  'home.loadError': 'No se pudieron cargar las recetas',
+  'home.tryAgain': 'Reintentar',
   'home.noMatchCreate': '+ Nueva receta para «{q}»',
 
   'card.yourRecipe': 'Tu receta',
@@ -156,7 +158,7 @@ I18N.register('es', {
   'chat.recipeFormatWarning': 'La receta puede tener problemas de formato',
   'chat.responseTruncated': 'La respuesta se cortó antes de terminar. Inténtalo de nuevo.',
   'chat.rateLimitBadge': '{used}/{limit} hoy',
-  'chat.aiUnavailablePlaceholder': 'La IA no está disponible en este entorno (las vistas previas de staging no tienen acceso a la IA).',
+  'chat.aiUnavailablePlaceholder': 'La IA no está disponible aquí',
   'chat.signInPlaceholder': 'Inicia sesión para cocinar con la IA.',
   'chat.aiDisabled': 'La IA no está disponible en este entorno, así que el chat está desactivado aquí.',
   'chat.needsAccess': 'RecipeBot necesita acceso a la IA para generar recetas. Aprueba el acceso cuando se te pida e inténtalo de nuevo.',

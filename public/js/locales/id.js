@@ -42,6 +42,8 @@ I18N.register('id', {
   'home.emptyTitle': 'Belum ada resep',
   'home.emptySubtitle': 'Mulai percakapan untuk membuat resep, lalu bagikan ke komunitas.',
   'home.noMatch': 'Tidak ada resep yang cocok dengan pencarianmu',
+  'home.loadError': 'Tidak bisa memuat resep',
+  'home.tryAgain': 'Coba lagi',
   'home.noMatchCreate': '+ Resep baru untuk “{q}”',
 
   'card.yourRecipe': 'Resepmu',
@@ -156,7 +158,7 @@ I18N.register('id', {
   'chat.recipeFormatWarning': 'Resep ini mungkin memiliki masalah format',
   'chat.responseTruncated': 'Respons terpotong sebelum selesai. Silakan coba lagi.',
   'chat.rateLimitBadge': '{used}/{limit} hari ini',
-  'chat.aiUnavailablePlaceholder': 'AI tidak tersedia di lingkungan ini (pratinjau staging tidak punya akses AI).',
+  'chat.aiUnavailablePlaceholder': 'AI tidak tersedia di sini',
   'chat.signInPlaceholder': 'Masuk untuk memasak dengan AI.',
   'chat.aiDisabled': 'AI tidak tersedia di lingkungan ini, jadi obrolan dinonaktifkan di sini.',
   'chat.needsAccess': 'RecipeBot butuh akses AI untuk membuat resep. Setujui akses saat diminta, lalu coba lagi.',
