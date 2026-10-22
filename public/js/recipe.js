@@ -160,6 +160,7 @@ const Recipe = {
             </div>
           </div>
           <button id="print-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.print')}</button>
+          <button id="shopping-list-btn" class="px-4 py-2 text-sm rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">${t('recipe.shoppingList')}</button>
         </div>
 
         ${this.renderIngredientSummary(recipe, ingredientScale)}
@@ -842,6 +843,7 @@ const Recipe = {
     display.querySelector('#import-json-input')?.addEventListener('change', (e) => { this.importJSON(e); closeExport(); });
 
     display.querySelector('#print-btn')?.addEventListener('click', () => window.print());
+    display.querySelector('#shopping-list-btn')?.addEventListener('click', () => this.openShoppingList(recipe));
 
     // Step timer buttons
     display.querySelectorAll('.step-timer-btn').forEach((btn) => {
@@ -1085,6 +1087,116 @@ const Recipe = {
         <span>${this.escapeHtml(ing.name)}</span><span class="tabular-nums">${g}g</span></div>`;
     });
     return html + '</div>';
+  },
+
+  // ── Shopping list ─────────────────────────────────────────────
+  //
+  // A one-off checklist of everything to buy for the recipe at its current
+  // servings/scale. An ingredient repeated across steps (same name and
+  // volume unit) is merged into one line; leftovers carried over from an
+  // earlier step (`from_step`) have nothing to buy and are skipped, matching
+  // computeMacros. Nothing is stored — ticks last while the dialog is open.
+
+  shoppingItems(recipe, scale) {
+    const items = [];
+    const byKey = new Map();
+    for (const step of recipe?.steps || []) {
+      for (const ing of step.ingredients || []) {
+        if (ing.from_step) continue;
+        const name = (ing.name || '').trim();
+        if (!name) continue;
+        // Unit is part of the key: different units stay separate lines so
+        // no amount is lost; the same ingredient + unit adds up.
+        const key = name.toLowerCase() + '|' + (ing.volume?.unit || '');
+        let item = byKey.get(key);
+        if (!item) {
+          item = {
+            name,
+            grams: 0,
+            volume: ing.volume ? { ...ing.volume, amount: 0 } : null,
+          };
+          byKey.set(key, item);
+          items.push(item);
+        }
+        item.grams += Number(ing.grams) || 0;
+        if (item.volume && ing.volume) item.volume.amount += Number(ing.volume.amount) || 0;
+      }
+    }
+    return items.map((item) => ({
+      name: item.name,
+      g: Math.round(item.grams * scale),
+      vol: this.formatVolume(item.volume, scale),
+    }));
+  },
+
+  shoppingListText(recipe) {
+    const servings = this.servingsFor(recipe);
+    const scale = this.scaleFor(recipe);
+    const items = this.shoppingItems(recipe, scale);
+    let text = `${t('shopping.subtitle', { title: recipe.title, n: servings })}\n\n`;
+    items.forEach((item) => {
+      text += item.vol
+        ? `- ${item.name} — ${item.g}g (${item.vol})\n`
+        : `- ${item.name} — ${item.g}g\n`;
+    });
+    return text.trimEnd();
+  },
+
+  openShoppingList(recipe) {
+    recipe = recipe || App.currentRecipe;
+    if (!recipe) return;
+    const modal = document.getElementById('shopping-list-modal');
+    const list = document.getElementById('shopping-list-items');
+    const sub = document.getElementById('shopping-list-sub');
+    const copyBtn = document.getElementById('shopping-list-copy');
+    const doneBtn = document.getElementById('shopping-list-done');
+    const closeBtn = document.getElementById('shopping-list-close');
+    if (!modal || !list || !sub || !copyBtn || !doneBtn || !closeBtn) return;
+
+    // Amounts are read when the dialog opens and do not follow a servings
+    // change made afterwards (the dialog covers the panel anyway).
+    const servings = this.servingsFor(recipe);
+    const scale = this.scaleFor(recipe);
+    const items = this.shoppingItems(recipe, scale);
+
+    // textContent (not innerHTML): the recipe title is user/model content.
+    sub.textContent = t('shopping.subtitle', { title: recipe.title, n: servings });
+    list.innerHTML = items.length
+      ? items.map((item) => `
+          <label class="shopping-row flex items-center justify-between gap-2 py-1.5 border-b border-zinc-200 dark:border-zinc-800">
+            <span class="flex items-center gap-2 min-w-0">
+              <input type="checkbox" class="ingredient-check">
+              <span class="ing-name text-sm">${this.escapeHtml(item.name)}</span>
+            </span>
+            <span class="ing-amt shrink-0 text-zinc-400 dark:text-zinc-500 tabular-nums text-xs">${item.g}g${item.vol ? ` · ${this.escapeHtml(item.vol)}` : ''}</span>
+          </label>`).join('')
+      : `<p class="text-sm text-zinc-500 dark:text-zinc-400 py-4">${t('shopping.empty')}</p>`;
+
+    copyBtn.disabled = !items.length;
+
+    const onCopy = () => {
+      if (!navigator.clipboard?.writeText) {
+        UI.toast(t('shopping.copyFailed'));
+        return;
+      }
+      navigator.clipboard.writeText(this.shoppingListText(recipe))
+        .then(() => UI.toast(t('common.copied')))
+        .catch(() => UI.toast(t('shopping.copyFailed')));
+    };
+    const onDone = () => this._shoppingDialog?.dismiss();
+
+    this._shoppingDialog = Dialogs.present(modal, {
+      name: 'shoppinglist',
+      onDismiss: () => {
+        copyBtn.removeEventListener('click', onCopy);
+        doneBtn.removeEventListener('click', onDone);
+        closeBtn.removeEventListener('click', onDone);
+        this._shoppingDialog = null;
+      },
+    });
+    copyBtn.addEventListener('click', onCopy);
+    doneBtn.addEventListener('click', onDone);
+    closeBtn.addEventListener('click', onDone);
   },
 
   // ── Export ────────────────────────────────────────────────────

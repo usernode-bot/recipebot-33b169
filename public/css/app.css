@@ -589,6 +589,16 @@ details[open] .summary-chevron {
   opacity: 0.5;
 }
 
+/* Checked state in the one-off shopping list (same look as the summary). */
+.shopping-row:has(.ingredient-check:checked) .ing-name {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+.shopping-row:has(.ingredient-check:checked) .ing-amt {
+  opacity: 0.5;
+}
+
 /* Ingredient checkboxes */
 .ingredient-check {
   appearance: none;
@@ -714,4 +724,59 @@ body::before {
   background:
     radial-gradient(ellipse at 25% 50%, rgba(201, 162, 39, 0.04) 0%, transparent 60%),
     radial-gradient(ellipse at 75% 20%, rgba(224, 122, 63, 0.03) 0%, transparent 60%);
+}
+
+/* ── Touch targets ────────────────────────────────────────────────
+   On the phone layout every control gets at least a 44×44px tappable box
+   (light and dark, review round 1). Icons and labels keep their size; only
+   the box around them grows, so the layout reads the same. */
+@media (max-width: 1023.98px) {
+  #home-btn { display: inline-flex; align-items: center; justify-content: center; }
+  .tab-btn,
+  #home-btn,
+  #chat-toggle,
+  #dark-mode-toggle,
+  #shortcuts-help-btn,
+  #user-menu-btn,
+  #sign-in-btn,
+  .servings-btn,
+  .scale-btn,
+  #temp-toggle,
+  #reset-progress,
+  #cook-btn,
+  #made-it-btn,
+  #fork-btn,
+  #share-btn,
+  #add-collection-btn,
+  #export-btn,
+  #print-btn,
+  #shopping-list-btn,
+  .step-timer-btn,
+  .ing-remove,
+  .ing-swap,
+  #shopping-list-close,
+  #shopping-list-done,
+  #shopping-list-copy {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* The checkbox itself stays 16px, but its row (a label — the thing a
+     finger actually hits) is a full 44px tall. */
+  .ingredient-label,
+  .shopping-row {
+    min-height: 44px;
+  }
+
+  /* The homepage's recipe cards, tag chips, rating stars and toolbar all use
+     compact text buttons; on a phone they get the same 44px box. */
+  #homepage button,
+  #homepage a[href],
+  #homepage select,
+  #homepage input {
+    min-height: 44px;
+  }
+  #homepage button {
+    min-width: 44px;
+  }
 }

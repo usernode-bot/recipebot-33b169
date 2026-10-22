@@ -69,7 +69,7 @@ document.addEventListener('i18n:change', () => {
 });
 
 // Toggle between the homepage feed and the chat + recipe layout.
-App.showView = function (view) {
+App.showView = function (view, opts) {
   App.currentView = view;
   const isHome = view === 'home';
   const homepage = document.getElementById('homepage');
@@ -87,7 +87,7 @@ App.showView = function (view) {
       isHome || (chatPanel && chatPanel.classList.contains('chat-closed')) ? 'none' : '';
   }
   if (tabs) tabs.style.display = isHome ? 'none' : '';
-  if (isHome && typeof Home !== 'undefined') Home.refresh();
+  if (isHome && typeof Home !== 'undefined' && !opts?.skipRefresh) Home.refresh();
 };
 
 // Anonymous mode: one dialog for every ownership/AI affordance. The reason
@@ -307,6 +307,16 @@ document.addEventListener('visibilitychange', () => {
       document.addEventListener('DOMContentLoaded', resolve, { once: true }));
   }
 
+  // Show the homepage with its loading skeleton before the auth probe and the
+  // route restore go out. Otherwise a slow (or held) API leaves the phone
+  // layout on the chat panel — the default panel pair — instead of the box
+  // that is still loading.
+  if (typeof Home !== 'undefined') {
+    Home.loading = true;
+    App.showView('home', { skipRefresh: true });
+    Home.render();
+  }
+
   // Signed in automatically via the platform iframe token — no login page.
   // With no token at all we skip the probe (guaranteed 401) and go straight
   // to anonymous browse mode.
@@ -477,6 +487,9 @@ function openUiState(name) {
     case 'export':
       if (typeof Recipe !== 'undefined' && hasRecipe) Recipe.openExportMenu();
       break;
+    case 'shoppinglist':
+      if (typeof Recipe !== 'undefined' && hasRecipe) Recipe.openShoppingList(App.currentRecipe);
+      break;
     default:
       console.warn('[route] unknown ui state', name);
   }
@@ -507,9 +520,14 @@ async function restoreRoute(route) {
   let ok = false;
   if (route.c) {
     // Conversations are owner-scoped: anonymous visitors can't restore one.
+    // The staging demo conversation is the exception — its recipe is served
+    // signed out so screenshot deep links land on the recipe.
     if (App.isAnonymous) {
-      console.warn('[route] conversation deep link needs an account — showing home');
-      HashParams.set('c', null);
+      ok = await Store.openDemoConversation(parseInt(route.c));
+      if (!ok) {
+        console.warn('[route] conversation deep link needs an account — showing home');
+        HashParams.set('c', null);
+      }
     } else {
       ok = await Store.selectConversation(parseInt(route.c), { restore: true });
       if (!ok) {

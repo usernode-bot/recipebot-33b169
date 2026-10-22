@@ -69,6 +69,34 @@ const Store = {
     return ok;
   },
 
+  // Staging demo deep link (/?c=<id>): a signed-out visitor can't restore an
+  // owner-scoped conversation, so the seeded demo recipe is read through the
+  // public no-login route instead. Read-only; nothing is written.
+  async openDemoConversation(id) {
+    if (!id || Number.isNaN(id)) return false;
+    try {
+      const res = await fetch(`/api/public/demo-recipe/${id}`);
+      if (!res.ok) return false;
+      const row = await res.json();
+      if (!row?.data) return false;
+      App.showView('chat');
+      App.currentConversationId = null;
+      App.pendingRecipe = null;
+      App.viewingShared = null;
+      App.viewingVersion = null;
+      App.currentRecipe = row.data;
+      Recipe.currentServings = row.data.default_servings;
+      Recipe.servingScale = 1.0;
+      Recipe.display(row.data);
+      App.setMobileTab?.('recipe');
+      HashParams.set('c', id);
+      App.setSignInPath?.(null);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
   // Look up one shared recipe by id for the `#s=<id>` / `?s=<id>` route.
   // Both feeds return the shape openShared consumes; the anonymous one just
   // omits the personalized fields (is_mine / my_rating / is_favorited).
