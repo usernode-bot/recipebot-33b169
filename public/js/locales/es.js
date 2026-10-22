@@ -152,6 +152,8 @@ I18N.register('es', {
   'chat.retrying': 'Reintentando…',
   'chat.stillWorking': 'Seguimos trabajando: las recetas largas de fuentes detalladas pueden tardar un par de minutos.',
   'chat.tryAgain': 'Intentar de nuevo',
+  'chat.approveAccess': 'Aprobar acceso a la IA',
+  'chat.approvingAccess': 'Esperando aprobación…',
   'chat.recipeFormatWarning': 'La receta puede tener problemas de formato',
   'chat.responseTruncated': 'La respuesta se cortó antes de terminar. Inténtalo de nuevo.',
   'chat.rateLimitBadge': '{used}/{limit} hoy',

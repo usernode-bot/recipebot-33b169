@@ -170,6 +170,8 @@ I18N.register('en', {
   'chat.retrying': 'Retrying…',
   'chat.stillWorking': 'Still working — long recipes from detailed sources can take a couple of minutes.',
   'chat.tryAgain': 'Try again',
+  'chat.approveAccess': 'Approve AI access',
+  'chat.approvingAccess': 'Waiting for approval…',
   'chat.recipeFormatWarning': 'This recipe may have formatting issues',
   'chat.responseTruncated': 'The response was cut off before finishing. Please try again.',
   'chat.rateLimitBadge': '{used}/{limit} today',

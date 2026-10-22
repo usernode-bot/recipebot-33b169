@@ -417,6 +417,41 @@ async function seedStagingDemo(pool) {
     log.info('db', 'Seeded staging timed-out-web-read demo conversation');
   }
 
+  // AI-permission demo (issue #126): a reply that failed because AI access had
+  // not been approved yet. Reopening it shows the "Approve AI access" button,
+  // which opens the platform's consent dialog and re-runs the same reply.
+  await pool.query(
+    `INSERT INTO conversations (id, user_id, title, preferences)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (id) DO NOTHING`,
+    [900015, DEMO_USER_ID, 'Staging demo — AI access needed', JSON.stringify({ complexity: 'normal', serving: 'normal' })]
+  );
+  const { rows: grantDemoRows } = await pool.query(
+    'SELECT 1 FROM messages WHERE conversation_id = $1 LIMIT 1',
+    [900015]
+  );
+  if (grantDemoRows.length === 0) {
+    const grantRequiredLog = [
+      {
+        type: 'error', kind: 'grant_required', ok: false,
+        text: 'RecipeBot needs your permission to use AI. Approve access when prompted, then send your message again.',
+      },
+    ];
+    await pool.query(
+      `INSERT INTO messages (conversation_id, role, content, recipe_data, response_log, created_at) VALUES
+       ($1, 'user', 'Staging demo: a quick weeknight pasta with spinach', NULL, $2, NOW() - interval '5 min')`,
+      [900015, JSON.stringify(grantRequiredLog)]
+    );
+    await pool.query(
+      `INSERT INTO pending_replies (id, conversation_id, user_id, status, events, created_at, updated_at)
+       VALUES (900308, 900015, $1, 'error', '[]'::jsonb,
+               NOW() - interval '5 min', NOW() - interval '4 min')
+       ON CONFLICT (id) DO NOTHING`,
+      [DEMO_USER_ID]
+    );
+    log.info('db', 'Seeded staging AI-access-needed demo conversation');
+  }
+
   // Failed-fix-up-with-details demo (issue #105): the reply failed during
   // "Fixing recipe format..." and carries a structured `detail` on its error
   // log entry — what the client now parks behind a closed "Details" toggle.
