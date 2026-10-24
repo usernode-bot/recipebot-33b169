@@ -360,14 +360,54 @@
         <div id="home-toolbar" class="sticky top-0 z-10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 bg-zinc-50/85 dark:bg-zinc-950/85 backdrop-blur flex flex-col sm:flex-row gap-2 sm:items-center">
           <input id="home-search" type="search" placeholder="Search recipes..." autocomplete="off" data-i18n-placeholder="home.searchPlaceholder"
             class="flex-1 min-w-0 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          <button id="new-conversation-btn" class="shrink-0 rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-sm font-medium text-white transition-colors" data-i18n="home.newRecipe">
-            + New recipe
-          </button>
+          <div class="flex gap-2 shrink-0">
+            <button id="pantry-btn" class="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 px-4 py-2 text-sm font-medium text-zinc-800 dark:text-zinc-100 transition-colors">
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8l1 11a2 2 0 002 2h8a2 2 0 002-2l1-11M9 8V6a3 3 0 016 0v2"/>
+              </svg>
+              <span data-i18n="pantry.title">Pantry</span>
+            </button>
+            <button id="new-conversation-btn" class="flex-1 sm:flex-none rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-sm font-medium text-white transition-colors" data-i18n="home.newRecipe">
+              + New recipe
+            </button>
+          </div>
         </div>
         <!-- Tag filter chips — diet tags first, then the community's most
              used ones. They filter every recipe list on the homepage, not
              just the community feed (built by home.js). -->
         <div id="home-tag-filters" class="flex flex-wrap gap-1.5"></div>
+
+        <!-- ── Pantry ─────────────────────────────────────────────────
+             List the ingredients you have, and the app ranks the recipes
+             you can already see (your own + community shares) by how many
+             of them the recipe uses. Replaces the homepage bands while
+             open; driven by public/js/pantry.js. -->
+        <section id="pantry-view" class="hidden space-y-6">
+          <div class="space-y-2">
+            <a id="pantry-back" href="__USERNODE_PLATFORM_ORIGIN__/#app/recipebot-33b169/full" class="inline-block text-sm text-blue-500 hover:text-blue-400 transition-colors" data-i18n="pantry.back">Back to recipes</a>
+            <h2 class="text-xl font-bold" data-i18n="pantry.title">Pantry</h2>
+            <p class="text-sm text-zinc-500 dark:text-zinc-400" data-i18n="pantry.lead">Add the ingredients you have and we'll find recipes you can cook.</p>
+          </div>
+
+          <form id="pantry-form" class="space-y-2">
+            <label for="pantry-input" class="block text-sm font-medium" data-i18n="pantry.inputLabel">Ingredients you have</label>
+            <div class="flex gap-2">
+              <input id="pantry-input" type="text" autocomplete="off" enterkeyhint="done" data-i18n-placeholder="pantry.placeholder" placeholder="e.g. eggs, rice, soy sauce"
+                class="flex-1 min-w-0 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <button type="submit" id="pantry-add-btn" class="shrink-0 rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 px-4 py-2 text-sm font-medium transition-colors" data-i18n="pantry.add">Add</button>
+            </div>
+            <p class="text-xs text-zinc-400 dark:text-zinc-500" data-i18n="pantry.hint">Separate ingredients with commas or press Enter.</p>
+          </form>
+
+          <div id="pantry-chips" class="flex flex-wrap gap-1.5"></div>
+
+          <button id="pantry-find" class="w-full sm:w-auto rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-medium text-white transition-colors" data-i18n="pantry.find">Find recipes</button>
+
+          <p id="pantry-empty" class="text-sm text-zinc-400 dark:text-zinc-600 hidden" data-i18n="pantry.empty">Add a few ingredients to see recipes you can cook.</p>
+          <p id="pantry-status" class="text-sm text-zinc-500 dark:text-zinc-400 hidden" role="status"></p>
+          <div id="pantry-results" class="space-y-4"></div>
+        </section>
+
         <!-- Collection detail (opened from a collection card; hides the box sections) -->
         <div id="collection-view" class="hidden"></div>
 
@@ -685,6 +725,7 @@
   <script src="/js/comments.js"></script>
   <script src="/js/recipe.js"></script>
   <script src="/js/home.js"></script>
+  <script src="/js/pantry.js"></script>
   <script src="/js/cooking-mode.js"></script>
   <script src="/js/shortcuts.js"></script>
 </body>

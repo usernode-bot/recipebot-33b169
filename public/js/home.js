@@ -136,6 +136,19 @@ const Home = {
     const tagFilterWrap = document.getElementById('home-tag-filters');
     if (!favSection || !mineSection || !commSection) return;
 
+    // The pantry page (public/js/pantry.js) also belongs to the homepage
+    // container and replaces everything else while it is open.
+    const pantryEl = document.getElementById('pantry-view');
+    const inPantry = typeof Pantry !== 'undefined' && !!Pantry.active;
+    pantryEl?.classList.toggle('hidden', !inPantry);
+    if (inPantry) {
+      for (const el of [bandMine, bandComm, emptyEl, noMatchEl, toolbar, tagFilterWrap, detailEl]) {
+        if (el) el.style.display = 'none';
+      }
+      Pantry.render();
+      return;
+    }
+
     // Collection detail replaces the box until closed. Blanking the two
     // bands covers every section inside them.
     const inDetail = !!this.activeCollection;
@@ -706,6 +719,9 @@ const Home = {
   // path clears the `coll` param when it didn't (deleted, private, 404).
   async openCollection(id) {
     if (!id || Number.isNaN(id)) return false;
+    // A collection replaces the homepage too; leave the pantry first so the
+    // two views cannot both claim the container.
+    if (typeof Pantry !== 'undefined' && Pantry.active) Pantry.close();
     try {
       const res = await fetch(this._collectionUrl(id));
       if (!res.ok) return false;
