@@ -86,6 +86,21 @@
       "expectSelector": "#home-no-match-create-btn"
     },
     {
+      "name": "Homepage links to the pantry",
+      "path": "/",
+      "expectSelector": "#pantry-btn"
+    },
+    {
+      "name": "Pantry page suggests matching recipes",
+      "path": "/?pantry=1&ingredients=chicken,broccoli",
+      "expectText": "Staging Demo Chicken Stir Fry"
+    },
+    {
+      "name": "Pantry suggestion shows numbered step instructions",
+      "path": "/?pantry=1&ingredients=chicken,broccoli",
+      "expectSelector": "#pantry-results ol li"
+    },
+    {
       "name": "Homepage renders",
       "path": "/",
       "expectSelector": "#homepage"

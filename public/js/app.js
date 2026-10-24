@@ -72,6 +72,13 @@ document.addEventListener('i18n:change', () => {
 App.showView = function (view) {
   App.currentView = view;
   const isHome = view === 'home';
+  // Leaving the homepage for a recipe closes the pantry, so its route does
+  // not survive onto a conversation view.
+  if (!isHome && typeof Pantry !== 'undefined' && Pantry.active) {
+    Pantry.active = false;
+    HashParams.set('pantry', null);
+    HashParams.set('pantryIn', null);
+  }
   const homepage = document.getElementById('homepage');
   const recipePanel = document.getElementById('recipe-panel');
   const chatPanel = document.getElementById('chat-panel');
@@ -200,8 +207,9 @@ window.Router = {
   // deliberate re-open of the app minutes later starts on home.
   MAX_AGE_MS: 30_000,
   // `coll` addresses an open collection so a refresh (or signing in from a
-  // public collection) comes back to it instead of the box.
-  ROUTE_KEYS: ['c', 's', 'coll', 'cook', 'ing', 'mac', 'ch'],
+  // public collection) comes back to it instead of the box. `pantry` opens
+  // the pantry page and `pantryIn` restores the ingredients it was showing.
+  ROUTE_KEYS: ['c', 's', 'coll', 'pantry', 'pantryIn', 'cook', 'ing', 'mac', 'ch'],
 
   // Hash params win over query params when both carry the same key.
   read() {
@@ -406,6 +414,12 @@ document.addEventListener('visibilitychange', () => {
   // every environment.
   App.deepLinkScale = parseFloat(hp.scale || query.get('scale')) || null;
   App.deepLinkServings = parseInt(hp.servings || query.get('servings'), 10) || null;
+  // ?ingredients=a,b — pre-fills the pantry and runs the search on boot.
+  // Read before normalize() so it survives a deep link's query form.
+  App.deepLinkPantry = (hp.ingredients || query.get('ingredients') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   let route = Router.read();
   // No route in the URL? A refresh inside the platform shell arrives with a
@@ -485,6 +499,18 @@ function openUiState(name) {
 // Boot dispatch for a resolved route. `c` (own conversation) wins over `s`
 // (read-only shared recipe) when both are somehow present.
 async function restoreRoute(route) {
+  // The pantry lives on the homepage, so it needs no panel setup. Its own
+  // ingredient list (pantryIn) wins over the ?ingredients= deep link once
+  // the route has been normalized.
+  if (route.pantry === '1') {
+    App.showView('home');
+    if (typeof Pantry !== 'undefined') {
+      const list = route.pantryIn ? route.pantryIn.split(',') : App.deepLinkPantry;
+      Pantry.open({ ingredients: list });
+    }
+    return;
+  }
+
   if (typeof Store === 'undefined') return App.showView('home');
 
   // A collection lives on the homepage (it replaces the box), so it's
@@ -573,8 +599,11 @@ function setupHomeButton() {
     HashParams.set('s', null);
     HashParams.set('coll', null);
     HashParams.set('cook', null);
+    HashParams.set('pantry', null);
+    HashParams.set('pantryIn', null);
     App.setSignInPath?.(null);
     if (typeof Home !== 'undefined') Home.activeCollection = null;
+    if (typeof Pantry !== 'undefined') Pantry.active = false;
     App.showView('home');
   });
 }

@@ -11,6 +11,8 @@ const { recipeRoutes } = require('./src/routes/recipes');
 const { chatRoutes } = require('./src/routes/chat');
 const { collectionRoutes } = require('./src/routes/collections');
 const { publicRoutes } = require('./src/routes/public');
+const { pantryRoutes } = require('./src/routes/pantry');
+const { getPool } = require('./src/db/pool');
 const log = require('./src/services/logger');
 
 const config = loadConfig();
@@ -30,8 +32,12 @@ const app = express();
 
 app.use(express.json());
 
+// Set once a stop signal arrives, so readiness polls see the container
+// leaving rotation instead of a reset connection.
+let shuttingDown = false;
+
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok' });
+  res.status(shuttingDown ? 503 : 200).json({ status: shuttingDown ? 'shutting_down' : 'ok' });
 });
 
 app.use(authMiddleware(config));
@@ -44,6 +50,7 @@ app.use(conversationRoutes(config));
 app.use(recipeRoutes(config));
 app.use(chatRoutes(config));
 app.use(collectionRoutes(config));
+app.use(pantryRoutes(config));
 
 // The static handler must never serve a file that renderTemplate owns, or it
 // hands out the unrendered template — placeholder text where the platform
@@ -87,12 +94,37 @@ app.get('*', (req, res) => {
   }
 });
 
+// Drain window for in-flight requests on stop. A literal, not an env var:
+// the platform's stop grace is the ceiling, not an allowance to spend.
+const DRAIN_MS = 3000;
+
 async function start() {
   await migrate(config);
 
-  app.listen(config.port, () => {
+  const server = app.listen(config.port, () => {
     log.info('server', `Listening on :${config.port}`);
   });
+
+  const pool = getPool(config);
+
+  async function shutdown(signal) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    log.info('server', `${signal} received, draining`);
+    server.close(() => {});
+    server.closeIdleConnections?.();
+    const timer = setTimeout(() => server.closeAllConnections?.(), DRAIN_MS);
+    timer.unref?.();
+    try {
+      await pool.end();
+    } catch (err) {
+      log.error('server', 'pool.end failed', { message: err.message });
+    }
+    process.exit(0);
+  }
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 start().catch((err) => {

@@ -57,6 +57,11 @@ Key architecture notes:
 - The recipe JSON contract is documented in the `display_recipe` tool
   schema in `src/services/llm.js` — step descriptions must NOT contain
   ingredient amounts (they'd go stale when servings scale).
+- **Pantry page** (`#pantry=1`): the homepage's chips are matched against
+  ``steps[].ingredients[].name`` across the requester's own recipes and
+  community shares (`GET /api/pantry/suggest`, `src/routes/pantry.js`).
+  Matching is string/token based, not AI, so it works in staging; each
+  suggestion renders the recipe's numbered steps.
 
 ## App-specific conventions
 
